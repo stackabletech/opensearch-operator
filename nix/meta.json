@@ -1,1 +1,1 @@
-{"operator": {"name": "zookeeper-operator", "pretty_string": "Apache ZooKeeper", "product_string": "zookeeper", "url": "stackabletech/zookeeper-operator.git"}}
+{"operator": {"name": "opensearch-operator", "pretty_string": "OpenSearch", "product_string": "opensearch", "url": "stackabletech/opensearch-operator.git"}}

@@ -74,7 +74,7 @@ rec {
       Cmd = [ "run" ];
     };
   };
-  docker = pkgs.linkFarm "opensearch-operator-docker" [
+  docker = pkgs.linkFarm "listener-operator-docker" [
     {
       name = "load-image";
       path = dockerImage;

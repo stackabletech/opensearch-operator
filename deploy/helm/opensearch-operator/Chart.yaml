@@ -1,0 +1,10 @@
+---
+apiVersion: v2
+name: opensearch-operator
+version: ""
+appVersion: ""
+description: The Stackable Operator for OpenSearch
+home: https://github.com/stackabletech/opensearch-operator
+maintainers:
+  - name: Stackable
+    url: https://www.stackable.tech
