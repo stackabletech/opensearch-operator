@@ -1,0 +1,38 @@
+{
+    "beku.py": {
+        "branch": "0.0.10",
+        "description": "Test suite expander for Stackable Kuttl tests.",
+        "homepage": null,
+        "owner": "stackabletech",
+        "repo": "beku.py",
+        "rev": "fc75202a38529a4ac6776dd8a5dfee278d927f58",
+        "sha256": "152yary0p11h87yabv74jnwkghsal7lx16az0qlzrzdrs6n5v8id",
+        "type": "tarball",
+        "url": "https://github.com/stackabletech/beku.py/archive/fc75202a38529a4ac6776dd8a5dfee278d927f58.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "crate2nix": {
+        "branch": "master",
+        "description": "nix build file generator for rust crates",
+        "homepage": "",
+        "owner": "kolloch",
+        "repo": "crate2nix",
+        "rev": "be31feae9a82c225c0fd1bdf978565dc452a483a",
+        "sha256": "14d0ymlrwk7dynv35qcw4xn0dylfpwjmf6f8znflbk2l6fk23l12",
+        "type": "tarball",
+        "url": "https://github.com/kolloch/crate2nix/archive/be31feae9a82c225c0fd1bdf978565dc452a483a.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b0b4b5f8f621bfe213b8b21694bab52ecfcbf30b",
+        "sha256": "1y8kwbb5b0r1m88nk871ai56qi2drygvibjgc2swp48jfyp5ya99",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/b0b4b5f8f621bfe213b8b21694bab52ecfcbf30b.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}
