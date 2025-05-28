@@ -6,7 +6,6 @@
 <h1 align="center">Stackable Operator for OpenSearch</h1>
 
 <!-- markdownlint-disable MD041 -->
-
 ![Build Actions Status](https://ci.stackable.tech/buildStatus/icon?job=opensearch%2doperator%2dit%2dnightly&subject=Integration%20Tests)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/stackabletech/opensearch-operator/graphs/commit-activity)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-green.svg)](https://docs.stackable.tech/home/stable/contributor/index.html)
