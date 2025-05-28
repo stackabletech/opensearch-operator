@@ -40,6 +40,4 @@ pub mod versioned {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}
