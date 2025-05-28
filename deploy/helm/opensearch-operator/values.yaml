@@ -1,0 +1,67 @@
+# Default values for opensearch-operator.
+---
+image:
+  repository: oci.stackable.tech/sdp/opensearch-operator
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+# Provide additional labels which get attached to all deployed resources
+labels:
+  stackable.tech/vendor: Stackable
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# When running on a non-default Kubernetes cluster domain, the cluster domain can be configured here.
+# See the https://docs.stackable.tech/home/stable/guides/kubernetes-cluster-domain guide for details.
+# kubernetesClusterDomain: my-cluster.local
+
+# See all available options and detailed explanations about the concept here:
+# https://docs.stackable.tech/home/stable/concepts/telemetry/
+telemetry:
+  consoleLog:
+    enabled: true
+  fileLog:
+    enabled: false
+    rotationPeriod: hourly
+    maxFiles: 6
+  otelLogExporter:
+    enabled: false
+  otelTraceExporter:
+    enabled: false

@@ -1,8 +1,8 @@
 ---
 apiVersion: v2
 name: opensearch-operator
-version: ""
-appVersion: ""
+version: "0.0.0-dev"
+appVersion: "0.0.0-dev"
 description: The Stackable Operator for OpenSearch
 home: https://github.com/stackabletech/opensearch-operator
 maintainers:
