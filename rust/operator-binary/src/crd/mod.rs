@@ -16,7 +16,7 @@ pub mod versioned {
         group = "opensearch.stackable.tech",
         kind = "OpenSearchCluster",
         plural = "opensearchclusters",
-        shortname = "zk",
+        shortname = "opensearch",
         status = "v1alpha1::OpenSearchClusterStatus",
         namespaced,
         crates(
@@ -26,9 +26,7 @@ pub mod versioned {
         )
     ))]
     #[serde(rename_all = "camelCase")]
-    pub struct OpenSearchClusterSpec {
-        we_cool: bool,
-    }
+    pub struct OpenSearchClusterSpec {}
 
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]

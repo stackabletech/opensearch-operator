@@ -12,7 +12,7 @@ spec:
     kind: OpenSearchCluster
     plural: opensearchclusters
     shortNames:
-      - zk
+      - opensearch
     singular: opensearchcluster
   scope: Namespaced
   versions:
@@ -24,11 +24,6 @@ spec:
           properties:
             spec:
               description: A OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
-              properties:
-                weCool:
-                  type: boolean
-              required:
-                - weCool
               type: object
             status:
               nullable: true
