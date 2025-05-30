@@ -755,6 +755,12 @@ dependencies = [
 
 [[package]]
 name = "futures"
+version = "0.1.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a471a38ef8ed83cd6e40aa59c1ffe17db6855c18e3604d9c4ed8c08ebc28678"
+
+[[package]]
+name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65bc07b1a8bc7c85c5f2e110c476c7389b4554ba72af57d8445ea63a576b0876"
@@ -830,6 +836,7 @@ version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
+ "futures 0.1.31",
  "futures-channel",
  "futures-core",
  "futures-io",
@@ -1447,7 +1454,7 @@ dependencies = [
  "bytes",
  "chrono",
  "either",
- "futures",
+ "futures 0.3.31",
  "home",
  "http",
  "http-body",
@@ -1518,7 +1525,7 @@ dependencies = [
  "async-stream",
  "backon",
  "educe",
- "futures",
+ "futures 0.3.31",
  "hashbrown 0.15.3",
  "hostname",
  "json-patch",
@@ -2567,6 +2574,8 @@ version = "0.0.0-dev"
 dependencies = [
  "built",
  "clap",
+ "const_format",
+ "futures 0.3.31",
  "serde",
  "serde_json",
  "snafu 0.8.6",
@@ -2588,7 +2597,7 @@ dependencies = [
  "dockerfile-parser",
  "educe",
  "either",
- "futures",
+ "futures 0.3.31",
  "indexmap 2.9.0",
  "json-patch",
  "k8s-openapi",

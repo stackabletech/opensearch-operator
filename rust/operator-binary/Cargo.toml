@@ -13,6 +13,8 @@ build = "build.rs"
 stackable-operator.workspace = true
 
 clap.workspace = true
+const_format.workspace = true
+futures.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
