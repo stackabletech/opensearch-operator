@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
@@ -7,11 +7,12 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{PodBuilder, container::ContainerBuilder},
     },
+    client::Client,
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
     k8s_openapi::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
-            core::v1::{Container, PodTemplateSpec},
+            core::v1::{Container, ObjectReference, PodTemplateSpec},
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -101,43 +102,108 @@ pub async fn reconcile(
 
     let client = &ctx.client;
 
+    // resolve
+
+    // validate
+
+    // build
+    let prepared_resources = build(opensearch);
+
+    // apply
+    let cluster_ref = opensearch.object_ref(&());
+    let apply_strategy = ClusterResourceApplyStrategy::from(&opensearch.spec.cluster_operation);
+    let applied_resources = apply(client, apply_strategy, &cluster_ref, prepared_resources).await?;
+
+    // update status
+    update_status(client, opensearch, applied_resources).await?;
+
+    Ok(Action::await_change())
+}
+
+struct Prepared;
+struct Applied;
+
+struct Resources<T> {
+    stateful_sets: Vec<StatefulSet>,
+    status: PhantomData<T>,
+}
+
+impl<T> Resources<T> {
+    fn new() -> Self {
+        Resources {
+            stateful_sets: vec![],
+            status: PhantomData,
+        }
+    }
+}
+
+fn build(opensearch: &v1alpha1::OpenSearchCluster) -> Resources<Prepared> {
+    let mut resources = Resources::new();
+
+    resources.stateful_sets.push(build_statefulset(opensearch));
+
+    resources
+}
+
+async fn apply(
+    client: &Client,
+    apply_strategy: ClusterResourceApplyStrategy,
+    cluster_ref: &ObjectReference,
+    resources: Resources<Prepared>,
+) -> Result<Resources<Applied>> {
     let mut cluster_resources = ClusterResources::new(
         APP_NAME,
         OPERATOR_NAME,
         CONTROLLER_NAME,
-        &opensearch.object_ref(&()),
-        ClusterResourceApplyStrategy::from(&opensearch.spec.cluster_operation),
+        cluster_ref,
+        apply_strategy,
     )
     .context(CreateClusterResourcesSnafu)?;
 
-    let mut ss_cond_builder = StatefulSetConditionBuilder::default();
-
-    let statefulset = build_statefulset(opensearch);
-
-    ss_cond_builder.add(cluster_resources.add(client, statefulset).await.unwrap());
-
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&opensearch.spec.cluster_operation);
-
-    let status = OpenSearchClusterStatus {
-        conditions: compute_conditions(
-            opensearch,
-            &[&ss_cond_builder, &cluster_operation_cond_builder],
-        ),
-        discovery_hash: None,
-    };
+    let mut applied_resources = Resources::new();
+    for stateful_set in resources.stateful_sets {
+        let applied_stateful_set = cluster_resources.add(client, stateful_set).await.unwrap();
+        applied_resources.stateful_sets.push(applied_stateful_set);
+    }
 
     cluster_resources
         .delete_orphaned_resources(client)
         .await
         .context(DeleteOrphanedResourcesSnafu)?;
 
+    Ok(applied_resources)
+}
+
+async fn update_status(
+    client: &Client,
+    cluster: &v1alpha1::OpenSearchCluster,
+    applied_resources: Resources<Applied>,
+) -> Result<()> {
+    let mut stateful_set_condition_builder = StatefulSetConditionBuilder::default();
+    for stateful_set in applied_resources.stateful_sets {
+        stateful_set_condition_builder.add(stateful_set);
+    }
+
+    let cluster_operation_cond_builder =
+        ClusterOperationsConditionBuilder::new(&cluster.spec.cluster_operation);
+
+    let status = OpenSearchClusterStatus {
+        conditions: compute_conditions(
+            cluster,
+            &[
+                &stateful_set_condition_builder,
+                &cluster_operation_cond_builder,
+            ],
+        ),
+        discovery_hash: None,
+    };
+
     client
-        .apply_patch_status(OPERATOR_NAME, opensearch, &status)
+        .apply_patch_status(OPERATOR_NAME, cluster, &status)
         .await
         .context(ApplyStatusSnafu)?;
 
-    Ok(Action::await_change())
+    Ok(())
 }
 
 fn build_statefulset(opensearch: &v1alpha1::OpenSearchCluster) -> StatefulSet {
