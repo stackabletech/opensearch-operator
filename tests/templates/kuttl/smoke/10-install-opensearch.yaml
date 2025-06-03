@@ -1,0 +1,6 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec: {}

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use clap::Parser as _;
-use const_format::concatcp;
+use controller::FULL_CONTROLLER_NAME;
 use crd::{OpenSearchCluster, v1alpha1};
 use futures::StreamExt;
 use snafu::{ResultExt as _, Snafu};
@@ -65,8 +65,6 @@ struct Opts {
 }
 
 const OPERATOR_NAME: &str = "opensearch.stackable.tech";
-const CONTROLLER_NAME: &str = "opensearchcluster";
-pub const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, '.', OPERATOR_NAME);
 
 #[tokio::main]
 #[snafu::report]
