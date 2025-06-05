@@ -25,6 +25,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 mod controller;
 mod crd;
+mod framework;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -98,7 +99,7 @@ async fn main() -> Result<()> {
             );
 
             let client = stackable_operator::client::initialize_operator(
-                Some(OPERATOR_NAME.to_string()),
+                Some(OPERATOR_NAME.to_owned()),
                 &cluster_info_opts,
             )
             .await
@@ -107,7 +108,7 @@ async fn main() -> Result<()> {
             let event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
                 Reporter {
-                    controller: FULL_CONTROLLER_NAME.to_string(),
+                    controller: FULL_CONTROLLER_NAME.to_owned(),
                     instance: None,
                 },
             ));

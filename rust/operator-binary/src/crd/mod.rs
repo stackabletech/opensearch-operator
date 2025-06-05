@@ -1,16 +1,18 @@
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
-    commons::cluster_operation::ClusterOperation,
-    kube::CustomResource,
+    commons::{cluster_operation::ClusterOperation, product_image_selection::ProductImage},
+    config::{fragment::Fragment, merge::Merge},
+    kube::{CustomResource, ResourceExt},
+    role_utils::Role,
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     versioned::versioned,
 };
 
+use crate::framework::ToLabelValue;
+
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
-    use stackable_operator::commons::cluster_operation::ClusterOperation;
-
     /// A OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch.
     /// Find more information on how to use it and the resources that the operator generates in the
     /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
@@ -30,9 +32,15 @@ pub mod versioned {
     ))]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterSpec {
+        // no doc string - See ProductImage struct
+        pub image: ProductImage,
+
         // no doc string - See ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
+
+        // Only one role here!
+        pub nodes: Role<OpenSearchConfigFragment>,
     }
 
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -55,5 +63,26 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
     }
 }
 
-#[cfg(test)]
-mod tests {}
+impl ToLabelValue for v1alpha1::OpenSearchCluster {
+    fn to_label_value(&self) -> String {
+        // opinionated!
+        self.name_unchecked()
+    }
+}
+
+// TODO Perhaps rename to InstanceConfig
+#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[fragment_attrs(
+    derive(
+        Clone,
+        Debug,
+        Default,
+        Deserialize,
+        Merge,
+        JsonSchema,
+        PartialEq,
+        Serialize
+    ),
+    serde(rename_all = "camelCase")
+)]
+pub struct OpenSearchConfig {}

@@ -3,4 +3,11 @@ apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
 metadata:
   name: opensearch
-spec: {}
+spec:
+  image:
+    custom: opensearchproject/opensearch:3.0.0
+    productVersion: 3.0.0
+  nodes:
+    roleGroups:
+      default:
+        replicas: 1
