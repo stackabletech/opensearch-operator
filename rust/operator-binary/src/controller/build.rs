@@ -15,12 +15,16 @@ use stackable_operator::{
     kvp::Labels,
 };
 
-use super::{APP_NAME, CONTROLLER_NAME, Prepared, Resources, RoleGroupName, ValidatedCluster};
+use super::{
+    APP_NAME, CONTROLLER_NAME, Prepared, Resources, RoleGroupConfig, RoleGroupName,
+    ValidatedCluster,
+};
 use crate::{
     OPERATOR_NAME,
     framework::{
-        AppName, ControllerName, OperatorName, RoleName,
+        AppName, ControllerName, OperatorName, RoleName, ToObjectName,
         kvp::label::{recommended_labels, role_group_selector},
+        qualified_role_group_name,
     },
 };
 
@@ -45,17 +49,24 @@ impl Builder {
 
     pub fn build(&self) -> Resources<Prepared> {
         let mut resources = Resources::new();
-        for role_group_name in self.cluster.role_group_configs.keys() {
+        for (role_group_name, role_group_config) in self.cluster.role_group_configs.iter() {
             resources
                 .stateful_sets
-                .push(self.build_statefulset(role_group_name));
+                .push(self.build_statefulset(role_group_name, role_group_config));
         }
         resources
     }
 
-    fn build_statefulset(&self, role_group_name: &RoleGroupName) -> StatefulSet {
+    fn build_statefulset(
+        &self,
+        role_group_name: &RoleGroupName,
+        role_group_config: &RoleGroupConfig,
+    ) -> StatefulSet {
         let metadata = ObjectMetaBuilder::new()
-            .name(&self.cluster.name)
+            .name(
+                qualified_role_group_name(&self.cluster.name, &self.role_name, role_group_name)
+                    .to_object_name(),
+            )
             .namespace(&self.cluster.namespace)
             .with_labels(self.build_recommended_labels(role_group_name))
             .build();
@@ -72,7 +83,7 @@ impl Builder {
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: Some(1),
+            replicas: role_group_config.replicas.map(i32::from),
             selector: LabelSelector {
                 match_labels: Some(statefulset_match_labels.into()),
                 ..LabelSelector::default()

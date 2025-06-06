@@ -31,7 +31,7 @@ use crate::{
         OpenSearchConfigFragment,
         v1alpha1::{self, OpenSearchClusterStatus},
     },
-    framework::{AppVersion, RoleGroupName, ToLabelValue},
+    framework::{AppVersion, ClusterName, RoleGroupName, ToLabelValue},
 };
 
 mod build;
@@ -82,20 +82,14 @@ impl ReconcilerError for Error {
 
 type RoleGroupConfig = RoleGroup<OpenSearchConfigFragment, GenericProductSpecificCommonConfig>;
 
-struct RoleConfig {
-    role_config: GenericRoleConfig,
-    role_group_configs: BTreeMap<RoleGroupName, RoleGroupConfig>,
-}
-
 // validated and converted to validated and safe types
 // no user errors
 // not restricted by CRD compliance
 pub struct ValidatedCluster {
     origin: v1alpha1::OpenSearchCluster,
-    // cluster: v1alpha1::OpenSearchCluster,
     pub image: ProductImage,
     pub product_version: AppVersion,
-    pub name: String,
+    pub name: ClusterName,
     pub namespace: String,
     pub role_config: GenericRoleConfig,
     // "validated" means that labels are valid and no ugly rolegroup name broke them
@@ -109,7 +103,7 @@ impl ToLabelValue for ValidatedCluster {
     }
 }
 
-// TODO Remove boilerplate
+// TODO Remove boilerplate (like derive_more)
 impl Resource for ValidatedCluster {
     type DynamicType =
         <v1alpha1::OpenSearchCluster as stackable_operator::kube::Resource>::DynamicType;
@@ -185,6 +179,7 @@ pub async fn reconcile(
     Ok(Action::await_change())
 }
 
+// Marker
 struct Prepared;
 struct Applied;
 
