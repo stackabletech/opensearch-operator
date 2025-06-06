@@ -22,9 +22,9 @@ use super::{
 use crate::{
     OPERATOR_NAME,
     framework::{
-        AppName, ControllerName, OperatorName, RoleName, ToObjectName,
+        AppName, ControllerName, OperatorName, RoleName,
         kvp::label::{recommended_labels, role_group_selector},
-        qualified_role_group_name,
+        to_qualified_role_group_name,
     },
 };
 
@@ -39,6 +39,7 @@ pub struct Builder {
 impl Builder {
     pub fn new(cluster: ValidatedCluster) -> Builder {
         Builder {
+            // into controller context!
             app_name: AppName::from_str(APP_NAME).unwrap(),
             role_name: RoleName::from_str("nodes").unwrap(),
             operator_name: OperatorName::from_str(OPERATOR_NAME).unwrap(),
@@ -63,10 +64,11 @@ impl Builder {
         role_group_config: &RoleGroupConfig,
     ) -> StatefulSet {
         let metadata = ObjectMetaBuilder::new()
-            .name(
-                qualified_role_group_name(&self.cluster.name, &self.role_name, role_group_name)
-                    .to_object_name(),
-            )
+            .name(to_qualified_role_group_name(
+                &self.cluster.name,
+                &self.role_name,
+                role_group_name,
+            ))
             .namespace(&self.cluster.namespace)
             .with_labels(self.build_recommended_labels(role_group_name))
             .build();

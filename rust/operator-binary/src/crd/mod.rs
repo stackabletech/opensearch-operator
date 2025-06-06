@@ -2,14 +2,12 @@ use serde::{Deserialize, Serialize};
 use stackable_operator::{
     commons::{cluster_operation::ClusterOperation, product_image_selection::ProductImage},
     config::{fragment::Fragment, merge::Merge},
-    kube::{CustomResource, ResourceExt},
+    kube::CustomResource,
     role_utils::Role,
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     versioned::versioned,
 };
-
-use crate::framework::ToLabelValue;
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
@@ -60,13 +58,6 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
             Some(status) => status.conditions.clone(),
             None => vec![],
         }
-    }
-}
-
-impl ToLabelValue for v1alpha1::OpenSearchCluster {
-    fn to_label_value(&self) -> String {
-        // opinionated!
-        self.name_unchecked()
     }
 }
 

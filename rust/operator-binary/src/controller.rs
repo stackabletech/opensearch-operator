@@ -1,40 +1,37 @@
-use std::{collections::BTreeMap, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
+use apply::apply;
 use build::Builder;
 use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
-    client::Client,
-    cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    cluster_resources::ClusterResourceApplyStrategy,
     commons::product_image_selection::ProductImage,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::ObjectReference},
-    kube::{
-        Resource,
-        core::{DeserializeGuard, error_boundary},
-        runtime::controller::Action,
-    },
-    kvp::LabelValueError,
+    k8s_openapi::api::apps::v1::StatefulSet,
+    kube::{Resource, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
     role_utils::{GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroup},
-    status::condition::{
-        compute_conditions, operations::ClusterOperationsConditionBuilder,
-        statefulset::StatefulSetConditionBuilder,
-    },
     time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+use update_status::update_status;
 use validate::validate;
 
 use crate::{
     OPERATOR_NAME,
     crd::{
         OpenSearchConfigFragment,
-        v1alpha1::{self, OpenSearchClusterStatus},
+        v1alpha1::{self},
     },
-    framework::{AppVersion, ClusterName, RoleGroupName, ToLabelValue},
+    framework::{
+        AppName, AppVersion, ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid,
+        IsLabelValue, OperatorName, RoleGroupName, RoleName,
+    },
 };
 
+mod apply;
 mod build;
+mod update_status;
 mod validate;
 
 const CONTROLLER_NAME: &str = "opensearchcluster";
@@ -50,26 +47,15 @@ pub struct Ctx {
 pub enum Error {
     #[snafu(display("OpenSearchCluster object is invalid"))]
     InvalidOpenSearchCluster {
-        source: error_boundary::InvalidObject,
+        // boxed because otherwise Clippy warns about a large enum variant
+        source: Box<stackable_operator::kube::core::error_boundary::InvalidObject>,
     },
 
-    #[snafu(display("failed to create cluster resources"))]
-    CreateClusterResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
-
-    #[snafu(display("failed to delete orphaned resources"))]
-    DeleteOrphanedResources {
-        source: stackable_operator::cluster_resources::Error,
-    },
+    #[snafu(display("failed to apply resources"))]
+    ApplyResources { source: apply::Error },
 
     #[snafu(display("failed to update status"))]
-    ApplyStatus {
-        source: stackable_operator::client::Error,
-    },
-
-    #[snafu(display("failed to use as label"))]
-    InvalidLabelName { source: LabelValueError },
+    UpdateStatus { source: update_status::Error },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -85,6 +71,7 @@ type RoleGroupConfig = RoleGroup<OpenSearchConfigFragment, GenericProductSpecifi
 // validated and converted to validated and safe types
 // no user errors
 // not restricted by CRD compliance
+#[derive(Clone)]
 pub struct ValidatedCluster {
     origin: v1alpha1::OpenSearchCluster,
     pub image: ProductImage,
@@ -96,10 +83,30 @@ pub struct ValidatedCluster {
     pub role_group_configs: BTreeMap<RoleGroupName, RoleGroupConfig>,
 }
 
-impl ToLabelValue for ValidatedCluster {
+impl HasObjectName for ValidatedCluster {
+    fn to_object_name(&self) -> String {
+        self.name.to_object_name()
+    }
+}
+
+impl HasNamespace for ValidatedCluster {
+    fn to_namespace(&self) -> String {
+        self.namespace.clone()
+    }
+}
+
+impl HasUid for ValidatedCluster {
+    fn to_uid(&self) -> String {
+        // TODO fix
+        self.origin.metadata.uid.clone().unwrap()
+    }
+}
+
+// ?
+impl IsLabelValue for ValidatedCluster {
     fn to_label_value(&self) -> String {
         // opinionated!
-        self.origin.to_label_value()
+        self.name.to_label_value()
     }
 }
 
@@ -155,7 +162,8 @@ pub async fn reconcile(
     let cluster = object
         .0
         .as_ref()
-        .map_err(error_boundary::InvalidObject::clone)
+        .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
+        .map_err(Box::new)
         .context(InvalidOpenSearchClusterSnafu)?;
 
     let client = &ctx.client;
@@ -166,15 +174,31 @@ pub async fn reconcile(
     let validated_cluster = validate(cluster).unwrap();
 
     // build (no client required; infallible)
-    let prepared_resources = Builder::new(validated_cluster).build();
+    let prepared_resources = Builder::new(validated_cluster.clone()).build();
 
     // apply (client required)
-    let cluster_ref = cluster.object_ref(&());
+    //
+    // into controller context!
+    let app_name = AppName::from_str(APP_NAME).unwrap();
+    let operator_name = OperatorName::from_str(OPERATOR_NAME).unwrap();
+    let controller_name = ControllerName::from_str(CONTROLLER_NAME).unwrap();
     let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
-    let applied_resources = apply(client, apply_strategy, &cluster_ref, prepared_resources).await?;
+    let applied_resources = apply(
+        client,
+        &app_name,
+        &operator_name,
+        &controller_name,
+        &validated_cluster,
+        apply_strategy,
+        prepared_resources,
+    )
+    .await
+    .context(ApplyResourcesSnafu)?;
 
     // update status (client required)
-    update_status(client, cluster, applied_resources).await?;
+    update_status(client, cluster, applied_resources)
+        .await
+        .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -195,65 +219,4 @@ impl<T> Resources<T> {
             status: PhantomData,
         }
     }
-}
-
-async fn apply(
-    client: &Client,
-    apply_strategy: ClusterResourceApplyStrategy,
-    cluster_ref: &ObjectReference,
-    resources: Resources<Prepared>,
-) -> Result<Resources<Applied>> {
-    let mut cluster_resources = ClusterResources::new(
-        APP_NAME,
-        OPERATOR_NAME,
-        CONTROLLER_NAME,
-        cluster_ref,
-        apply_strategy,
-    )
-    .context(CreateClusterResourcesSnafu)?;
-
-    let mut applied_resources = Resources::new();
-    for stateful_set in resources.stateful_sets {
-        let applied_stateful_set = cluster_resources.add(client, stateful_set).await.unwrap();
-        applied_resources.stateful_sets.push(applied_stateful_set);
-    }
-
-    cluster_resources
-        .delete_orphaned_resources(client)
-        .await
-        .context(DeleteOrphanedResourcesSnafu)?;
-
-    Ok(applied_resources)
-}
-
-async fn update_status(
-    client: &Client,
-    cluster: &v1alpha1::OpenSearchCluster,
-    applied_resources: Resources<Applied>,
-) -> Result<()> {
-    let mut stateful_set_condition_builder = StatefulSetConditionBuilder::default();
-    for stateful_set in applied_resources.stateful_sets {
-        stateful_set_condition_builder.add(stateful_set);
-    }
-
-    let cluster_operation_cond_builder =
-        ClusterOperationsConditionBuilder::new(&cluster.spec.cluster_operation);
-
-    let status = OpenSearchClusterStatus {
-        conditions: compute_conditions(
-            cluster,
-            &[
-                &stateful_set_condition_builder,
-                &cluster_operation_cond_builder,
-            ],
-        ),
-        discovery_hash: None,
-    };
-
-    client
-        .apply_patch_status(OPERATOR_NAME, cluster, &status)
-        .await
-        .context(ApplyStatusSnafu)?;
-
-    Ok(())
 }

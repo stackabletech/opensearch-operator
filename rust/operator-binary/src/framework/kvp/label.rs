@@ -4,11 +4,13 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    AppName, AppVersion, ControllerName, OperatorName, RoleGroupName, RoleName, ToLabelValue,
+    AppName, AppVersion, ControllerName, IsLabelValue, OperatorName, RoleGroupName, RoleName,
 };
 
+pub const LABEL_VALUE_MAX_LENGTH: usize = 63;
+
 pub fn recommended_labels(
-    owner: &(impl Resource + ToLabelValue),
+    owner: &(impl Resource + IsLabelValue),
     app_name: &AppName,
     app_version: &AppVersion,
     operator_name: &OperatorName,
@@ -30,7 +32,7 @@ pub fn recommended_labels(
 }
 
 pub fn role_group_selector(
-    owner: &(impl Resource + ToLabelValue),
+    owner: &(impl Resource + IsLabelValue),
     app_name: &AppName,
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
