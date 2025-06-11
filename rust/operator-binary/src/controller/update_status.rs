@@ -8,7 +8,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{Applied, Resources};
+use super::{Applied, ContextNames, Resources};
 use crate::{
     OPERATOR_NAME,
     crd::v1alpha1::{self, OpenSearchClusterStatus},
@@ -37,6 +37,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn update_status(
     client: &Client,
+    names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
     applied_resources: Resources<Applied>,
 ) -> Result<()> {
@@ -60,7 +61,7 @@ pub async fn update_status(
     };
 
     client
-        .apply_patch_status(OPERATOR_NAME, cluster, &status)
+        .apply_patch_status(&format!("{}", names.operator_name), cluster, &status)
         .await
         .context(UpdateStatusSnafu)?;
 

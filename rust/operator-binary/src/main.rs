@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
-use controller::FULL_CONTROLLER_NAME;
 use crd::{OpenSearchCluster, v1alpha1};
+use framework::OperatorName;
 use futures::StreamExt;
 use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{
@@ -65,8 +65,6 @@ struct Opts {
     cmd: Command,
 }
 
-const OPERATOR_NAME: &str = "opensearch.stackable.tech";
-
 #[tokio::main]
 #[snafu::report]
 async fn main() -> Result<()> {
@@ -98,17 +96,23 @@ async fn main() -> Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            let operator_name = OperatorName::from_str("opensearch.stackable.tech")
+                .expect("should be a valid operator name");
+
             let client = stackable_operator::client::initialize_operator(
-                Some(OPERATOR_NAME.to_owned()),
+                Some(format!("{operator_name}")),
                 &cluster_info_opts,
             )
             .await
             .context(CreateClientSnafu)?;
 
+            let controller_context = controller::Context::new(client.clone(), operator_name);
+            let full_controller_name = controller_context.full_controller_name();
+
             let event_recorder = Arc::new(Recorder::new(
                 client.as_kube_client(),
                 Reporter {
-                    controller: FULL_CONTROLLER_NAME.to_owned(),
+                    controller: full_controller_name.clone(),
                     instance: None,
                 },
             ));
@@ -130,9 +134,7 @@ async fn main() -> Result<()> {
                 .run(
                     controller::reconcile,
                     controller::error_policy,
-                    Arc::new(controller::Ctx {
-                        client: client.clone(),
-                    }),
+                    Arc::new(controller_context),
                 )
                 .for_each_concurrent(
                     16, // concurrency limit
@@ -140,10 +142,11 @@ async fn main() -> Result<()> {
                         // The event_recorder needs to be shared across all invocations, so that
                         // events are correctly aggregated
                         let event_recorder = event_recorder.clone();
+                        let full_controller_name = full_controller_name.clone();
                         async move {
                             report_controller_reconciled(
                                 &event_recorder,
-                                FULL_CONTROLLER_NAME,
+                                &full_controller_name,
                                 &result,
                             )
                             .await;

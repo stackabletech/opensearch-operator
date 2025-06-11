@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
 use apply::apply;
 use build::Builder;
-use const_format::concatcp;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
@@ -18,14 +17,13 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    OPERATOR_NAME,
     crd::{
         OpenSearchConfigFragment,
         v1alpha1::{self},
     },
     framework::{
         AppName, AppVersion, ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid,
-        IsLabelValue, OperatorName, RoleGroupName, RoleName,
+        IsLabelValue, OperatorName, RoleGroupName,
     },
 };
 
@@ -34,12 +32,35 @@ mod build;
 mod update_status;
 mod validate;
 
-const CONTROLLER_NAME: &str = "opensearchcluster";
-pub const FULL_CONTROLLER_NAME: &str = concatcp!(CONTROLLER_NAME, '.', OPERATOR_NAME);
-const APP_NAME: &str = "opensearch";
+pub struct ContextNames {
+    pub app_name: AppName,
+    pub operator_name: OperatorName,
+    pub controller_name: ControllerName,
+}
 
-pub struct Ctx {
-    pub client: stackable_operator::client::Client,
+pub struct Context {
+    client: stackable_operator::client::Client,
+    names: ContextNames,
+}
+
+impl Context {
+    pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
+        Context {
+            client,
+            names: ContextNames {
+                app_name: AppName::from_str("opensearch").unwrap(),
+                operator_name,
+                controller_name: ControllerName::from_str("opensearchcluster").unwrap(),
+            },
+        }
+    }
+
+    pub fn full_controller_name(&self) -> String {
+        format!(
+            "{}.{}",
+            self.names.controller_name, self.names.operator_name
+        )
+    }
 }
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -142,9 +163,9 @@ impl Resource for ValidatedCluster {
 }
 
 pub fn error_policy(
-    _obj: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
+    _object: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
     error: &Error,
-    _ctx: Arc<Ctx>,
+    _context: Arc<Context>,
 ) -> Action {
     match error {
         // root object is invalid, will be requed when modified
@@ -155,7 +176,7 @@ pub fn error_policy(
 
 pub async fn reconcile(
     object: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
-    ctx: Arc<Ctx>,
+    context: Arc<Context>,
 ) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
@@ -166,28 +187,19 @@ pub async fn reconcile(
         .map_err(Box::new)
         .context(InvalidOpenSearchClusterSnafu)?;
 
-    let client = &ctx.client;
-
     // ~resolve~ dereference (client required)
 
     // validate (no client required)
     let validated_cluster = validate(cluster).unwrap();
 
     // build (no client required; infallible)
-    let prepared_resources = Builder::new(validated_cluster.clone()).build();
+    let prepared_resources = Builder::new(&context.names, validated_cluster.clone()).build();
 
     // apply (client required)
-    //
-    // into controller context!
-    let app_name = AppName::from_str(APP_NAME).unwrap();
-    let operator_name = OperatorName::from_str(OPERATOR_NAME).unwrap();
-    let controller_name = ControllerName::from_str(CONTROLLER_NAME).unwrap();
     let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
     let applied_resources = apply(
-        client,
-        &app_name,
-        &operator_name,
-        &controller_name,
+        &context.client,
+        &context.names,
         &validated_cluster,
         apply_strategy,
         prepared_resources,
@@ -196,7 +208,7 @@ pub async fn reconcile(
     .context(ApplyResourcesSnafu)?;
 
     // update status (client required)
-    update_status(client, cluster, applied_resources)
+    update_status(&context.client, &context.names, cluster, applied_resources)
         .await
         .context(UpdateStatusSnafu)?;
 

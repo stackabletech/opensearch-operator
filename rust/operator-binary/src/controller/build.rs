@@ -15,35 +15,24 @@ use stackable_operator::{
     kvp::Labels,
 };
 
-use super::{
-    APP_NAME, CONTROLLER_NAME, Prepared, Resources, RoleGroupConfig, RoleGroupName,
-    ValidatedCluster,
-};
-use crate::{
-    OPERATOR_NAME,
-    framework::{
-        AppName, ControllerName, OperatorName, RoleName,
-        kvp::label::{recommended_labels, role_group_selector},
-        to_qualified_role_group_name,
-    },
+use super::{ContextNames, Prepared, Resources, RoleGroupConfig, RoleGroupName, ValidatedCluster};
+use crate::framework::{
+    RoleName,
+    kvp::label::{recommended_labels, role_group_selector},
+    to_qualified_role_group_name,
 };
 
-pub struct Builder {
-    app_name: AppName,
-    operator_name: OperatorName,
-    controller_name: ControllerName,
+pub struct Builder<'a> {
+    names: &'a ContextNames,
     role_name: RoleName,
     cluster: ValidatedCluster,
 }
 
-impl Builder {
-    pub fn new(cluster: ValidatedCluster) -> Builder {
+impl<'a> Builder<'a> {
+    pub fn new(names: &'a ContextNames, cluster: ValidatedCluster) -> Builder<'a> {
         Builder {
-            // into controller context!
-            app_name: AppName::from_str(APP_NAME).unwrap(),
+            names,
             role_name: RoleName::from_str("nodes").unwrap(),
-            operator_name: OperatorName::from_str(OPERATOR_NAME).unwrap(),
-            controller_name: ControllerName::from_str(CONTROLLER_NAME).unwrap(),
             cluster,
         }
     }
@@ -77,7 +66,7 @@ impl Builder {
 
         let statefulset_match_labels = role_group_selector(
             &self.cluster,
-            &self.app_name,
+            &self.names.app_name,
             &self.role_name,
             role_group_name,
         );
@@ -135,10 +124,10 @@ impl Builder {
     fn build_recommended_labels(&self, role_group_name: &RoleGroupName) -> Labels {
         recommended_labels(
             &self.cluster,
-            &self.app_name,
+            &self.names.app_name,
             &self.cluster.product_version,
-            &self.operator_name,
-            &self.controller_name,
+            &self.names.operator_name,
+            &self.names.controller_name,
             &self.role_name,
             role_group_name,
         )

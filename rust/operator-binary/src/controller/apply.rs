@@ -2,7 +2,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{client::Client, cluster_resources::ClusterResourceApplyStrategy};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{Applied, Prepared, Resources};
+use super::{Applied, Context, ContextNames, Prepared, Resources};
 use crate::framework::{
     AppName, ControllerName, HasNamespace, HasObjectName, HasUid, OperatorName,
     cluster_resources::cluster_resources_new,
@@ -26,19 +26,15 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn apply(
     client: &Client,
-    // app_name, operator_name, ... in context?
-    app_name: &AppName,
-    operator_name: &OperatorName,
-    controller_name: &ControllerName,
+    names: &ContextNames,
     cluster: &(impl HasObjectName + HasNamespace + HasUid),
-    // ref?
     apply_strategy: ClusterResourceApplyStrategy,
     resources: Resources<Prepared>,
 ) -> Result<Resources<Applied>> {
     let mut cluster_resources = cluster_resources_new(
-        app_name,
-        operator_name,
-        controller_name,
+        &names.app_name,
+        &names.operator_name,
+        &names.controller_name,
         cluster,
         apply_strategy,
     );
