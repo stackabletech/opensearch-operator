@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{marker::PhantomData, str::FromStr};
 
 use stackable_operator::{
     builder::{
@@ -9,6 +9,7 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{Container, PodTemplateSpec},
+            policy::v1::PodDisruptionBudget,
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
@@ -18,9 +19,12 @@ use stackable_operator::{
 use super::{ContextNames, Prepared, Resources, RoleGroupConfig, RoleGroupName, ValidatedCluster};
 use crate::framework::{
     RoleName,
+    builder::pdb::pod_disruption_budget_builder_with_role,
     kvp::label::{recommended_labels, role_group_selector},
     to_qualified_role_group_name,
 };
+
+const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 
 pub struct Builder<'a> {
     names: &'a ContextNames,
@@ -38,13 +42,22 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build(&self) -> Resources<Prepared> {
-        let mut resources = Resources::new();
-        for (role_group_name, role_group_config) in self.cluster.role_group_configs.iter() {
-            resources
-                .stateful_sets
-                .push(self.build_statefulset(role_group_name, role_group_config));
+        let stateful_sets = self
+            .cluster
+            .role_group_configs
+            .iter()
+            .map(|(role_group_name, role_group_config)| {
+                self.build_statefulset(role_group_name, role_group_config)
+            })
+            .collect();
+
+        let pod_disruption_budgets = self.build_pdb().into_iter().collect();
+
+        Resources {
+            stateful_sets,
+            pod_disruption_budgets,
+            status: PhantomData,
         }
-        resources
     }
 
     fn build_statefulset(
@@ -83,6 +96,8 @@ impl<'a> Builder<'a> {
             template,
             ..StatefulSetSpec::default()
         };
+
+        // TODO Implement overrides
 
         StatefulSet {
             metadata,
@@ -131,5 +146,28 @@ impl<'a> Builder<'a> {
             &self.role_name,
             role_group_name,
         )
+    }
+
+    fn build_pdb(&self) -> Option<PodDisruptionBudget> {
+        let pdb_config = &self.cluster.role_config.pod_disruption_budget;
+
+        if pdb_config.enabled {
+            let max_unavailable = pdb_config
+                .max_unavailable
+                .unwrap_or(PDB_DEFAULT_MAX_UNAVAILABLE);
+            Some(
+                pod_disruption_budget_builder_with_role(
+                    &self.cluster,
+                    &self.names.app_name,
+                    &self.role_name,
+                    &self.names.operator_name,
+                    &self.names.controller_name,
+                )
+                .with_max_unavailable(max_unavailable)
+                .build(),
+            )
+        } else {
+            None
+        }
     }
 }

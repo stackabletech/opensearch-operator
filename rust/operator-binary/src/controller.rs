@@ -1,12 +1,12 @@
 use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
-use apply::apply;
+use apply::Applier;
 use build::Builder;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::product_image_selection::ProductImage,
-    k8s_openapi::api::apps::v1::StatefulSet,
+    k8s_openapi::api::{apps::v1::StatefulSet, policy::v1::PodDisruptionBudget},
     kube::{Resource, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
     role_utils::{GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroup},
@@ -18,7 +18,7 @@ use validate::validate;
 
 use crate::{
     crd::{
-        OpenSearchConfigFragment,
+        OpenSearchConfig,
         v1alpha1::{self},
     },
     framework::{
@@ -91,7 +91,7 @@ impl ReconcilerError for Error {
     }
 }
 
-type RoleGroupConfig = RoleGroup<OpenSearchConfigFragment, GenericProductSpecificCommonConfig>;
+type RoleGroupConfig = RoleGroup<OpenSearchConfig, GenericProductSpecificCommonConfig>;
 
 // validated and converted to validated and safe types
 // no user errors
@@ -201,13 +201,13 @@ pub async fn reconcile(
 
     // apply (client required)
     let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
-    let applied_resources = apply(
+    let applied_resources = Applier::new(
         &context.client,
         &context.names,
         &validated_cluster,
         apply_strategy,
-        prepared_resources,
     )
+    .apply(prepared_resources)
     .await
     .context(ApplyResourcesSnafu)?;
 
@@ -225,14 +225,6 @@ struct Applied;
 
 struct Resources<T> {
     stateful_sets: Vec<StatefulSet>,
+    pod_disruption_budgets: Vec<PodDisruptionBudget>,
     status: PhantomData<T>,
-}
-
-impl<T> Resources<T> {
-    fn new() -> Self {
-        Resources {
-            stateful_sets: vec![],
-            status: PhantomData,
-        }
-    }
 }

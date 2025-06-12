@@ -5,7 +5,10 @@ use stackable_operator::kube::{Resource, ResourceExt};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{AppVersion, RoleGroupName, ValidatedCluster};
-use crate::{crd::v1alpha1, framework::ClusterName};
+use crate::{
+    crd::{OpenSearchConfigFragment, v1alpha1},
+    framework::{ClusterName, role_utils::with_validated_config},
+};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -29,9 +32,9 @@ pub enum Error {
     #[snafu(display("failed to set role-group name"))]
     ParseRoleGroupName { source: crate::framework::Error },
 
-    #[snafu(display("failed to set recommended labels"))]
-    RecommendedLabels {
-        source: stackable_operator::kvp::LabelError,
+    #[snafu(display("fragment validation failure"))]
+    ValidateOpenSearchConfig {
+        source: stackable_operator::config::fragment::ValidationError,
     },
 }
 
@@ -53,9 +56,15 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
     for (raw_role_group_name, role_group_config) in &cluster.spec.nodes.role_groups {
         let role_group_name =
             RoleGroupName::from_str(raw_role_group_name).context(ParseRoleGroupNameSnafu)?;
-        role_group_configs.insert(role_group_name, role_group_config.clone());
 
-        // TODO merge configs
+        let validated_role_group_config = with_validated_config(
+            role_group_config,
+            &cluster.spec.nodes,
+            &OpenSearchConfigFragment::default(),
+        )
+        .context(ValidateOpenSearchConfigSnafu)?;
+
+        role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
     Ok(ValidatedCluster {

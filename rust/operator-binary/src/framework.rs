@@ -8,8 +8,10 @@ use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::kvp::LabelValue;
 use strum::{EnumDiscriminants, IntoStaticStr};
 
+pub mod builder;
 pub mod cluster_resources;
 pub mod kvp;
+pub mod role_utils;
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]

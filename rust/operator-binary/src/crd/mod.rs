@@ -62,7 +62,7 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
 }
 
 // TODO Perhaps rename to InstanceConfig
-#[derive(Clone, Debug, Default, Fragment, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
 #[fragment_attrs(
     derive(
         Clone,

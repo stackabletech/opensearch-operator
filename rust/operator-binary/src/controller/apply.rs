@@ -1,5 +1,10 @@
+use std::marker::PhantomData;
+
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{client::Client, cluster_resources::ClusterResourceApplyStrategy};
+use stackable_operator::{
+    client::Client,
+    cluster_resources::{ClusterResource, ClusterResourceApplyStrategy, ClusterResources},
+};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, Prepared, Resources};
@@ -23,34 +28,64 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn apply(
-    client: &Client,
-    names: &ContextNames,
-    cluster: &(impl HasObjectName + HasNamespace + HasUid),
-    apply_strategy: ClusterResourceApplyStrategy,
-    resources: Resources<Prepared>,
-) -> Result<Resources<Applied>> {
-    let mut cluster_resources = cluster_resources_new(
-        &names.app_name,
-        &names.operator_name,
-        &names.controller_name,
-        cluster,
-        apply_strategy,
-    );
+pub struct Applier<'a> {
+    client: &'a Client,
+    cluster_resources: ClusterResources,
+}
 
-    let mut applied_resources = Resources::new();
-    for stateful_set in resources.stateful_sets {
-        let applied_stateful_set = cluster_resources
-            .add(client, stateful_set)
-            .await
-            .context(ApplyResourceSnafu)?;
-        applied_resources.stateful_sets.push(applied_stateful_set);
+impl<'a> Applier<'a> {
+    pub fn new(
+        client: &'a Client,
+        names: &ContextNames,
+        cluster: &(impl HasObjectName + HasNamespace + HasUid),
+        apply_strategy: ClusterResourceApplyStrategy,
+    ) -> Applier<'a> {
+        let cluster_resources = cluster_resources_new(
+            &names.app_name,
+            &names.operator_name,
+            &names.controller_name,
+            cluster,
+            apply_strategy,
+        );
+
+        Applier {
+            client,
+            cluster_resources,
+        }
     }
 
-    cluster_resources
-        .delete_orphaned_resources(client)
-        .await
-        .context(DeleteOrphanedResourcesSnafu)?;
+    pub async fn apply(mut self, resources: Resources<Prepared>) -> Result<Resources<Applied>> {
+        let stateful_sets = self.add_resources(resources.stateful_sets).await?;
 
-    Ok(applied_resources)
+        let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
+
+        self.cluster_resources
+            .delete_orphaned_resources(self.client)
+            .await
+            .context(DeleteOrphanedResourcesSnafu)?;
+
+        Ok(Resources {
+            stateful_sets,
+            pod_disruption_budgets,
+            status: PhantomData,
+        })
+    }
+
+    async fn add_resources<T: ClusterResource + Sync>(
+        &mut self,
+        resources: Vec<T>,
+    ) -> Result<Vec<T>> {
+        let mut applied_resources = vec![];
+
+        for resource in resources {
+            let applied_resource = self
+                .cluster_resources
+                .add(self.client, resource)
+                .await
+                .context(ApplyResourceSnafu)?;
+            applied_resources.push(applied_resource);
+        }
+
+        Ok(applied_resources)
+    }
 }
