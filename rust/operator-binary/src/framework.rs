@@ -3,7 +3,7 @@
 
 use std::{fmt::Display, str::FromStr};
 
-use kvp::label::LABEL_VALUE_MAX_LENGTH;
+// use kvp::label::LABEL_VALUE_MAX_LENGTH;
 use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::kvp::LabelValue;
 use strum::{EnumDiscriminants, IntoStaticStr};

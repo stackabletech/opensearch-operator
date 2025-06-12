@@ -9,10 +9,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, Resources};
-use crate::{
-    OPERATOR_NAME,
-    crd::v1alpha1::{self, OpenSearchClusterStatus},
-};
+use crate::crd::v1alpha1::{self, OpenSearchClusterStatus};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]

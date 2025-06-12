@@ -48,9 +48,10 @@ impl Context {
         Context {
             client,
             names: ContextNames {
-                app_name: AppName::from_str("opensearch").unwrap(),
+                app_name: AppName::from_str("opensearch").expect("should be a valid product name"),
                 operator_name,
-                controller_name: ControllerName::from_str("opensearchcluster").unwrap(),
+                controller_name: ControllerName::from_str("opensearchcluster")
+                    .expect("should be a valid controller name"),
             },
         }
     }
@@ -66,11 +67,14 @@ impl Context {
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("OpenSearchCluster object is invalid"))]
-    InvalidOpenSearchCluster {
+    #[snafu(display("failed to deserialize cluster definition"))]
+    DeserializeClusterDefinition {
         // boxed because otherwise Clippy warns about a large enum variant
         source: Box<stackable_operator::kube::core::error_boundary::InvalidObject>,
     },
+
+    #[snafu(display("failed to validate cluster"))]
+    ValidateCluster { source: validate::Error },
 
     #[snafu(display("failed to apply resources"))]
     ApplyResources { source: apply::Error },
@@ -99,6 +103,7 @@ pub struct ValidatedCluster {
     pub product_version: AppVersion,
     pub name: ClusterName,
     pub namespace: String,
+    pub uid: String,
     pub role_config: GenericRoleConfig,
     // "validated" means that labels are valid and no ugly rolegroup name broke them
     pub role_group_configs: BTreeMap<RoleGroupName, RoleGroupConfig>,
@@ -118,8 +123,7 @@ impl HasNamespace for ValidatedCluster {
 
 impl HasUid for ValidatedCluster {
     fn to_uid(&self) -> String {
-        // TODO fix
-        self.origin.metadata.uid.clone().unwrap()
+        self.uid.clone()
     }
 }
 
@@ -169,7 +173,7 @@ pub fn error_policy(
 ) -> Action {
     match error {
         // root object is invalid, will be requed when modified
-        Error::InvalidOpenSearchCluster { .. } => Action::await_change(),
+        Error::DeserializeClusterDefinition { .. } => Action::await_change(),
         _ => Action::requeue(*Duration::from_secs(5)),
     }
 }
@@ -185,12 +189,12 @@ pub async fn reconcile(
         .as_ref()
         .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
         .map_err(Box::new)
-        .context(InvalidOpenSearchClusterSnafu)?;
+        .context(DeserializeClusterDefinitionSnafu)?;
 
-    // ~resolve~ dereference (client required)
+    // dereference (client required)
 
     // validate (no client required)
-    let validated_cluster = validate(cluster).unwrap();
+    let validated_cluster = validate(cluster).context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = Builder::new(&context.names, validated_cluster.clone()).build();
