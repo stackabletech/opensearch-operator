@@ -51,16 +51,11 @@ pub trait IsLabelValue {
 }
 
 /// max_length must not exceed 63! This cannot be checked at compile time.
-macro_rules! object_name {
-    ($name:ident, $max_length:literal) => {
+macro_rules! attributed_string_type {
+    ($name:ident $(, $attribute:tt)*) => {
         /// Bla
         #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
-
-        impl $name {
-            // type arithmetic would be better
-            pub const MAX_LENGTH: usize = $max_length;
-        }
 
         impl Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -68,52 +63,96 @@ macro_rules! object_name {
             }
         }
 
+        impl FromStr for $name {
+            type Err = Error;
+
+            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+
+                $(attributed_string_type!(@from_str $name, s, $attribute);)*
+
+                Ok(Self(s.to_owned()))
+            }
+        }
+
+        $(attributed_string_type!(@trait_impl $name, $attribute);)*
+    };
+    (@from_str $name:ident, $s:expr, (max_length = $max_length:literal)) => {
+        let length = $s.len() as usize;
+        ensure!(
+            length <= $name::MAX_LENGTH,
+            LengthExceededSnafu {
+                length,
+                max_length: $name::MAX_LENGTH,
+            }
+        );
+    };
+    (@from_str $name:ident, $s:expr, is_object_name) => {
+        stackable_operator::validation::is_rfc_1123_subdomain($s).context(InvalidObjectNameSnafu)?;
+    };
+    (@from_str $name:ident, $s:expr, is_valid_label_value) => {
+        LabelValue::from_str($s).context(InvalidLabelValueSnafu)?;
+    };
+    (@trait_impl $name:ident, (max_length = $max_length:literal)) => {
+        impl $name {
+            // type arithmetic would be better
+            pub const MAX_LENGTH: usize = $max_length;
+        }
+    };
+    (@trait_impl $name:ident, is_object_name) => {
         impl HasObjectName for $name {
             fn to_object_name(&self) -> String {
                 self.0.clone()
             }
         }
-
+    };
+    (@trait_impl $name:ident, is_valid_label_value) => {
         impl IsLabelValue for $name {
             fn to_label_value(&self) -> String {
                 self.0.clone()
-            }
-        }
-
-        impl FromStr for $name {
-            type Err = Error;
-
-            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                let length = s.len() as usize;
-                ensure!(
-                    /* length <= LABEL_VALUE_MAX_LENGTH && */ length <= $name::MAX_LENGTH,
-                    LengthExceededSnafu {
-                        length,
-                        max_length: $name::MAX_LENGTH,
-                    }
-                );
-
-                stackable_operator::validation::is_rfc_1123_subdomain(s)
-                    .context(InvalidObjectNameSnafu)?;
-
-                LabelValue::from_str(s).context(InvalidLabelValueSnafu)?;
-
-                Ok(Self(s.to_owned()))
             }
         }
     };
 }
 
 // There are compile time checks elsewhere ...
-// TODO Do not automatically derive ToObjectName and ToLabelValue.
-// Version is no object name!
-object_name!(AppName, 54);
-object_name!(AppVersion, 63);
-object_name!(ClusterName, 63);
-object_name!(ControllerName, 63);
-object_name!(OperatorName, 63);
-object_name!(RoleGroupName, 63);
-object_name!(RoleName, 63);
+attributed_string_type! {
+    AppName,
+    (max_length = 54),
+    is_valid_label_value
+}
+attributed_string_type! {
+    AppVersion,
+    (max_length = 63),
+    is_valid_label_value
+}
+attributed_string_type! {
+    ClusterName,
+    (max_length = 63),
+    is_object_name,
+    is_valid_label_value
+}
+attributed_string_type! {
+    ControllerName,
+    (max_length = 63),
+    is_valid_label_value
+}
+attributed_string_type! {
+    OperatorName,
+    (max_length = 63),
+    is_valid_label_value
+}
+attributed_string_type! {
+    RoleGroupName,
+    (max_length = 63),
+    is_object_name,
+    is_valid_label_value
+}
+attributed_string_type! {
+    RoleName,
+    (max_length = 63),
+    is_object_name,
+    is_valid_label_value
+}
 
 pub fn to_qualified_role_group_name(
     cluster_name: &ClusterName,
