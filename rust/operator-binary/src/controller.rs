@@ -22,8 +22,8 @@ use crate::{
         v1alpha1::{self},
     },
     framework::{
-        AppName, AppVersion, ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid,
-        IsLabelValue, OperatorName, RoleGroupName,
+        ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
+        OperatorName, ProductName, ProductVersion, RoleGroupName,
     },
 };
 
@@ -33,7 +33,7 @@ mod update_status;
 mod validate;
 
 pub struct ContextNames {
-    pub app_name: AppName,
+    pub product_name: ProductName,
     pub operator_name: OperatorName,
     pub controller_name: ControllerName,
 }
@@ -48,7 +48,8 @@ impl Context {
         Context {
             client,
             names: ContextNames {
-                app_name: AppName::from_str("opensearch").expect("should be a valid product name"),
+                product_name: ProductName::from_str("opensearch")
+                    .expect("should be a valid product name"),
                 operator_name,
                 controller_name: ControllerName::from_str("opensearchcluster")
                     .expect("should be a valid controller name"),
@@ -100,7 +101,7 @@ type RoleGroupConfig = RoleGroup<OpenSearchConfig, GenericProductSpecificCommonC
 pub struct ValidatedCluster {
     origin: v1alpha1::OpenSearchCluster,
     pub image: ProductImage,
-    pub product_version: AppVersion,
+    pub product_version: ProductVersion,
     pub name: ClusterName,
     pub namespace: String,
     pub uid: String,

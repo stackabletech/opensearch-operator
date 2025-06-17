@@ -4,15 +4,16 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    AppName, AppVersion, ControllerName, IsLabelValue, OperatorName, RoleGroupName, RoleName,
+    ControllerName, IsLabelValue, OperatorName, ProductName, ProductVersion, RoleGroupName,
+    RoleName,
 };
 
 pub const LABEL_VALUE_MAX_LENGTH: usize = 63;
 
 pub fn recommended_labels(
     owner: &(impl Resource + IsLabelValue),
-    app_name: &AppName,
-    app_version: &AppVersion,
+    product_name: &ProductName,
+    product_version: &ProductVersion,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
     role_name: &RoleName,
@@ -20,8 +21,8 @@ pub fn recommended_labels(
 ) -> Labels {
     let object_labels = ObjectLabels {
         owner,
-        app_name: &app_name.to_label_value(),
-        app_version: &app_version.to_label_value(),
+        app_name: &product_name.to_label_value(),
+        app_version: &product_version.to_label_value(),
         operator_name: &operator_name.to_label_value(),
         controller_name: &controller_name.to_label_value(),
         role: &role_name.to_label_value(),
@@ -33,13 +34,13 @@ pub fn recommended_labels(
 
 pub fn role_group_selector(
     owner: &(impl Resource + IsLabelValue),
-    app_name: &AppName,
+    product_name: &ProductName,
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
 ) -> Labels {
     Labels::role_group_selector(
         owner,
-        &app_name.to_label_value(),
+        &product_name.to_label_value(),
         &role_name.to_label_value(),
         &role_group_name.to_label_value(),
     )

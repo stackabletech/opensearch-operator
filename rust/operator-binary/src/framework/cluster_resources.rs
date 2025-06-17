@@ -4,12 +4,12 @@ use stackable_operator::{
 };
 
 use super::{
-    AppName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue, OperatorName,
+    ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName,
 };
 use crate::framework::kvp::label::LABEL_VALUE_MAX_LENGTH;
 
 pub fn cluster_resources_new(
-    app_name: &AppName,
+    product_name: &ProductName,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
     cluster: &(impl HasObjectName + HasNamespace + HasUid),
@@ -17,14 +17,14 @@ pub fn cluster_resources_new(
 ) -> ClusterResources {
     // ClusterResources::new creates a label value from the given app name by appending
     // `-operator`. For the resulting label value to be valid, it must not exceed 63 characters.
-    // Check at compile time that AppName::MAX_LENGTH is defined accordingly.
+    // Check at compile time that ProductName::MAX_LENGTH is defined accordingly.
     const _: () = assert!(
-        AppName::MAX_LENGTH <= LABEL_VALUE_MAX_LENGTH - "-operator".len(),
-        "The label value `<app_name>-operator` must not exceed 63 characters."
+        ProductName::MAX_LENGTH <= LABEL_VALUE_MAX_LENGTH - "-operator".len(),
+        "The label value `<product_name>-operator` must not exceed 63 characters."
     );
 
     ClusterResources::new(
-        &app_name.to_label_value(),
+        &product_name.to_label_value(),
         &operator_name.to_label_value(),
         &controller_name.to_label_value(),
         &ObjectReference {

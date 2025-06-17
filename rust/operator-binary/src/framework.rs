@@ -3,7 +3,7 @@
 
 use std::{fmt::Display, str::FromStr};
 
-// use kvp::label::LABEL_VALUE_MAX_LENGTH;
+use kvp::label::LABEL_VALUE_MAX_LENGTH;
 use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::kvp::LabelValue;
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -30,30 +30,35 @@ pub enum Error {
     },
 }
 
-// according to RFC 1123
-const _OBJECT_NAME_MAX_LENGTH: usize = 253;
+/// Maximum length of a DNS subdomain name as defined in RFC 1123.
+#[allow(dead_code)]
+const OBJECT_NAME_MAX_LENGTH: usize = 253;
 
-// useful?
+/// Has a name that can be used as a DNS subdomain name as defined in RFC 1123.
+/// Most resource types, e.g. a Pod, require such a compliant name.
 pub trait HasObjectName {
     fn to_object_name(&self) -> String;
 }
 
+/// Has a namespace
 pub trait HasNamespace {
     fn to_namespace(&self) -> String;
 }
 
+/// Has a Kubernetes UID
 pub trait HasUid {
     fn to_uid(&self) -> String;
 }
 
+/// Is a valid label value as defined in RFC 1123.
 pub trait IsLabelValue {
     fn to_label_value(&self) -> String;
 }
 
-/// max_length must not exceed 63! This cannot be checked at compile time.
+/// Restricted string type with attributes like maximum length.
 macro_rules! attributed_string_type {
-    ($name:ident $(, $attribute:tt)*) => {
-        /// Bla
+    ($name:ident, $description:literal $(, $attribute:tt)*) => {
+        #[doc = $description]
         #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
 
@@ -76,7 +81,7 @@ macro_rules! attributed_string_type {
 
         $(attributed_string_type!(@trait_impl $name, $attribute);)*
     };
-    (@from_str $name:ident, $s:expr, (max_length = $max_length:literal)) => {
+    (@from_str $name:ident, $s:expr, (max_length = $max_length:expr)) => {
         let length = $s.len() as usize;
         ensure!(
             length <= $name::MAX_LENGTH,
@@ -92,7 +97,7 @@ macro_rules! attributed_string_type {
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         LabelValue::from_str($s).context(InvalidLabelValueSnafu)?;
     };
-    (@trait_impl $name:ident, (max_length = $max_length:literal)) => {
+    (@trait_impl $name:ident, (max_length = $max_length:expr)) => {
         impl $name {
             // type arithmetic would be better
             pub const MAX_LENGTH: usize = $max_length;
@@ -114,55 +119,73 @@ macro_rules! attributed_string_type {
     };
 }
 
-// There are compile time checks elsewhere ...
 attributed_string_type! {
-    AppName,
+    ProductName,
+    "The name of a product, e.g. \"opensearch\"",
+    // A suffix is added to produce a label value. An according compile-time check ensures that
+    // max_length cannot be set higher.
     (max_length = 54),
     is_valid_label_value
 }
 attributed_string_type! {
-    AppVersion,
-    (max_length = 63),
+    ProductVersion,
+    "The version of a product, e.g. \"3.0.0\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     ClusterName,
-    (max_length = 63),
+    "The name of a cluster/stacklet, e.g. \"my-opensearch-cluster\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_object_name,
     is_valid_label_value
 }
 attributed_string_type! {
     ControllerName,
-    (max_length = 63),
+    "The name of a controller in an operator, e.g. \"opensearchcluster\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     OperatorName,
-    (max_length = 63),
+    "The name of an operator, e.g. \"opensearch.stackable.tech\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     RoleGroupName,
-    (max_length = 63),
+    "The name of a role-group name, e.g. \"clusterManager\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_object_name,
     is_valid_label_value
 }
 attributed_string_type! {
     RoleName,
-    (max_length = 63),
+    "The name of a role name, e.g. \"nodes\"",
+    (max_length = LABEL_VALUE_MAX_LENGTH),
     is_object_name,
     is_valid_label_value
 }
 
+/// Creates a qualified role group name consisting of the cluster name, role name and role-group
+/// name.
+/// The result is a valid DNS subdomain name as defined in RFC 1123 that can be used e.g. as a name
+/// for a StatefulSet.
 pub fn to_qualified_role_group_name(
     cluster_name: &ClusterName,
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
 ) -> String {
-    // Compile time check
+    // Compile-time check
     const _: () = assert!(
-        ClusterName::MAX_LENGTH + RoleName::MAX_LENGTH + RoleGroupName::MAX_LENGTH
-            <= _OBJECT_NAME_MAX_LENGTH - 3 /* dashes */ - 4, /* digits */
+        ClusterName::MAX_LENGTH
+            + 1 /* dash */
+            + RoleName::MAX_LENGTH
+            + 1 /* dash */
+            + RoleGroupName::MAX_LENGTH
+            + 1 /* dash */
+            + 4 /* digits */
+            <= OBJECT_NAME_MAX_LENGTH,
         "The maximum lengths of the cluster name, role name and role group name must be defined so that the combination of these names (including separators and the sequential pod number) is also a valid object name with a maximum of 263 characters (see RFC 1123)"
     );
 
@@ -179,14 +202,14 @@ mod tests {
     use std::str::FromStr;
 
     use super::{ClusterName, RoleGroupName, RoleName, to_qualified_role_group_name};
-    use crate::framework::AppName;
+    use crate::framework::ProductName;
 
     #[test]
     fn test_object_name_constraints() {
-        assert!(AppName::from_str("valid-role-group-name").is_ok());
-        assert!(AppName::from_str("invalid-character: /").is_err());
+        assert!(ProductName::from_str("valid-role-group-name").is_ok());
+        assert!(ProductName::from_str("invalid-character: /").is_err());
         assert!(
-            AppName::from_str(
+            ProductName::from_str(
                 "too-long-123456789012345678901234567890123456789012345678901234567890"
             )
             .is_err()

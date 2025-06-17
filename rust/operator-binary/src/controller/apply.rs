@@ -41,7 +41,7 @@ impl<'a> Applier<'a> {
         apply_strategy: ClusterResourceApplyStrategy,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
-            &names.app_name,
+            &names.product_name,
             &names.operator_name,
             &names.controller_name,
             cluster,

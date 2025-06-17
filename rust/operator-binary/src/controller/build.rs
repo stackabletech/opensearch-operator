@@ -36,7 +36,7 @@ impl<'a> Builder<'a> {
     pub fn new(names: &'a ContextNames, cluster: ValidatedCluster) -> Builder<'a> {
         Builder {
             names,
-            role_name: RoleName::from_str("nodes").unwrap(),
+            role_name: RoleName::from_str("nodes").expect("should be a valid role name"),
             cluster,
         }
     }
@@ -79,7 +79,7 @@ impl<'a> Builder<'a> {
 
         let statefulset_match_labels = role_group_selector(
             &self.cluster,
-            &self.names.app_name,
+            &self.names.product_name,
             &self.role_name,
             role_group_name,
         );
@@ -127,9 +127,8 @@ impl<'a> Builder<'a> {
             .image
             .resolve("opensearch", crate::built_info::PKG_VERSION);
 
-        // TODO ContainerName as typed string?
         ContainerBuilder::new("opensearch")
-            .expect("ContainerBuilder not created")
+            .expect("should be a valid container name")
             .image_from_product_image(&product_image)
             .add_env_var("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "super@Secret1")
             .add_env_var("cluster.initial_master_nodes", "opensearch-0")
@@ -139,7 +138,7 @@ impl<'a> Builder<'a> {
     fn build_recommended_labels(&self, role_group_name: &RoleGroupName) -> Labels {
         recommended_labels(
             &self.cluster,
-            &self.names.app_name,
+            &self.names.product_name,
             &self.cluster.product_version,
             &self.names.operator_name,
             &self.names.controller_name,
@@ -158,7 +157,7 @@ impl<'a> Builder<'a> {
             Some(
                 pod_disruption_budget_builder_with_role(
                     &self.cluster,
-                    &self.names.app_name,
+                    &self.names.product_name,
                     &self.role_name,
                     &self.names.operator_name,
                     &self.names.controller_name,

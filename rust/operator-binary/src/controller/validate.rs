@@ -4,7 +4,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::kube::{Resource, ResourceExt};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{AppVersion, RoleGroupName, ValidatedCluster};
+use super::{ProductVersion, RoleGroupName, ValidatedCluster};
 use crate::{
     crd::{OpenSearchConfigFragment, v1alpha1},
     framework::{ClusterName, role_utils::with_validated_config},
@@ -49,7 +49,7 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
 
     let uid = cluster.uid().context(GetClusterUidSnafu)?;
 
-    let product_version = AppVersion::from_str(cluster.spec.image.product_version())
+    let product_version = ProductVersion::from_str(cluster.spec.image.product_version())
         .context(ParseProductVersionSnafu)?;
 
     let mut role_group_configs = BTreeMap::new();

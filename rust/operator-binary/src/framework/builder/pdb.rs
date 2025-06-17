@@ -4,18 +4,18 @@ use stackable_operator::{
     kube::{Resource, api::ObjectMeta},
 };
 
-use crate::framework::{AppName, ControllerName, IsLabelValue, OperatorName, RoleName};
+use crate::framework::{ControllerName, IsLabelValue, OperatorName, ProductName, RoleName};
 
 pub fn pod_disruption_budget_builder_with_role(
     owner: &(impl Resource<DynamicType = ()> + IsLabelValue),
-    app_name: &AppName,
+    product_name: &ProductName,
     role_name: &RoleName,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
 ) -> PodDisruptionBudgetBuilder<ObjectMeta, LabelSelector, ()> {
     PodDisruptionBudgetBuilder::new_with_role(
         owner,
-        &app_name.to_label_value(),
+        &product_name.to_label_value(),
         &role_name.to_label_value(),
         &operator_name.to_label_value(),
         &controller_name.to_label_value(),
