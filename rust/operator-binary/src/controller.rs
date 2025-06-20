@@ -6,7 +6,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::product_image_selection::ProductImage,
-    k8s_openapi::api::{apps::v1::StatefulSet, policy::v1::PodDisruptionBudget},
+    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service, policy::v1::PodDisruptionBudget},
     kube::{Resource, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
     role_utils::{GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroup},
@@ -17,10 +17,7 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    crd::{
-        OpenSearchConfig,
-        v1alpha1::{self},
-    },
+    crd::v1alpha1::{self},
     framework::{
         ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
         OperatorName, ProductName, ProductVersion, RoleGroupName,
@@ -29,6 +26,7 @@ use crate::{
 
 mod apply;
 mod build;
+mod node_config;
 mod update_status;
 mod validate;
 
@@ -92,7 +90,7 @@ impl ReconcilerError for Error {
     }
 }
 
-type RoleGroupConfig = RoleGroup<OpenSearchConfig, GenericProductSpecificCommonConfig>;
+type RoleGroupConfig = RoleGroup<v1alpha1::OpenSearchConfig, GenericProductSpecificCommonConfig>;
 
 // validated and converted to validated and safe types
 // no user errors
@@ -108,6 +106,30 @@ pub struct ValidatedCluster {
     pub role_config: GenericRoleConfig,
     // "validated" means that labels are valid and no ugly rolegroup name broke them
     pub role_group_configs: BTreeMap<RoleGroupName, RoleGroupConfig>,
+}
+
+impl ValidatedCluster {
+    pub fn is_single_node(&self) -> bool {
+        self.node_count() == 1
+    }
+
+    pub fn node_count(&self) -> u32 {
+        self.role_group_configs
+            .values()
+            .map(|rg| rg.replicas.unwrap_or(1) as u32)
+            .sum()
+    }
+
+    pub fn role_group_configs_filtered_by_node_role(
+        &self,
+        node_role: &v1alpha1::NodeRole,
+    ) -> BTreeMap<RoleGroupName, RoleGroupConfig> {
+        self.role_group_configs
+            .clone()
+            .into_iter()
+            .filter(|c| c.1.config.config.node_roles.contains(node_role))
+            .collect()
+    }
 }
 
 impl HasObjectName for ValidatedCluster {
@@ -226,6 +248,7 @@ struct Applied;
 
 struct Resources<T> {
     stateful_sets: Vec<StatefulSet>,
+    services: Vec<Service>,
     pod_disruption_budgets: Vec<PodDisruptionBudget>,
     status: PhantomData<T>,
 }

@@ -6,7 +6,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{ProductVersion, RoleGroupName, ValidatedCluster};
 use crate::{
-    crd::{OpenSearchConfigFragment, v1alpha1},
+    crd::v1alpha1,
     framework::{ClusterName, role_utils::with_validated_config},
 };
 
@@ -60,7 +60,7 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
         let validated_role_group_config = with_validated_config(
             role_group_config,
             &cluster.spec.nodes,
-            &OpenSearchConfigFragment::default(),
+            &v1alpha1::OpenSearchConfigFragment::default(),
         )
         .context(ValidateOpenSearchConfigSnafu)?;
 

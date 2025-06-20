@@ -1,0 +1,102 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: cluster-manager
+    app.kubernetes.io/version: 3.0.0
+    cluster-manager: "true"
+    stackable.tech/vendor: Stackable
+  name: opensearch-nodes-cluster-manager
+spec:
+  podManagementPolicy: Parallel
+  replicas: 3
+  template:
+    spec:
+      containers:
+        - name: opensearch
+          env:
+            - name: discovery.seed_hosts
+              value: opensearch-cluster-manager
+            - name: discovery.type
+              value: zen
+            - name: cluster.initial_cluster_manager_nodes
+              value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
+            - name: network.host
+              value: 0.0.0.0
+            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+              value: super@Secret1
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: node.roles
+              value: cluster-manager
+status:
+  readyReplicas: 3
+  replicas: 3
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: data
+    app.kubernetes.io/version: 3.0.0
+    data: "true"
+    ingest: "true"
+    remote-cluster-client: "true"
+    stackable.tech/vendor: Stackable
+  name: opensearch-nodes-data
+spec:
+  podManagementPolicy: Parallel
+  replicas: 5
+  template:
+    spec:
+      containers:
+        - name: opensearch
+          env:
+            - name: discovery.seed_hosts
+              value: opensearch-cluster-manager
+            - name: discovery.type
+              value: zen
+            - name: cluster.initial_cluster_manager_nodes
+            - name: network.host
+              value: 0.0.0.0
+            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+              value: super@Secret1
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: node.roles
+              value: ingest,data,remote-cluster-client
+status:
+  readyReplicas: 5
+  replicas: 5
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+  name: opensearch-nodes
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch

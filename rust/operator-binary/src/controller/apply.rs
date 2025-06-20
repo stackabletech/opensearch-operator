@@ -57,6 +57,8 @@ impl<'a> Applier<'a> {
     pub async fn apply(mut self, resources: Resources<Prepared>) -> Result<Resources<Applied>> {
         let stateful_sets = self.add_resources(resources.stateful_sets).await?;
 
+        let services = self.add_resources(resources.services).await?;
+
         let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
 
         self.cluster_resources
@@ -66,6 +68,7 @@ impl<'a> Applier<'a> {
 
         Ok(Resources {
             stateful_sets,
+            services,
             pod_disruption_budgets,
             status: PhantomData,
         })

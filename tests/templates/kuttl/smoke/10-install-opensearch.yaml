@@ -9,5 +9,15 @@ spec:
     productVersion: 3.0.0
   nodes:
     roleGroups:
-      default:
-        replicas: 1
+      cluster-manager:
+        config:
+          nodeRoles:
+            - cluster_manager
+        replicas: 3
+      data:
+        config:
+          nodeRoles:
+            - ingest
+            - data
+            - remote_cluster_client
+        replicas: 5
