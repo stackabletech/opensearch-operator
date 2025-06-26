@@ -8,12 +8,14 @@ use stackable_operator::{
         merge::{Atomic, Merge},
     },
     kube::CustomResource,
-    role_utils::Role,
+    role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
     versioned::versioned,
 };
 use strum::Display;
+
+use crate::framework::role_utils::GenericProductSpecificCommonConfig;
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
@@ -45,7 +47,8 @@ pub mod versioned {
         pub cluster_operation: ClusterOperation,
 
         /// OpenSearch nodes
-        pub nodes: Role<OpenSearchConfigFragment>,
+        pub nodes:
+            Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -72,9 +75,9 @@ pub mod versioned {
         Data,
         #[strum(serialize = "ingest")]
         Ingest,
-        #[strum(serialize = "cluster-manager")]
+        #[strum(serialize = "cluster_manager")]
         ClusterManager,
-        #[strum(serialize = "remote-cluster-client")]
+        #[strum(serialize = "remote_cluster_client")]
         RemoteClusterClient,
         #[strum(serialize = "warm")]
         Warm,

@@ -6,10 +6,14 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::product_image_selection::ProductImage,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service, policy::v1::PodDisruptionBudget},
-    kube::{Resource, core::DeserializeGuard, runtime::controller::Action},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service},
+        policy::v1::PodDisruptionBudget,
+    },
+    kube::{Resource, api::ObjectMeta, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
-    role_utils::{GenericProductSpecificCommonConfig, GenericRoleConfig, RoleGroup},
+    role_utils::GenericRoleConfig,
     time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -21,6 +25,7 @@ use crate::{
     framework::{
         ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
         OperatorName, ProductName, ProductVersion, RoleGroupName,
+        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
     },
 };
 
@@ -90,14 +95,16 @@ impl ReconcilerError for Error {
     }
 }
 
-type RoleGroupConfig = RoleGroup<v1alpha1::OpenSearchConfig, GenericProductSpecificCommonConfig>;
+type OpenSearchRoleGroupConfig =
+    RoleGroupConfig<GenericProductSpecificCommonConfig, v1alpha1::OpenSearchConfig>;
 
 // validated and converted to validated and safe types
 // no user errors
 // not restricted by CRD compliance
+// TODO More derives
 #[derive(Clone)]
 pub struct ValidatedCluster {
-    origin: v1alpha1::OpenSearchCluster,
+    metadata: ObjectMeta,
     pub image: ProductImage,
     pub product_version: ProductVersion,
     pub name: ClusterName,
@@ -105,7 +112,7 @@ pub struct ValidatedCluster {
     pub uid: String,
     pub role_config: GenericRoleConfig,
     // "validated" means that labels are valid and no ugly rolegroup name broke them
-    pub role_group_configs: BTreeMap<RoleGroupName, RoleGroupConfig>,
+    pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
@@ -116,18 +123,18 @@ impl ValidatedCluster {
     pub fn node_count(&self) -> u32 {
         self.role_group_configs
             .values()
-            .map(|rg| rg.replicas.unwrap_or(1) as u32)
+            .map(|rg| rg.replicas as u32)
             .sum()
     }
 
     pub fn role_group_configs_filtered_by_node_role(
         &self,
         node_role: &v1alpha1::NodeRole,
-    ) -> BTreeMap<RoleGroupName, RoleGroupConfig> {
+    ) -> BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig> {
         self.role_group_configs
             .clone()
             .into_iter()
-            .filter(|c| c.1.config.config.node_roles.contains(node_role))
+            .filter(|c| c.1.config.node_roles.contains(node_role))
             .collect()
     }
 }
@@ -181,11 +188,11 @@ impl Resource for ValidatedCluster {
     }
 
     fn meta(&self) -> &stackable_operator::kube::api::ObjectMeta {
-        self.origin.meta()
+        &self.metadata
     }
 
     fn meta_mut(&mut self) -> &mut stackable_operator::kube::api::ObjectMeta {
-        self.origin.meta_mut()
+        &mut self.metadata
     }
 }
 
@@ -249,6 +256,7 @@ struct Applied;
 struct Resources<T> {
     stateful_sets: Vec<StatefulSet>,
     services: Vec<Service>,
+    config_maps: Vec<ConfigMap>,
     pod_disruption_budgets: Vec<PodDisruptionBudget>,
     status: PhantomData<T>,
 }

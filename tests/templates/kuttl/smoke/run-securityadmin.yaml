@@ -1,0 +1,61 @@
+# This job creates the .opendistro_security index and populates it with
+# the configuration stored in the opensearch-security-config Secret.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: run-securityadmin
+spec:
+  template:
+    spec:
+      containers:
+        - name: run-securityadmin
+          image: opensearchproject/opensearch:3.0.0
+          command:
+            - /bin/sh
+            - -c
+            - >
+              plugins/opensearch-security/tools/securityadmin.sh
+              -cacert config/tls-client/ca.crt
+              -cert config/tls-client/tls.crt
+              -key config/tls-client/tls.key
+              --hostname opensearch-nodes-cluster-manager.$NAMESPACE.svc.cluster.local
+              --configdir config/opensearch-security/
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: security-config
+              mountPath: /usr/share/opensearch/config/opensearch-security
+              readOnly: true
+            - name: tls-client
+              # The Java policy allows reading from /usr/share/opensearch/config.
+              mountPath: /usr/share/opensearch/config/tls-client
+              readOnly: true
+      volumes:
+        - name: security-config
+          secret:
+            secretName: opensearch-security-config
+        # Create a client TLS certificate to run securityadmin.sh
+        - name: tls-client
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+                  secrets.stackable.tech/scope: pod
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      # serviceAccountName: opensearch-cluster-master
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 1000
+      restartPolicy: OnFailure

@@ -59,6 +59,8 @@ impl<'a> Applier<'a> {
 
         let services = self.add_resources(resources.services).await?;
 
+        let config_maps = self.add_resources(resources.config_maps).await?;
+
         let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
 
         self.cluster_resources
@@ -69,6 +71,7 @@ impl<'a> Applier<'a> {
         Ok(Resources {
             stateful_sets,
             services,
+            config_maps,
             pod_disruption_budgets,
             status: PhantomData,
         })

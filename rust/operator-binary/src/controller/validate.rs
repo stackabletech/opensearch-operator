@@ -7,7 +7,10 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use super::{ProductVersion, RoleGroupName, ValidatedCluster};
 use crate::{
     crd::v1alpha1,
-    framework::{ClusterName, role_utils::with_validated_config},
+    framework::{
+        ClusterName,
+        role_utils::{RoleGroupConfig, with_validated_config},
+    },
 };
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -57,18 +60,21 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
         let role_group_name =
             RoleGroupName::from_str(raw_role_group_name).context(ParseRoleGroupNameSnafu)?;
 
-        let validated_role_group_config = with_validated_config(
+        let validated_role_group = with_validated_config(
             role_group_config,
             &cluster.spec.nodes,
             &v1alpha1::OpenSearchConfigFragment::default(),
         )
         .context(ValidateOpenSearchConfigSnafu)?;
+        let validated_role_group_config = RoleGroupConfig::from(validated_role_group);
+
+        println!("{:?}", validated_role_group_config);
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
     Ok(ValidatedCluster {
-        origin: cluster.to_owned(),
+        metadata: cluster.meta().to_owned(),
         image: cluster.spec.image.clone(),
         product_version,
         name: cluster_name,

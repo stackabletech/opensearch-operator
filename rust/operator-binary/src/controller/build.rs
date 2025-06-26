@@ -2,37 +2,34 @@ use std::{marker::PhantomData, str::FromStr};
 
 use stackable_operator::{
     builder::{
+        configmap::ConfigMapBuilder,
         meta::ObjectMetaBuilder,
-        pod::{
-            PodBuilder,
-            container::{ContainerBuilder, FieldPathEnvVar},
-        },
+        pod::{PodBuilder, container::ContainerBuilder},
     },
     k8s_openapi::{
+        DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                Container, ContainerPort, PodTemplateSpec, Service, ServicePort, ServiceSpec,
+                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodTemplateSpec,
+                Service, ServicePort, ServiceSpec, Volume, VolumeMount,
             },
             policy::v1::PodDisruptionBudget,
         },
         apimachinery::pkg::apis::meta::v1::LabelSelector,
     },
     kvp::{
-        Label, Labels,
+        Label, Labels, ObjectLabels,
         consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
     },
 };
 
 use super::{
-    ContextNames, Prepared, Resources, RoleGroupConfig, RoleGroupName, ValidatedCluster,
-    node_config::{
-        DISCOVERY_SEED_HOSTS, DISCOVERY_TYPE, INITIAL_CLUSTER_MANAGER_NODES, NETWORK_HOST,
-        NODE_NAME, NODE_ROLES, NodeConfig,
-    },
+    ContextNames, OpenSearchRoleGroupConfig, Prepared, Resources, RoleGroupName, ValidatedCluster,
+    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
 };
 use crate::framework::{
-    RoleName,
+    IsLabelValue, RoleName,
     builder::pdb::pod_disruption_budget_builder_with_role,
     kvp::label::{recommended_labels, role_group_selector},
     to_qualified_role_group_name,
@@ -40,6 +37,7 @@ use crate::framework::{
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 
+// TODO Convert to RoleGroupBuilder
 pub struct Builder<'a> {
     names: &'a ContextNames,
     role_name: RoleName,
@@ -59,45 +57,94 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build(&self) -> Resources<Prepared> {
-        let stateful_sets = self
-            .cluster
-            .role_group_configs
-            .iter()
-            .map(|(role_group_name, role_group_config)| {
-                self.build_statefulset(role_group_name, role_group_config)
-            })
-            .collect();
+        let mut config_maps = vec![];
+        let mut stateful_sets = vec![];
+        let mut services = vec![];
 
-        let services = vec![self.build_cluster_manager_service()];
+        for (role_group_name, role_group_config) in &self.cluster.role_group_configs {
+            // used for the name of the StatefulSet, role-group ConfigMap, ...
+            let qualified_role_group_name =
+                to_qualified_role_group_name(&self.cluster.name, &self.role_name, role_group_name);
 
-        // TODO Create further services
+            let config_map = self.build_role_group_config_map(
+                &qualified_role_group_name,
+                role_group_name,
+                role_group_config,
+            );
+            let stateful_set = self.build_statefulset(
+                &qualified_role_group_name,
+                role_group_name,
+                role_group_config,
+            );
+
+            let service =
+                self.build_role_group_service(&qualified_role_group_name, role_group_name);
+
+            config_maps.push(config_map);
+            stateful_sets.push(stateful_set);
+            services.push(service);
+        }
+
+        let cluster_manager_service = self.build_cluster_manager_service();
+        services.push(cluster_manager_service);
 
         let pod_disruption_budgets = self.build_pdb().into_iter().collect();
 
         Resources {
             stateful_sets,
             services,
+            config_maps,
             pod_disruption_budgets,
             status: PhantomData,
         }
     }
 
-    fn build_statefulset(
+    fn build_role_group_config_map(
         &self,
+        config_map_name: &str,
         role_group_name: &RoleGroupName,
-        role_group_config: &RoleGroupConfig,
-    ) -> StatefulSet {
+        role_group_config: &OpenSearchRoleGroupConfig,
+    ) -> ConfigMap {
         let metadata = ObjectMetaBuilder::new()
-            .name(to_qualified_role_group_name(
-                &self.cluster.name,
-                &self.role_name,
-                role_group_name,
-            ))
+            .name(config_map_name)
             .namespace(&self.cluster.namespace)
+            .ownerreference_from_resource(&self.cluster, None, Some(true))
+            // TODO Fix
+            .unwrap()
             .with_labels(self.build_recommended_labels(role_group_name))
             .build();
 
-        let template = self.build_pod_template(role_group_name, role_group_config);
+        ConfigMapBuilder::new()
+            .metadata(metadata)
+            .add_data(
+                CONFIGURATION_FILE_OPENSEARCH_YML,
+                self.node_config.static_opensearch_config(role_group_config),
+            )
+            .build()
+            // TODO Fix
+            .unwrap()
+    }
+
+    fn build_statefulset(
+        &self,
+        qualified_role_group_name: &str,
+        role_group_name: &RoleGroupName,
+        role_group_config: &OpenSearchRoleGroupConfig,
+    ) -> StatefulSet {
+        let metadata = ObjectMetaBuilder::new()
+            .name(qualified_role_group_name)
+            .namespace(&self.cluster.namespace)
+            .ownerreference_from_resource(&self.cluster, None, Some(true))
+            // TODO Fix
+            .unwrap()
+            .with_labels(self.build_recommended_labels(role_group_name))
+            .build();
+
+        let template = self.build_pod_template(
+            qualified_role_group_name,
+            role_group_name,
+            role_group_config,
+        );
 
         let statefulset_match_labels = role_group_selector(
             &self.cluster,
@@ -109,7 +156,7 @@ impl<'a> Builder<'a> {
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: role_group_config.replicas.map(i32::from),
+            replicas: Some(role_group_config.replicas as i32),
             selector: LabelSelector {
                 match_labels: Some(statefulset_match_labels.into()),
                 ..LabelSelector::default()
@@ -118,8 +165,6 @@ impl<'a> Builder<'a> {
             template,
             ..StatefulSetSpec::default()
         };
-
-        // TODO Implement overrides
 
         StatefulSet {
             metadata,
@@ -130,14 +175,14 @@ impl<'a> Builder<'a> {
 
     fn build_pod_template(
         &self,
+        qualified_role_group_name: &str,
         role_group_name: &RoleGroupName,
-        role_group_config: &RoleGroupConfig,
+        role_group_config: &OpenSearchRoleGroupConfig,
     ) -> PodTemplateSpec {
         let mut builder = PodBuilder::new();
 
-        let opensearch_config = &role_group_config.config.config;
         let mut node_role_labels = Labels::new();
-        for node_role in opensearch_config.node_roles.iter() {
+        for node_role in role_group_config.config.node_roles.iter() {
             node_role_labels
                 .insert(Label::try_from((format!("{node_role}"), "true".to_string())).unwrap());
         }
@@ -149,43 +194,54 @@ impl<'a> Builder<'a> {
 
         let container = self.build_container(role_group_config);
 
-        builder
+        let mut pod_template = builder
             .metadata(metadata)
             .add_container(container)
-            .build_template()
+            .add_volume(Volume {
+                name: "config".to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    name: qualified_role_group_name.to_owned(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+            // TODO ?
+            .unwrap()
+            .build_template();
+
+        pod_template.merge_from(role_group_config.pod_overrides.clone());
+
+        pod_template
     }
 
-    fn build_container(&self, role_group_config: &RoleGroupConfig) -> Container {
+    fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
         let product_image = self
             .cluster
             .image
             .resolve("opensearch", crate::built_info::PKG_VERSION);
 
-        let opensearch_config = &role_group_config.config.config;
-
         ContainerBuilder::new("opensearch")
             .expect("should be a valid container name")
             .image_from_product_image(&product_image)
-            .add_env_var(
-                DISCOVERY_SEED_HOSTS,
-                self.node_config.discovery_seed_hosts(),
-            )
-            .add_env_var(DISCOVERY_TYPE, self.node_config.discovery_type())
-            .add_env_var(
-                INITIAL_CLUSTER_MANAGER_NODES,
+            .command(vec![
+                "/usr/share/opensearch/opensearch-docker-entrypoint.sh".to_owned(),
+            ])
+            .args(role_group_config.cli_overrides_to_vec())
+            .add_env_vars(
                 self.node_config
-                    .initial_cluster_manager_nodes(&opensearch_config.node_roles),
+                    .environment_variables(role_group_config)
+                    .into(),
             )
-            .add_env_var(NETWORK_HOST, self.node_config.network_host())
-            // TODO Is this option also required on a proper custom image?
-            .add_env_var("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "super@Secret1")
-            // Set the OpenSearch node name to the Pod name.
-            // The node name is used e.g. for `{INITIAL_CLUSTER_MANAGER_NODES}`.
-            .add_env_var_from_field_path(NODE_NAME, FieldPathEnvVar::Name)
-            .add_env_var(
-                NODE_ROLES,
-                self.node_config.node_roles(&opensearch_config.node_roles),
-            )
+            .add_volume_mounts([VolumeMount {
+                // TODO Use path and file constants
+                mount_path: "/usr/share/opensearch/config/opensearch.yml".to_owned(),
+                name: "config".to_owned(),
+                read_only: Some(true),
+                sub_path: Some("opensearch.yml".to_owned()),
+                ..VolumeMount::default()
+            }])
+            // TODO ?
+            .unwrap()
             .add_container_ports(vec![
                 ContainerPort {
                     name: Some("http".to_owned()),
@@ -211,6 +267,71 @@ impl<'a> Builder<'a> {
             &self.role_name,
             role_group_name,
         )
+    }
+
+    fn build_role_group_service(
+        &self,
+        qualified_role_group_name: &str,
+        role_group_name: &RoleGroupName,
+    ) -> Service {
+        let ports = vec![
+            ServicePort {
+                name: Some("http".to_owned()),
+                port: 9200,
+                ..ServicePort::default()
+            },
+            ServicePort {
+                name: Some("transport".to_owned()),
+                port: 9300,
+                ..ServicePort::default()
+            },
+        ];
+
+        // TODO Add metrics port and Prometheus label
+
+        let metadata = ObjectMetaBuilder::new()
+            .name(qualified_role_group_name)
+            .namespace(&self.cluster.namespace)
+            .ownerreference_from_resource(&self.cluster, None, Some(true))
+            // TODO Fix
+            .unwrap()
+            .with_recommended_labels(ObjectLabels {
+                owner: &self.cluster,
+                app_name: &self.names.product_name.to_label_value(),
+                app_version: &self.cluster.product_version.to_label_value(),
+                operator_name: &self.names.operator_name.to_label_value(),
+                controller_name: &self.names.controller_name.to_label_value(),
+                role: &self.role_name.to_label_value(),
+                role_group: &role_group_name.to_label_value(),
+            })
+            // TODO fix
+            .unwrap()
+            .build();
+
+        let service_selector = Labels::role_group_selector(
+            &self.cluster,
+            &self.names.product_name.to_label_value(),
+            &self.role_name.to_label_value(),
+            &role_group_name.to_label_value(),
+        )
+        // TODO fix
+        .unwrap();
+
+        let service_spec = ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(ports),
+            selector: Some(service_selector.into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        };
+
+        Service {
+            metadata,
+            spec: Some(service_spec),
+            status: None,
+        }
     }
 
     fn build_cluster_manager_service(&self) -> Service {
