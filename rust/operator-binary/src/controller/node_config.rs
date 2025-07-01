@@ -89,8 +89,8 @@ impl NodeConfig {
     }
 
     pub fn discovery_seed_hosts(&self) -> String {
-        // TODO Fix
-        "opensearch-cluster-manager".to_owned()
+        // TODO Check length
+        format!("{}-cluster-manager", self.cluster_name())
     }
 
     /// Configuration for `{DISCOVERY_TYPE}`

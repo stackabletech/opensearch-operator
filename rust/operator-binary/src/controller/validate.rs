@@ -68,7 +68,7 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
         .context(ValidateOpenSearchConfigSnafu)?;
         let validated_role_group_config = RoleGroupConfig::from(validated_role_group);
 
-        println!("{:?}", validated_role_group_config);
+        println!("{validated_role_group_config:?}");
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }

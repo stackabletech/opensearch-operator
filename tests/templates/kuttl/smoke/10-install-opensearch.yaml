@@ -180,7 +180,6 @@ stringData:
       reserved: false
       backend_roles:
         - admin
-      description: Maps admin to all_access
 
     kibana_server:
       reserved: true

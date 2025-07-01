@@ -10,6 +10,7 @@ use crate::framework::{
 
 pub const LABEL_VALUE_MAX_LENGTH: usize = 63;
 
+/// Infallible variant of `Labels::recommended`
 pub fn recommended_labels(
     owner: &(impl Resource + IsLabelValue),
     product_name: &ProductName,
@@ -32,6 +33,7 @@ pub fn recommended_labels(
         .expect("Labels should be created because all given parameters produce valid label values")
 }
 
+/// Infallible variant of `Labels::role_group_selector`
 pub fn role_group_selector(
     owner: &(impl Resource + IsLabelValue),
     product_name: &ProductName,

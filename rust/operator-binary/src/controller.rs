@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
 use apply::Applier;
-use build::Builder;
+use build::build;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
@@ -227,7 +227,7 @@ pub async fn reconcile(
     let validated_cluster = validate(cluster).context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
-    let prepared_resources = Builder::new(&context.names, validated_cluster.clone()).build();
+    let prepared_resources = build(&context.names, validated_cluster.clone());
 
     // apply (client required)
     let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
