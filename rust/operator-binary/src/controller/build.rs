@@ -28,11 +28,14 @@ use super::{
     ContextNames, OpenSearchRoleGroupConfig, Prepared, Resources, RoleGroupName, ValidatedCluster,
     node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
 };
-use crate::framework::{
-    IsLabelValue, RoleName,
-    builder::pdb::pod_disruption_budget_builder_with_role,
-    kvp::label::{recommended_labels, role_group_selector},
-    to_qualified_role_group_name,
+use crate::{
+    crd::v1alpha1,
+    framework::{
+        IsLabelValue, RoleName,
+        builder::pdb::pod_disruption_budget_builder_with_role,
+        kvp::label::{recommended_labels, role_group_selector},
+        to_qualified_role_group_name,
+    },
 };
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
@@ -380,7 +383,11 @@ impl<'a> Builder<'a> {
             .with_labels(labels)
             .build();
 
-        let service_selector = [("cluster-manager".to_owned(), "true".to_owned())].into();
+        let service_selector = [(
+            v1alpha1::NodeRole::ClusterManager.to_string(),
+            "true".to_owned(),
+        )]
+        .into();
 
         let service_spec = ServiceSpec {
             // Internal communication does not need to be exposed

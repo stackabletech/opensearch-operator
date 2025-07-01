@@ -1,3 +1,10 @@
+# All fields are checked that are set by the operator.
+# This helps to detect unintentional changes.
+# The maintenance effort should be okay as long as it is only done in the smoke test.
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -9,34 +16,101 @@ metadata:
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
     app.kubernetes.io/version: 3.0.0
-    cluster-manager: "true"
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
   podManagementPolicy: Parallel
   replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch
+      app.kubernetes.io/role-group: cluster-manager
+  serviceName: ""
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: cluster-manager
+        app.kubernetes.io/version: 3.0.0
+        cluster_manager: "true"
+        stackable.tech/vendor: Stackable
     spec:
       containers:
-        - name: opensearch
-          env:
-            - name: discovery.seed_hosts
-              value: opensearch-cluster-manager
-            - name: discovery.type
-              value: zen
-            - name: cluster.initial_cluster_manager_nodes
-              value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
-            - name: network.host
-              value: 0.0.0.0
-            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
-              value: super@Secret1
-            - name: node.name
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-            - name: node.roles
-              value: cluster-manager
+      - command:
+        - /usr/share/opensearch/opensearch-docker-entrypoint.sh
+        env:
+        - name: DISABLE_INSTALL_DEMO_CONFIG
+          value: "true"
+        - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+          value: super@Secret1
+        - name: cluster.initial_cluster_manager_nodes
+          value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
+        - name: discovery.seed_hosts
+          value: opensearch-cluster-manager
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: node.roles
+          value: cluster_manager
+        image: opensearchproject/opensearch:3.0.0
+        imagePullPolicy: Always
+        name: opensearch
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /usr/share/opensearch/config/opensearch.yml
+          name: config
+          readOnly: true
+          subPath: opensearch.yml
+        - mountPath: /usr/share/opensearch/config/opensearch-security
+          name: security-config
+          readOnly: true
+        - mountPath: /usr/share/opensearch/config/tls
+          name: tls
+          readOnly: true
+      securityContext:
+        fsGroup: 1000
+      volumes:
+      - configMap:
+          name: opensearch-nodes-cluster-manager
+        name: config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: node,pod,service=opensearch-cluster-manager,service=opensearch-nodes-cluster-manager
+              creationTimestamp: null
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: secrets.stackable.tech
+              volumeMode: Filesystem
+        name: tls
+      - name: security-config
+        secret:
+          defaultMode: 420
+          secretName: opensearch-security-config
 status:
   readyReplicas: 3
   replicas: 3
@@ -51,35 +125,101 @@ metadata:
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
     app.kubernetes.io/version: 3.0.0
-    data: "true"
-    ingest: "true"
-    remote-cluster-client: "true"
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
   podManagementPolicy: Parallel
   replicas: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch
+      app.kubernetes.io/role-group: data
+  serviceName: ""
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: data
+        app.kubernetes.io/version: 3.0.0
+        data: "true"
+        ingest: "true"
+        remote_cluster_client: "true"
+        stackable.tech/vendor: Stackable
     spec:
       containers:
-        - name: opensearch
-          env:
-            - name: discovery.seed_hosts
-              value: opensearch-cluster-manager
-            - name: discovery.type
-              value: zen
-            - name: cluster.initial_cluster_manager_nodes
-            - name: network.host
-              value: 0.0.0.0
-            - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
-              value: super@Secret1
-            - name: node.name
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.name
-            - name: node.roles
-              value: ingest,data,remote-cluster-client
+      - command:
+        - /usr/share/opensearch/opensearch-docker-entrypoint.sh
+        env:
+        - name: DISABLE_INSTALL_DEMO_CONFIG
+          value: "true"
+        - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+          value: super@Secret1
+        - name: cluster.initial_cluster_manager_nodes
+        - name: discovery.seed_hosts
+          value: opensearch-cluster-manager
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: node.roles
+          value: ingest,data,remote_cluster_client
+        image: opensearchproject/opensearch:3.0.0
+        imagePullPolicy: Always
+        name: opensearch
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /usr/share/opensearch/config/opensearch.yml
+          name: config
+          readOnly: true
+          subPath: opensearch.yml
+        - mountPath: /usr/share/opensearch/config/opensearch-security
+          name: security-config
+          readOnly: true
+        - mountPath: /usr/share/opensearch/config/tls
+          name: tls
+          readOnly: true
+      securityContext:
+        fsGroup: 1000
+      volumes:
+      - configMap:
+          name: opensearch-nodes-data
+        name: config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data
+              creationTimestamp: null
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: secrets.stackable.tech
+              volumeMode: Filesystem
+        name: tls
+      - name: security-config
+        secret:
+          secretName: opensearch-security-config
 status:
   readyReplicas: 5
   replicas: 5

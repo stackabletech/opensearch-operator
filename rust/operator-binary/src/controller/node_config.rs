@@ -90,7 +90,7 @@ impl NodeConfig {
 
     pub fn discovery_seed_hosts(&self) -> String {
         // TODO Fix
-        "opensearch-nodes-cluster-manager.default.svc.cluster.local".to_owned()
+        "opensearch-cluster-manager".to_owned()
     }
 
     /// Configuration for `{DISCOVERY_TYPE}`
@@ -166,7 +166,7 @@ impl NodeConfig {
     pub fn node_roles(&self, node_roles: &NodeRoles) -> String {
         node_roles
             .iter()
-            .map(|r| format!("{}", r))
+            .map(|node_role| format!("{node_role}"))
             .collect::<Vec<_>>()
             .join(",")
     }

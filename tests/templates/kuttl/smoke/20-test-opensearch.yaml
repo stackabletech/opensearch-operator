@@ -61,7 +61,7 @@ data:
 
     # TODO Use a discovery ConfigMap
 
-    host = 'opensearch-nodes-cluster-manager.default.svc.cluster.local'
+    host = 'opensearch-cluster-manager'
     port = 9200
     auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
     ca_certs_path = '/stackable/tls/ca.crt'
