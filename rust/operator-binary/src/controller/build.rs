@@ -11,12 +11,12 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodTemplateSpec,
-                Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodTemplateSpec, Probe,
+                Service, ServicePort, ServiceSpec, TCPSocketAction, Volume, VolumeMount,
             },
             policy::v1::PodDisruptionBudget,
         },
-        apimachinery::pkg::apis::meta::v1::LabelSelector,
+        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kvp::{
         Label, Labels, ObjectLabels,
@@ -223,6 +223,29 @@ impl<'a> Builder<'a> {
             .image
             .resolve("opensearch", crate::built_info::PKG_VERSION);
 
+        // Probe values taken from the official Helm chart
+        let startup_probe = Probe {
+            failure_threshold: Some(30),
+            initial_delay_seconds: Some(5),
+            period_seconds: Some(10),
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(9200),
+                ..TCPSocketAction::default()
+            }),
+            timeout_seconds: Some(3),
+            ..Probe::default()
+        };
+        let readiness_probe = Probe {
+            failure_threshold: Some(3),
+            period_seconds: Some(5),
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(9200),
+                ..TCPSocketAction::default()
+            }),
+            timeout_seconds: Some(3),
+            ..Probe::default()
+        };
+
         ContainerBuilder::new("opensearch")
             .expect("should be a valid container name")
             .image_from_product_image(&product_image)
@@ -257,6 +280,8 @@ impl<'a> Builder<'a> {
                     ..ContainerPort::default()
                 },
             ])
+            .startup_probe(startup_probe)
+            .readiness_probe(readiness_probe)
             .build()
     }
 

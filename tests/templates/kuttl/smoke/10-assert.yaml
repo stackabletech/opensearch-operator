@@ -74,6 +74,21 @@ spec:
         - containerPort: 9300
           name: transport
           protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9200
+          timeoutSeconds: 3
+        startupProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 9200
+          timeoutSeconds: 3
         volumeMounts:
         - mountPath: /usr/share/opensearch/config/opensearch.yml
           name: config
@@ -184,6 +199,21 @@ spec:
         - containerPort: 9300
           name: transport
           protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 9200
+          timeoutSeconds: 3
+        startupProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 9200
+          timeoutSeconds: 3
         volumeMounts:
         - mountPath: /usr/share/opensearch/config/opensearch.yml
           name: config
