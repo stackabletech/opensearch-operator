@@ -30,7 +30,7 @@ use super::{
 use crate::{
     crd::v1alpha1,
     framework::{
-        RoleName,
+        ClusterName, OBJECT_NAME_MAX_LENGTH, RoleName,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
@@ -78,13 +78,13 @@ impl<'a> RoleBuilder<'a> {
                     self.cluster.clone(),
                     role_group_name.clone(),
                     role_group_config.clone(),
+                    self.discovery_service_name(),
                 )
             })
             .collect()
     }
 
     fn build_cluster_manager_service(&self) -> Service {
-        // TODO Share port config
         let ports = vec![
             ServicePort {
                 name: Some(HTTP_PORT_NAME.to_owned()),
@@ -127,7 +127,7 @@ impl<'a> RoleBuilder<'a> {
             .unwrap();
 
         let metadata = ObjectMetaBuilder::new()
-            .name(format!("{}-cluster-manager", self.cluster.name))
+            .name(self.discovery_service_name())
             .namespace(&self.cluster.namespace)
             .ownerreference(ownerreference_from_resource(
                 &self.cluster,
@@ -182,7 +182,22 @@ impl<'a> RoleBuilder<'a> {
             None
         }
     }
+
+    fn discovery_service_name(&self) -> String {
+        const SUFFIX: &str = "-cluster-manager";
+
+        // Compile-time check
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= OBJECT_NAME_MAX_LENGTH,
+            "The resource name `<cluster_name>-cluster-manager` must not exceed 253 characters."
+        );
+
+        format!("{}{SUFFIX}", self.cluster.name)
+    }
 }
+
+// Path in opensearchproject/opensearch:3.0.0
+const OPENSEARCH_BASE_PATH: &str = "/usr/share/opensearch";
 
 struct RoleGroupBuilder<'a> {
     names: &'a ContextNames,
@@ -201,6 +216,7 @@ impl<'a> RoleGroupBuilder<'a> {
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
+        discovery_service_name: String,
     ) -> RoleGroupBuilder<'a> {
         // used for the name of the StatefulSet, role-group ConfigMap, ...
         let qualified_role_group_name =
@@ -210,7 +226,12 @@ impl<'a> RoleGroupBuilder<'a> {
             names,
             role_name: role_name.clone(),
             cluster: cluster.clone(),
-            node_config: NodeConfig::new(role_name, cluster),
+            node_config: NodeConfig::new(
+                role_name,
+                cluster,
+                role_group_config.clone(),
+                discovery_service_name,
+            ),
             qualified_role_group_name,
             role_group_name,
             role_group_config,
@@ -231,8 +252,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         let data = [(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config
-                .static_opensearch_config(&self.role_group_config),
+            self.node_config.static_opensearch_config(),
         )]
         .into();
 
@@ -351,18 +371,15 @@ impl<'a> RoleGroupBuilder<'a> {
         ContainerBuilder::new("opensearch")
             .expect("should be a valid container name")
             .image_from_product_image(&product_image)
-            .command(vec![
-                "/usr/share/opensearch/opensearch-docker-entrypoint.sh".to_owned(),
-            ])
+            .command(vec![format!(
+                "{OPENSEARCH_BASE_PATH}/opensearch-docker-entrypoint.sh"
+            )])
             .args(role_group_config.cli_overrides_to_vec())
-            .add_env_vars(
-                self.node_config
-                    .environment_variables(role_group_config)
-                    .into(),
-            )
+            .add_env_vars(self.node_config.environment_variables().into())
             .add_volume_mounts([VolumeMount {
-                // TODO Use path and file constants
-                mount_path: "/usr/share/opensearch/config/opensearch.yml".to_owned(),
+                mount_path: format!(
+                    "{OPENSEARCH_BASE_PATH}/config/{CONFIGURATION_FILE_OPENSEARCH_YML}"
+                ),
                 name: CONFIG_VOLUME_NAME.to_owned(),
                 read_only: Some(true),
                 sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
@@ -422,7 +439,7 @@ impl<'a> RoleGroupBuilder<'a> {
             },
         ];
 
-        // TODO Add metrics port and Prometheus label
+        // TODO Add Prometheus label
 
         let metadata = ObjectMetaBuilder::new()
             .name(self.qualified_role_group_name.clone())

@@ -101,8 +101,7 @@ type OpenSearchRoleGroupConfig =
 // validated and converted to validated and safe types
 // no user errors
 // not restricted by CRD compliance
-// TODO More derives
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedCluster {
     metadata: ObjectMeta,
     pub image: ProductImage,

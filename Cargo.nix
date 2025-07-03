@@ -2818,9 +2818,9 @@ rec {
       };
       "h2" = rec {
         crateName = "h2";
-        version = "0.4.10";
+        version = "0.4.11";
         edition = "2021";
-        sha256 = "19f0va87lhzrc0lmwkgcz1z0haf6glajb4icp0b7n50vdmkilhm9";
+        sha256 = "118771sqbsa6cn48y9waxq24jx80f5xy8af0lq5ixq7ifsi51nhp";
         authors = [
           "Carl Lerche <me@carllerche.com>"
           "Sean McArthur <sean@seanmonstar.com>"
@@ -2854,7 +2854,7 @@ rec {
           }
           {
             name = "indexmap";
-            packageId = "indexmap 2.9.0";
+            packageId = "indexmap 2.10.0";
             features = [ "std" ];
           }
           {
@@ -4123,11 +4123,11 @@ rec {
           "serde-1" = [ "serde" ];
         };
       };
-      "indexmap 2.9.0" = rec {
+      "indexmap 2.10.0" = rec {
         crateName = "indexmap";
-        version = "2.9.0";
+        version = "2.10.0";
         edition = "2021";
-        sha256 = "07m15a571yywmvqyb7ms717q9n42b46badbpsmx215jrg7dhv9yf";
+        sha256 = "0qd6g26gxzl6dbf132w48fa8rr95glly3jhbk90i29726d9xhk7y";
         dependencies = [
           {
             name = "equivalent";
@@ -4149,6 +4149,37 @@ rec {
           "serde" = [ "dep:serde" ];
         };
         resolvedDefaultFeatures = [ "default" "std" ];
+      };
+      "io-uring" = rec {
+        crateName = "io-uring";
+        version = "0.7.8";
+        edition = "2021";
+        sha256 = "04whnj5a4pml44jhsmmf4p87bpgr7swkcijx4yjcng8900pj0vmq";
+        libName = "io_uring";
+        authors = [
+          "quininer <quininer@live.com>"
+        ];
+        dependencies = [
+          {
+            name = "bitflags";
+            packageId = "bitflags";
+          }
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "libc";
+            packageId = "libc";
+            usesDefaultFeatures = false;
+          }
+        ];
+        features = {
+          "bindgen" = [ "dep:bindgen" ];
+          "direct-syscall" = [ "sc" ];
+          "overwrite" = [ "bindgen" ];
+          "sc" = [ "dep:sc" ];
+        };
       };
       "ipnet" = rec {
         crateName = "ipnet";
@@ -6951,9 +6982,9 @@ rec {
       };
       "reqwest" = rec {
         crateName = "reqwest";
-        version = "0.12.20";
+        version = "0.12.22";
         edition = "2021";
-        sha256 = "04qqxghqszjxk4pl4vxa5qlwinkfx0vvjkk10vv2n3hkv6blrgza";
+        sha256 = "0cbmfrcrk6wbg93apmji0fln1ca9322af2kc7dpa18vcgs9k3jfb";
         authors = [
           "Sean McArthur <sean@seanmonstar.com>"
         ];
@@ -7160,7 +7191,7 @@ rec {
           "h2" = [ "dep:h2" ];
           "hickory-dns" = [ "dep:hickory-resolver" "dep:once_cell" ];
           "http2" = [ "h2" "hyper/http2" "hyper-util/http2" "hyper-rustls?/http2" ];
-          "http3" = [ "rustls-tls-manual-roots" "dep:h3" "dep:h3-quinn" "dep:quinn" "dep:slab" "tokio/macros" ];
+          "http3" = [ "rustls-tls-manual-roots" "dep:h3" "dep:h3-quinn" "dep:quinn" "tokio/macros" ];
           "json" = [ "dep:serde_json" ];
           "macos-system-configuration" = [ "system-proxy" ];
           "multipart" = [ "dep:mime_guess" "dep:futures-util" ];
@@ -8001,7 +8032,7 @@ rec {
         dependencies = [
           {
             name = "indexmap";
-            packageId = "indexmap 2.9.0";
+            packageId = "indexmap 2.10.0";
           }
           {
             name = "itoa";
@@ -8481,7 +8512,7 @@ rec {
           }
           {
             name = "indexmap";
-            packageId = "indexmap 2.9.0";
+            packageId = "indexmap 2.10.0";
           }
           {
             name = "json-patch";
@@ -9344,9 +9375,9 @@ rec {
       };
       "tokio" = rec {
         crateName = "tokio";
-        version = "1.45.1";
+        version = "1.46.0";
         edition = "2021";
-        sha256 = "0yb7h0mr0m0gfwdl1jir2k37gcrwhcib2kiyx9f95npi7sim3vvm";
+        sha256 = "1i1ypwjxrsxz1w14qyvj3smcandl6dsg6h85w75shmhp920bnh0i";
         authors = [
           "Tokio Contributors <team@tokio.rs>"
         ];
@@ -9362,6 +9393,17 @@ rec {
             optional = true;
           }
           {
+            name = "io-uring";
+            packageId = "io-uring";
+            usesDefaultFeatures = false;
+            target = { target, features }: ((target."tokio_uring" or false) && ("linux" == target."os" or null));
+          }
+          {
+            name = "libc";
+            packageId = "libc";
+            target = { target, features }: ((target."tokio_uring" or false) && ("linux" == target."os" or null));
+          }
+          {
             name = "libc";
             packageId = "libc";
             optional = true;
@@ -9372,6 +9414,13 @@ rec {
             packageId = "mio";
             optional = true;
             usesDefaultFeatures = false;
+          }
+          {
+            name = "mio";
+            packageId = "mio";
+            usesDefaultFeatures = false;
+            target = { target, features }: ((target."tokio_uring" or false) && ("linux" == target."os" or null));
+            features = [ "os-poll" "os-ext" ];
           }
           {
             name = "parking_lot";
@@ -9387,6 +9436,11 @@ rec {
             packageId = "signal-hook-registry";
             optional = true;
             target = { target, features }: (target."unix" or false);
+          }
+          {
+            name = "slab";
+            packageId = "slab";
+            target = { target, features }: ((target."tokio_uring" or false) && ("linux" == target."os" or null));
           }
           {
             name = "socket2";

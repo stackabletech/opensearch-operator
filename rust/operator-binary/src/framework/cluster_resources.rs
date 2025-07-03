@@ -19,7 +19,7 @@ pub fn cluster_resources_new(
     // `-operator`. For the resulting label value to be valid, it must not exceed 63 characters.
     // Check at compile time that ProductName::MAX_LENGTH is defined accordingly.
     const _: () = assert!(
-        ProductName::MAX_LENGTH <= LABEL_VALUE_MAX_LENGTH - "-operator".len(),
+        ProductName::MAX_LENGTH + "-operator".len() <= LABEL_VALUE_MAX_LENGTH,
         "The label value `<product_name>-operator` must not exceed 63 characters."
     );
 

@@ -110,7 +110,6 @@ where
                 role.config.pod_overrides.clone(),
                 role_group.config.pod_overrides.clone(),
             ),
-            // TODO Merge
             product_specific_common_config: merged_product_specific_common_config(
                 role.config.product_specific_common_config.clone(),
                 role_group.config.product_specific_common_config.clone(),

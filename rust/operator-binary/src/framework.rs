@@ -32,7 +32,7 @@ pub enum Error {
 
 /// Maximum length of a DNS subdomain name as defined in RFC 1123.
 #[allow(dead_code)]
-const OBJECT_NAME_MAX_LENGTH: usize = 253;
+pub const OBJECT_NAME_MAX_LENGTH: usize = 253;
 
 /// Has a name that can be used as a DNS subdomain name as defined in RFC 1123.
 /// Most resource types, e.g. a Pod, require such a compliant name.
@@ -136,6 +136,8 @@ attributed_string_type! {
 attributed_string_type! {
     ClusterName,
     "The name of a cluster/stacklet, e.g. \"my-opensearch-cluster\"",
+    // Suffixes are added to produce a resource names. According compile-time check ensures that
+    // max_length cannot be set higher.
     (max_length = LABEL_VALUE_MAX_LENGTH),
     is_object_name,
     is_valid_label_value

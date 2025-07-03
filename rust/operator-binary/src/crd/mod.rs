@@ -139,14 +139,6 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct NodeRoles(Vec<v1alpha1::NodeRole>);
 
-// impl Iterator for NodeRoles {
-//     type Item = v1alpha1::NodeRole;
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.
-//     }
-// }
-
 impl NodeRoles {
     pub fn contains(&self, node_role: &v1alpha1::NodeRole) -> bool {
         self.0.contains(node_role)

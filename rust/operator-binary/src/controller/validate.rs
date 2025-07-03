@@ -16,7 +16,6 @@ use crate::{
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    // TODO Improve message
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {},
 
