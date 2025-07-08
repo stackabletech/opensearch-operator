@@ -2,11 +2,19 @@ use std::slice;
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
-    commons::{cluster_operation::ClusterOperation, product_image_selection::ProductImage},
+    commons::{
+        cluster_operation::ClusterOperation,
+        product_image_selection::ProductImage,
+        resources::{
+            CpuLimitsFragment, MemoryLimitsFragment, NoRuntimeLimitsFragment, PvcConfig,
+            PvcConfigFragment, Resources, ResourcesFragment,
+        },
+    },
     config::{
         fragment::Fragment,
         merge::{Atomic, Merge},
     },
+    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     kube::CustomResource,
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
@@ -88,16 +96,6 @@ pub mod versioned {
         Search,
     }
 
-    // #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-    // pub struct NR {
-    //     data: Option<()>,
-    //     ingest: Option<()>,
-    //     cluster_manager: Option<()>,
-    //     remote_cluster_client: Option<()>,
-    //     warm: Option<()>,
-    //     search: Option<()>,
-    // }
-
     #[derive(Clone, Debug, Fragment, JsonSchema, PartialEq)]
     #[fragment_attrs(
         derive(
@@ -114,6 +112,28 @@ pub mod versioned {
     )]
     pub struct OpenSearchConfig {
         pub node_roles: NodeRoles,
+
+        #[fragment_attrs(serde(default))]
+        pub resources: Resources<StorageConfig>,
+    }
+
+    #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
+    #[fragment_attrs(
+        derive(
+            Clone,
+            Debug,
+            Default,
+            Deserialize,
+            Merge,
+            JsonSchema,
+            PartialEq,
+            Serialize
+        ),
+        serde(rename_all = "camelCase")
+    )]
+    pub struct StorageConfig {
+        #[fragment_attrs(serde(default))]
+        pub data: PvcConfig,
     }
 
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -132,6 +152,46 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
         match &self.status {
             Some(status) => status.conditions.clone(),
             None => vec![],
+        }
+    }
+}
+
+impl v1alpha1::OpenSearchConfig {
+    pub fn default_config() -> v1alpha1::OpenSearchConfigFragment {
+        v1alpha1::OpenSearchConfigFragment {
+            resources: ResourcesFragment {
+                memory: MemoryLimitsFragment {
+                    // An idle node already requires 2 Gi.
+                    limit: Some(Quantity("2Gi".to_owned())),
+                    runtime_limits: NoRuntimeLimitsFragment {},
+                },
+                cpu: CpuLimitsFragment {
+                    // Default taken from the Helm chart, see
+                    // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L150
+                    min: Some(Quantity("1".to_owned())),
+                    // an arbitrary value
+                    max: Some(Quantity("4".to_owned())),
+                },
+                storage: v1alpha1::StorageConfigFragment {
+                    data: PvcConfigFragment {
+                        // Default taken from the Helm chart, see
+                        // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L220
+                        // This value should be overriden by the user. Data nodes need probably
+                        // more, the other nodes less.
+                        capacity: Some(Quantity("8Gi".to_owned())),
+                        storage_class: None,
+                        selectors: None,
+                    },
+                },
+            },
+            // Defaults taken from the Helm chart, see
+            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
+            node_roles: Some(NodeRoles(vec![
+                v1alpha1::NodeRole::ClusterManager,
+                v1alpha1::NodeRole::Ingest,
+                v1alpha1::NodeRole::Data,
+                v1alpha1::NodeRole::RemoteClusterClient,
+            ])),
         }
     }
 }

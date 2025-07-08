@@ -41,6 +41,7 @@ use crate::{
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 const CONFIG_VOLUME_NAME: &str = "config";
+const DATA_VOLUME_NAME: &str = "data";
 const HTTP_PORT_NAME: &str = "http";
 const HTTP_PORT: u16 = 9200;
 const TRANSPORT_PORT_NAME: &str = "transport";
@@ -275,14 +276,23 @@ impl<'a> RoleGroupBuilder<'a> {
             .with_labels(self.build_recommended_labels())
             .build();
 
-        let template = self.build_pod_template();
-
         let statefulset_match_labels = role_group_selector(
             &self.cluster,
             &self.names.product_name,
             &self.role_name,
             &self.role_group_name,
         );
+
+        let template = self.build_pod_template();
+
+        let data_volume_claim_template = self
+            .role_group_config
+            .config
+            .resources
+            .storage
+            .data
+            // TODO Compare name with Helm chart
+            .build_pvc(DATA_VOLUME_NAME, Some(vec!["ReadWriteOnce"]));
 
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
@@ -294,6 +304,7 @@ impl<'a> RoleGroupBuilder<'a> {
             },
             service_name: None,
             template,
+            volume_claim_templates: Some(vec![data_volume_claim_template]),
             ..StatefulSetSpec::default()
         };
 
@@ -376,15 +387,22 @@ impl<'a> RoleGroupBuilder<'a> {
             )])
             .args(role_group_config.cli_overrides_to_vec())
             .add_env_vars(self.node_config.environment_variables().into())
-            .add_volume_mounts([VolumeMount {
-                mount_path: format!(
-                    "{OPENSEARCH_BASE_PATH}/config/{CONFIGURATION_FILE_OPENSEARCH_YML}"
-                ),
-                name: CONFIG_VOLUME_NAME.to_owned(),
-                read_only: Some(true),
-                sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
-                ..VolumeMount::default()
-            }])
+            .add_volume_mounts([
+                VolumeMount {
+                    mount_path: format!(
+                        "{OPENSEARCH_BASE_PATH}/config/{CONFIGURATION_FILE_OPENSEARCH_YML}"
+                    ),
+                    name: CONFIG_VOLUME_NAME.to_owned(),
+                    read_only: Some(true),
+                    sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
+                    ..VolumeMount::default()
+                },
+                VolumeMount {
+                    mount_path: format!("{OPENSEARCH_BASE_PATH}/data"),
+                    name: DATA_VOLUME_NAME.to_owned(),
+                    ..VolumeMount::default()
+                },
+            ])
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .add_container_ports(vec![
                 ContainerPort {
@@ -403,6 +421,7 @@ impl<'a> RoleGroupBuilder<'a> {
                     ..ContainerPort::default()
                 },
             ])
+            .resources(self.role_group_config.config.resources.clone().into())
             .startup_probe(startup_probe)
             .readiness_probe(readiness_probe)
             .build()

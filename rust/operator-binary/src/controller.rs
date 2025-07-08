@@ -240,6 +240,9 @@ pub async fn reconcile(
     .await
     .context(ApplyResourcesSnafu)?;
 
+    // create discovery ConfigMap
+    // TODO Think about: Address from Listener has to be added to some ConfigMap
+
     // update status (client required)
     update_status(&context.client, &context.names, cluster, applied_resources)
         .await

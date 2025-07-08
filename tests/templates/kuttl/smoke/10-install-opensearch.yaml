@@ -1,3 +1,4 @@
+# TODO Test with OpenShift
 ---
 apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
@@ -13,6 +14,10 @@ spec:
         config:
           nodeRoles:
             - cluster_manager
+          resources:
+            storage:
+              data:
+                capacity: 100Mi
         replicas: 3
         podOverrides:
           spec:
@@ -29,7 +34,11 @@ spec:
             - ingest
             - data
             - remote_cluster_client
-        replicas: 5
+          resources:
+            storage:
+              data:
+                capacity: 2Gi
+        replicas: 2
         podOverrides:
           spec:
             volumes:
@@ -46,6 +55,7 @@ spec:
     configOverrides:
       # TODO Add the required options to the operator
       opensearch.yml:
+        # TODO Check that this is safe despite the warning in the documentation
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
         plugins.security.ssl.transport.pemcert_filepath: /usr/share/opensearch/config/tls/tls.crt

@@ -35,5 +35,5 @@ pub fn cluster_resources_new(
         },
         apply_strategy,
     )
-    .expect("")
+    .expect("ClusterResources should be created because the cluster object reference contains name, namespace and uid.")
 }

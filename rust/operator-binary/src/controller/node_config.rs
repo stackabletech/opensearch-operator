@@ -1,3 +1,5 @@
+// TODO Create build module and move build.rs and this file into it
+
 use serde_json::{Value, json};
 use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
@@ -9,7 +11,8 @@ use crate::{
 
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-// TODO Document how to enter config_overrides of various types, e.g. string, list, boolean, ...
+// TODO Document how to enter config_overrides of various types, e.g. string, list, boolean,
+// object, ...
 
 // Configuration file format
 //
@@ -244,7 +247,7 @@ mod tests {
     };
 
     use stackable_operator::{
-        commons::product_image_selection::ProductImage,
+        commons::{product_image_selection::ProductImage, resources::Resources},
         k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector, PodTemplateSpec},
         kube::api::ObjectMeta,
         role_utils::GenericRoleConfig,
@@ -278,6 +281,7 @@ mod tests {
             replicas: 1,
             config: v1alpha1::OpenSearchConfig {
                 node_roles: NodeRoles::default(),
+                resources: Resources::default(),
             },
             config_overrides: HashMap::default(),
             env_overrides: [("TEST".to_owned(), "value".to_owned())].into(),
