@@ -1,10 +1,9 @@
-// TODO Create build module and move build.rs and this file into it
-
 use serde_json::{Value, json};
 use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
-use super::{OpenSearchRoleGroupConfig, ValidatedCluster};
+use super::ValidatedCluster;
 use crate::{
+    controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{RoleName, builder::pod::container::EnvVarSet, to_qualified_role_group_name},
 };
