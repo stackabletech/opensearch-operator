@@ -8,8 +8,9 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodTemplateSpec, Probe,
-                Service, ServicePort, ServiceSpec, TCPSocketAction, Volume, VolumeMount,
+                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodSecurityContext,
+                PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -44,6 +45,7 @@ const OPENSEARCH_BASE_PATH: &str = "/usr/share/opensearch";
 pub struct RoleGroupBuilder<'a> {
     names: &'a ContextNames,
     role_name: RoleName,
+    service_account_name: String,
     cluster: ValidatedCluster,
     node_config: NodeConfig,
     qualified_role_group_name: String,
@@ -55,6 +57,7 @@ impl<'a> RoleGroupBuilder<'a> {
     pub fn new(
         names: &'a ContextNames,
         role_name: RoleName,
+        service_account_name: String,
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
@@ -67,6 +70,7 @@ impl<'a> RoleGroupBuilder<'a> {
         RoleGroupBuilder {
             names,
             role_name: role_name.clone(),
+            service_account_name,
             cluster: cluster.clone(),
             node_config: NodeConfig::new(
                 role_name,
@@ -184,6 +188,11 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..Default::default()
             })
             .expect("The volume names are statically defined and there should be no duplicates.")
+            .security_context(PodSecurityContext {
+                fs_group: Some(1000),
+                ..PodSecurityContext::default()
+            })
+            .service_account_name(&self.service_account_name)
             .build_template();
 
         pod_template.merge_from(self.role_group_config.pod_overrides.clone());

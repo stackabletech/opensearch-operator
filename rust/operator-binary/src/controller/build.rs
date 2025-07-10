@@ -27,12 +27,18 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> Resources<Prepa
     let cluster_manager_service = role_builder.build_cluster_manager_service();
     services.push(cluster_manager_service);
 
+    let service_accounts = vec![role_builder.build_service_account()];
+
+    let role_bindings = vec![role_builder.build_role_binding()];
+
     let pod_disruption_budgets = role_builder.build_pdb().into_iter().collect();
 
     Resources {
         stateful_sets,
         services,
         config_maps,
+        service_accounts,
+        role_bindings,
         pod_disruption_budgets,
         status: PhantomData,
     }

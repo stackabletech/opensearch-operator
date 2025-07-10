@@ -6,12 +6,13 @@ metadata:
 spec:
   template:
     spec:
-      # serviceAccountName: test-sa
       containers:
         - name: test-opensearch
           image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
           command:
             - /bin/bash
+            - -euxo
+            - pipefail
             - -c
           args:
             - |
@@ -26,6 +27,19 @@ spec:
               mountPath: /stackable/scripts
             - name: tls
               mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
       volumes:
         - name: script
           configMap:
@@ -43,10 +57,9 @@ spec:
                 resources:
                   requests:
                     storage: "1"
+      serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000
-        runAsGroup: 1000
-        runAsUser: 1000
       restartPolicy: OnFailure
 ---
 apiVersion: v1

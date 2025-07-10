@@ -8,8 +8,9 @@ use stackable_operator::{
     commons::product_image_selection::ProductImage,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
-        core::v1::{ConfigMap, Service},
+        core::v1::{ConfigMap, Service, ServiceAccount},
         policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
     },
     kube::{Resource, api::ObjectMeta, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
@@ -258,6 +259,8 @@ struct Resources<T> {
     stateful_sets: Vec<StatefulSet>,
     services: Vec<Service>,
     config_maps: Vec<ConfigMap>,
+    service_accounts: Vec<ServiceAccount>,
+    role_bindings: Vec<RoleBinding>,
     pod_disruption_budgets: Vec<PodDisruptionBudget>,
     status: PhantomData<T>,
 }
