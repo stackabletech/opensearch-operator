@@ -8,7 +8,7 @@ use crate::framework::{
     RoleName,
 };
 
-pub const LABEL_VALUE_MAX_LENGTH: usize = 63;
+pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 
 /// Infallible variant of `Labels::recommended`
 pub fn recommended_labels(

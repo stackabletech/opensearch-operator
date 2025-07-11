@@ -16,12 +16,12 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> Resources<Prepa
 
     let role_name = RoleName::from_str("nodes").expect("should be a valid role name");
 
-    let role_builder = RoleBuilder::new(names, role_name, cluster.clone());
+    let role_builder = RoleBuilder::new(role_name, cluster.clone(), names);
 
     for role_group_builder in role_builder.role_group_builders() {
         config_maps.push(role_group_builder.build_config_map());
-        stateful_sets.push(role_group_builder.build_statefulset());
-        services.push(role_group_builder.build_service());
+        stateful_sets.push(role_group_builder.build_stateful_set());
+        services.push(role_group_builder.build_headless_service());
     }
 
     let cluster_manager_service = role_builder.build_cluster_manager_service();

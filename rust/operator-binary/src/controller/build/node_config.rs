@@ -5,7 +5,7 @@ use super::ValidatedCluster;
 use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
-    framework::{RoleName, builder::pod::container::EnvVarSet, to_qualified_role_group_name},
+    framework::{RoleName, builder::pod::container::EnvVarSet, role_group_utils},
 };
 
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
@@ -219,13 +219,16 @@ impl NodeConfig {
             // names here and use them as node names.
             let mut pod_names = vec![];
             for (role_group_name, role_group_config) in cluster_manager_configs {
-                let sts_name = to_qualified_role_group_name(
-                    &self.cluster.name,
-                    &self.role_name,
-                    &role_group_name,
+                let role_group_resource_names = role_group_utils::ResourceNames {
+                    cluster_name: self.cluster.name.clone(),
+                    role_name: self.role_name.clone(),
+                    role_group_name,
+                };
+
+                pod_names.extend(
+                    (0..role_group_config.replicas)
+                        .map(|i| format!("{}-{i}", role_group_resource_names.stateful_set_name())),
                 );
-                pod_names
-                    .extend((0..role_group_config.replicas).map(|i| format!("{sts_name}-{i}")));
             }
             // Pod names cannot contain commas, therefore creating a comma-separated list is safe.
             pod_names.join(",")

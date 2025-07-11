@@ -1,9 +1,10 @@
 // Type-safe wrappers that cannot throw errors
 // The point is, to move the validation "upwards".
+// The contents of this module will be moved to operator-rs when stabilized.
 
 use std::{fmt::Display, str::FromStr};
 
-use kvp::label::LABEL_VALUE_MAX_LENGTH;
+use kvp::label::MAX_LABEL_VALUE_LENGTH;
 use snafu::{ResultExt, Snafu, ensure};
 use stackable_operator::kvp::LabelValue;
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -11,6 +12,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 pub mod builder;
 pub mod cluster_resources;
 pub mod kvp;
+pub mod role_group_utils;
 pub mod role_utils;
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -30,9 +32,10 @@ pub enum Error {
     },
 }
 
+// TODO The maximum length of objects differs.
 /// Maximum length of a DNS subdomain name as defined in RFC 1123.
 #[allow(dead_code)]
-pub const OBJECT_NAME_MAX_LENGTH: usize = 253;
+pub const MAX_OBJECT_NAME_LENGTH: usize = 253;
 
 /// Has a name that can be used as a DNS subdomain name as defined in RFC 1123.
 /// Most resource types, e.g. a Pod, require such a compliant name.
@@ -130,7 +133,7 @@ attributed_string_type! {
 attributed_string_type! {
     ProductVersion,
     "The version of a product, e.g. \"3.0.0\"",
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
@@ -138,72 +141,41 @@ attributed_string_type! {
     "The name of a cluster/stacklet, e.g. \"my-opensearch-cluster\"",
     // Suffixes are added to produce a resource names. According compile-time check ensures that
     // max_length cannot be set higher.
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    (max_length = 24),
     is_object_name,
     is_valid_label_value
 }
 attributed_string_type! {
     ControllerName,
     "The name of a controller in an operator, e.g. \"opensearchcluster\"",
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     OperatorName,
     "The name of an operator, e.g. \"opensearch.stackable.tech\"",
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     RoleGroupName,
-    "The name of a role-group name, e.g. \"clusterManager\"",
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    "The name of a role-group name, e.g. \"cluster-manager\"",
+    (max_length = 16),
     is_object_name,
     is_valid_label_value
 }
 attributed_string_type! {
     RoleName,
     "The name of a role name, e.g. \"nodes\"",
-    (max_length = LABEL_VALUE_MAX_LENGTH),
+    (max_length = 10),
     is_object_name,
     is_valid_label_value
-}
-
-/// Creates a qualified role group name consisting of the cluster name, role name and role-group
-/// name.
-/// The result is a valid DNS subdomain name as defined in RFC 1123 that can be used e.g. as a name
-/// for a StatefulSet.
-pub fn to_qualified_role_group_name(
-    cluster_name: &ClusterName,
-    role_name: &RoleName,
-    role_group_name: &RoleGroupName,
-) -> String {
-    // Compile-time check
-    const _: () = assert!(
-        ClusterName::MAX_LENGTH
-            + 1 /* dash */
-            + RoleName::MAX_LENGTH
-            + 1 /* dash */
-            + RoleGroupName::MAX_LENGTH
-            + 1 /* dash */
-            + 4 /* digits */
-            <= OBJECT_NAME_MAX_LENGTH,
-        "The maximum lengths of the cluster name, role name and role group name must be defined so that the combination of these names (including separators and the sequential pod number) is also a valid object name with a maximum of 263 characters (see RFC 1123)"
-    );
-
-    format!(
-        "{}-{}-{}",
-        cluster_name.to_object_name(),
-        role_name.to_object_name(),
-        role_group_name.to_object_name()
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
-    use super::{ClusterName, RoleGroupName, RoleName, to_qualified_role_group_name};
     use crate::framework::ProductName;
 
     #[test]
@@ -215,20 +187,6 @@ mod tests {
                 "too-long-123456789012345678901234567890123456789012345678901234567890"
             )
             .is_err()
-        );
-    }
-
-    #[test]
-    fn test_qualified_role_group_name() {
-        let qualified_role_group_name = to_qualified_role_group_name(
-            &ClusterName::from_str("test-cluster").expect("should be a valid cluster name"),
-            &RoleName::from_str("data-nodes").expect("should be a valid role name"),
-            &RoleGroupName::from_str("ssd-storage").expect("should be a valid role group name"),
-        );
-
-        assert_eq!(
-            "test-cluster-data-nodes-ssd-storage",
-            qualified_role_group_name
         );
     }
 }

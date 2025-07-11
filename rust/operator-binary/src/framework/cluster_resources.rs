@@ -6,7 +6,7 @@ use stackable_operator::{
 use super::{
     ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName,
 };
-use crate::framework::kvp::label::LABEL_VALUE_MAX_LENGTH;
+use crate::framework::kvp::label::MAX_LABEL_VALUE_LENGTH;
 
 pub fn cluster_resources_new(
     product_name: &ProductName,
@@ -19,7 +19,7 @@ pub fn cluster_resources_new(
     // `-operator`. For the resulting label value to be valid, it must not exceed 63 characters.
     // Check at compile time that ProductName::MAX_LENGTH is defined accordingly.
     const _: () = assert!(
-        ProductName::MAX_LENGTH + "-operator".len() <= LABEL_VALUE_MAX_LENGTH,
+        ProductName::MAX_LENGTH + "-operator".len() <= MAX_LABEL_VALUE_LENGTH,
         "The label value `<product_name>-operator` must not exceed 63 characters."
     );
 

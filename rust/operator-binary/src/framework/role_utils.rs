@@ -11,6 +11,9 @@ use stackable_operator::{
     schemars::JsonSchema,
 };
 
+use super::ProductName;
+use crate::framework::{ClusterName, MAX_OBJECT_NAME_LENGTH, kvp::label::MAX_LABEL_VALUE_LENGTH};
+
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericProductSpecificCommonConfig {}
 
@@ -169,4 +172,49 @@ where
     let mut merged_config = role_group_config;
     merged_config.merge(&role_config);
     merged_config
+}
+
+pub struct ResourceNames {
+    pub cluster_name: ClusterName,
+    pub product_name: ProductName,
+}
+
+impl ResourceNames {
+    pub fn service_account_name(&self) -> String {
+        const SUFFIX: &str = "-serviceaccount";
+
+        // Compile-time check
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= MAX_OBJECT_NAME_LENGTH,
+            "The ServiceAccount name `<cluster_name>-serviceaccount` must not exceed 253 characters."
+        );
+
+        format!("{}{SUFFIX}", self.cluster_name)
+    }
+
+    pub fn role_binding_name(&self) -> String {
+        const SUFFIX: &str = "-rolebinding";
+
+        // No compile-time check, because RoleBinding names do not seem to be restricted.
+
+        format!("{}{SUFFIX}", self.cluster_name)
+    }
+
+    pub fn cluster_role_name(&self) -> String {
+        const SUFFIX: &str = "-clusterrole";
+
+        // No compile-time check, because ClusterRole names do not seem to be restricted.
+
+        format!("{}{SUFFIX}", self.product_name)
+    }
+
+    pub fn discovery_service_name(&self) -> String {
+        // Compile-time check
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH <= MAX_LABEL_VALUE_LENGTH,
+            "The Service name `<cluster_name>` must not exceed 63 characters."
+        );
+
+        format!("{}", self.cluster_name)
+    }
 }

@@ -15,6 +15,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
+    kube::api::ObjectMeta,
     kvp::{Label, Labels},
 };
 
@@ -25,7 +26,7 @@ use crate::{
         RoleGroupName, RoleName,
         builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
-        to_qualified_role_group_name,
+        role_group_utils::ResourceNames,
     },
 };
 
@@ -33,8 +34,6 @@ pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: u16 = 9200;
 pub const TRANSPORT_PORT_NAME: &str = "transport";
 pub const TRANSPORT_PORT: u16 = 9300;
-pub const METRICS_PORT_NAME: &str = "metrics";
-pub const METRICS_PORT: u16 = 9600;
 
 const CONFIG_VOLUME_NAME: &str = "config";
 const DATA_VOLUME_NAME: &str = "data";
@@ -43,58 +42,50 @@ const DATA_VOLUME_NAME: &str = "data";
 const OPENSEARCH_BASE_PATH: &str = "/usr/share/opensearch";
 
 pub struct RoleGroupBuilder<'a> {
-    names: &'a ContextNames,
     role_name: RoleName,
     service_account_name: String,
     cluster: ValidatedCluster,
     node_config: NodeConfig,
-    qualified_role_group_name: String,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
+    context_names: &'a ContextNames,
+    resource_names: ResourceNames,
 }
 
 impl<'a> RoleGroupBuilder<'a> {
     pub fn new(
-        names: &'a ContextNames,
         role_name: RoleName,
         service_account_name: String,
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
+        context_names: &'a ContextNames,
         discovery_service_name: String,
     ) -> RoleGroupBuilder<'a> {
-        // used for the name of the StatefulSet, role-group ConfigMap, ...
-        let qualified_role_group_name =
-            to_qualified_role_group_name(&cluster.name, &role_name, &role_group_name);
-
         RoleGroupBuilder {
-            names,
             role_name: role_name.clone(),
             service_account_name,
             cluster: cluster.clone(),
             node_config: NodeConfig::new(
-                role_name,
-                cluster,
+                role_name.clone(),
+                cluster.clone(),
                 role_group_config.clone(),
                 discovery_service_name,
             ),
-            qualified_role_group_name,
-            role_group_name,
+            role_group_name: role_group_name.clone(),
             role_group_config,
+            context_names,
+            resource_names: ResourceNames {
+                cluster_name: cluster.name.clone(),
+                role_name,
+                role_group_name,
+            },
         }
     }
 
     pub fn build_config_map(&self) -> ConfigMap {
-        let metadata = ObjectMetaBuilder::new()
-            .name(self.qualified_role_group_name.clone())
-            .namespace(&self.cluster.namespace)
-            .ownerreference(ownerreference_from_resource(
-                &self.cluster,
-                None,
-                Some(true),
-            ))
-            .with_labels(self.build_recommended_labels())
-            .build();
+        let metadata =
+            self.common_metadata(self.resource_names.role_group_config_map(), Labels::new());
 
         let data = [(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
@@ -109,24 +100,8 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    pub fn build_statefulset(&self) -> StatefulSet {
-        let metadata = ObjectMetaBuilder::new()
-            .name(self.qualified_role_group_name.clone())
-            .namespace(&self.cluster.namespace)
-            .ownerreference(ownerreference_from_resource(
-                &self.cluster,
-                None,
-                Some(true),
-            ))
-            .with_labels(self.build_recommended_labels())
-            .build();
-
-        let statefulset_match_labels = role_group_selector(
-            &self.cluster,
-            &self.names.product_name,
-            &self.role_name,
-            &self.role_group_name,
-        );
+    pub fn build_stateful_set(&self) -> StatefulSet {
+        let metadata = self.common_metadata(self.resource_names.stateful_set_name(), Labels::new());
 
         let template = self.build_pod_template();
 
@@ -144,10 +119,10 @@ impl<'a> RoleGroupBuilder<'a> {
             pod_management_policy: Some("Parallel".to_string()),
             replicas: Some(self.role_group_config.replicas.into()),
             selector: LabelSelector {
-                match_labels: Some(statefulset_match_labels.into()),
+                match_labels: Some(self.pod_selector().into()),
                 ..LabelSelector::default()
             },
-            service_name: None,
+            service_name: Some(self.resource_names.headless_service_name()),
             template,
             volume_claim_templates: Some(vec![data_volume_claim_template]),
             ..StatefulSetSpec::default()
@@ -165,12 +140,14 @@ impl<'a> RoleGroupBuilder<'a> {
 
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
-            node_role_labels
-                .insert(Label::try_from((format!("{node_role}"), "true".to_string())).unwrap());
+            node_role_labels.insert(
+                Label::try_from((format!("{node_role}"), "true".to_string()))
+                    .expect("should be a valid label"),
+            );
         }
 
         let metadata = ObjectMetaBuilder::new()
-            .with_labels(self.build_recommended_labels())
+            .with_labels(self.recommended_labels())
             .with_labels(node_role_labels)
             .build();
 
@@ -182,7 +159,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .add_volume(Volume {
                 name: CONFIG_VOLUME_NAME.to_owned(),
                 config_map: Some(ConfigMapVolumeSource {
-                    name: self.qualified_role_group_name.clone(),
+                    name: self.resource_names.role_group_config_map(),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -265,11 +242,6 @@ impl<'a> RoleGroupBuilder<'a> {
                     container_port: TRANSPORT_PORT.into(),
                     ..ContainerPort::default()
                 },
-                ContainerPort {
-                    name: Some(METRICS_PORT_NAME.to_owned()),
-                    container_port: METRICS_PORT.into(),
-                    ..ContainerPort::default()
-                },
             ])
             .resources(self.role_group_config.config.resources.clone().into())
             .startup_probe(startup_probe)
@@ -277,19 +249,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .build()
     }
 
-    fn build_recommended_labels(&self) -> Labels {
-        recommended_labels(
-            &self.cluster,
-            &self.names.product_name,
-            &self.cluster.product_version,
-            &self.names.operator_name,
-            &self.names.controller_name,
-            &self.role_name,
-            &self.role_group_name,
-        )
-    }
-
-    pub fn build_service(&self) -> Service {
+    pub fn build_headless_service(&self) -> Service {
         let ports = vec![
             ServicePort {
                 name: Some(HTTP_PORT_NAME.to_owned()),
@@ -301,39 +261,29 @@ impl<'a> RoleGroupBuilder<'a> {
                 port: TRANSPORT_PORT.into(),
                 ..ServicePort::default()
             },
-            ServicePort {
-                name: Some(METRICS_PORT_NAME.to_owned()),
-                port: METRICS_PORT.into(),
-                ..ServicePort::default()
-            },
         ];
 
-        // TODO Add Prometheus label
+        self.build_role_group_service(
+            self.resource_names.headless_service_name(),
+            ports,
+            Labels::new(),
+        )
+    }
 
-        let metadata = ObjectMetaBuilder::new()
-            .name(self.qualified_role_group_name.clone())
-            .namespace(&self.cluster.namespace)
-            .ownerreference(ownerreference_from_resource(
-                &self.cluster,
-                None,
-                Some(true),
-            ))
-            .with_labels(self.build_recommended_labels())
-            .build();
-
-        let service_selector = role_group_selector(
-            &self.cluster,
-            &self.names.product_name,
-            &self.role_name,
-            &self.role_group_name,
-        );
+    fn build_role_group_service(
+        &self,
+        service_name: impl Into<String>,
+        ports: Vec<ServicePort>,
+        extra_labels: Labels,
+    ) -> Service {
+        let metadata = self.common_metadata(service_name, extra_labels);
 
         let service_spec = ServiceSpec {
             // Internal communication does not need to be exposed
             type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(ports),
-            selector: Some(service_selector.into()),
+            selector: Some(self.pod_selector().into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         };
@@ -343,5 +293,44 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(service_spec),
             status: None,
         }
+    }
+
+    fn common_metadata(
+        &self,
+        resource_name: impl Into<String>,
+        extra_labels: Labels,
+    ) -> ObjectMeta {
+        ObjectMetaBuilder::new()
+            .name(resource_name)
+            .namespace(&self.cluster.namespace)
+            .ownerreference(ownerreference_from_resource(
+                &self.cluster,
+                None,
+                Some(true),
+            ))
+            .with_labels(self.recommended_labels())
+            .with_labels(extra_labels)
+            .build()
+    }
+
+    fn recommended_labels(&self) -> Labels {
+        recommended_labels(
+            &self.cluster,
+            &self.context_names.product_name,
+            &self.cluster.product_version,
+            &self.context_names.operator_name,
+            &self.context_names.controller_name,
+            &self.role_name,
+            &self.role_group_name,
+        )
+    }
+
+    fn pod_selector(&self) -> Labels {
+        role_group_selector(
+            &self.cluster,
+            &self.context_names.product_name,
+            &self.role_name,
+            &self.role_group_name,
+        )
     }
 }
