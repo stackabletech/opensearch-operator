@@ -1,4 +1,4 @@
-use std::slice;
+use std::{slice, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -19,6 +19,7 @@ use stackable_operator::{
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     status::condition::{ClusterCondition, HasStatusCondition},
+    time::Duration,
     versioned::versioned,
 };
 use strum::Display;
@@ -115,6 +116,11 @@ pub mod versioned {
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
+
+        /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the
+        /// operator documentation for details.
+        #[fragment_attrs(serde(default))]
+        pub graceful_shutdown_timeout: Duration,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -159,6 +165,14 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
 impl v1alpha1::OpenSearchConfig {
     pub fn default_config() -> v1alpha1::OpenSearchConfigFragment {
         v1alpha1::OpenSearchConfigFragment {
+            // Defaults taken from the Helm chart, see
+            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
+            node_roles: Some(NodeRoles(vec![
+                v1alpha1::NodeRole::ClusterManager,
+                v1alpha1::NodeRole::Ingest,
+                v1alpha1::NodeRole::Data,
+                v1alpha1::NodeRole::RemoteClusterClient,
+            ])),
             resources: ResourcesFragment {
                 memory: MemoryLimitsFragment {
                     // An idle node already requires 2 Gi.
@@ -184,14 +198,11 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
-            // Defaults taken from the Helm chart, see
-            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
-            node_roles: Some(NodeRoles(vec![
-                v1alpha1::NodeRole::ClusterManager,
-                v1alpha1::NodeRole::Ingest,
-                v1alpha1::NodeRole::Data,
-                v1alpha1::NodeRole::RemoteClusterClient,
-            ])),
+            // Default taken from the Helm chart, see
+            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L364
+            graceful_shutdown_timeout: Some(
+                Duration::from_str("2m").expect("should be a valid duration"),
+            ),
         }
     }
 }

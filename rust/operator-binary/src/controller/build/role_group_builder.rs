@@ -1,16 +1,13 @@
 use stackable_operator::{
-    builder::{
-        meta::ObjectMetaBuilder,
-        pod::{PodBuilder, container::ContainerBuilder},
-    },
+    builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
     k8s_openapi::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodSecurityContext,
-                PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction, Volume,
-                VolumeMount,
+                PodSpec, PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec,
+                TCPSocketAction, Volume, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -136,8 +133,6 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     fn build_pod_template(&self) -> PodTemplateSpec {
-        let mut builder = PodBuilder::new();
-
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(
@@ -153,24 +148,35 @@ impl<'a> RoleGroupBuilder<'a> {
 
         let container = self.build_container(&self.role_group_config);
 
-        let mut pod_template = builder
-            .metadata(metadata)
-            .add_container(container)
-            .add_volume(Volume {
-                name: CONFIG_VOLUME_NAME.to_owned(),
-                config_map: Some(ConfigMapVolumeSource {
-                    name: self.resource_names.role_group_config_map(),
-                    ..Default::default()
+        // The PodBuilder is not used because it re-validates the values which are already
+        // validated. For instance, it would be necessary to convert the
+        // termination_grace_period_seconds into a Duration, the PodBuilder parses the Duration,
+        // converts it back into seconds and fails if this is not possible.
+        let mut pod_template = PodTemplateSpec {
+            metadata: Some(metadata),
+            spec: Some(PodSpec {
+                containers: vec![container],
+                security_context: Some(PodSecurityContext {
+                    fs_group: Some(1000),
+                    ..PodSecurityContext::default()
                 }),
-                ..Default::default()
-            })
-            .expect("The volume names are statically defined and there should be no duplicates.")
-            .security_context(PodSecurityContext {
-                fs_group: Some(1000),
-                ..PodSecurityContext::default()
-            })
-            .service_account_name(&self.service_account_name)
-            .build_template();
+                service_account_name: Some(self.service_account_name.clone()),
+                termination_grace_period_seconds: Some(
+                    self.role_group_config
+                        .config
+                        .termination_grace_period_seconds,
+                ),
+                volumes: Some(vec![Volume {
+                    name: CONFIG_VOLUME_NAME.to_owned(),
+                    config_map: Some(ConfigMapVolumeSource {
+                        name: self.resource_names.role_group_config_map(),
+                        ..Default::default()
+                    }),
+                    ..Volume::default()
+                }]),
+                ..PodSpec::default()
+            }),
+        };
 
         pod_template.merge_from(self.role_group_config.pod_overrides.clone());
 

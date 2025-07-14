@@ -7,7 +7,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{Applied, ContextNames, Prepared, Resources};
+use super::{Applied, ContextNames, KubernetesResources, Prepared};
 use crate::framework::{
     HasNamespace, HasObjectName, HasUid, cluster_resources::cluster_resources_new,
 };
@@ -54,7 +54,10 @@ impl<'a> Applier<'a> {
         }
     }
 
-    pub async fn apply(mut self, resources: Resources<Prepared>) -> Result<Resources<Applied>> {
+    pub async fn apply(
+        mut self,
+        resources: KubernetesResources<Prepared>,
+    ) -> Result<KubernetesResources<Applied>> {
         let stateful_sets = self.add_resources(resources.stateful_sets).await?;
 
         let services = self.add_resources(resources.services).await?;
@@ -72,7 +75,7 @@ impl<'a> Applier<'a> {
             .await
             .context(DeleteOrphanedResourcesSnafu)?;
 
-        Ok(Resources {
+        Ok(KubernetesResources {
             stateful_sets,
             services,
             config_maps,

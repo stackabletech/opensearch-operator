@@ -22,7 +22,10 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    crd::v1alpha1::{self},
+    crd::{
+        NodeRoles,
+        v1alpha1::{self},
+    },
     framework::{
         ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
         OperatorName, ProductName, ProductVersion, RoleGroupName,
@@ -96,7 +99,14 @@ impl ReconcilerError for Error {
 }
 
 type OpenSearchRoleGroupConfig =
-    RoleGroupConfig<GenericProductSpecificCommonConfig, v1alpha1::OpenSearchConfig>;
+    RoleGroupConfig<GenericProductSpecificCommonConfig, ValidatedOpenSearchConfig>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedOpenSearchConfig {
+    pub node_roles: NodeRoles,
+    pub resources: stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>,
+    pub termination_grace_period_seconds: i64,
+}
 
 // validated and converted to validated and safe types
 // no user errors
@@ -255,7 +265,7 @@ pub async fn reconcile(
 struct Prepared;
 struct Applied;
 
-struct Resources<T> {
+struct KubernetesResources<T> {
     stateful_sets: Vec<StatefulSet>,
     services: Vec<Service>,
     config_maps: Vec<ConfigMap>,

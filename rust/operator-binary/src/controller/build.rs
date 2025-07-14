@@ -2,14 +2,14 @@ use std::{marker::PhantomData, str::FromStr};
 
 use role_builder::RoleBuilder;
 
-use super::{ContextNames, Prepared, Resources, ValidatedCluster};
+use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
 use crate::framework::RoleName;
 
 pub mod node_config;
 pub mod role_builder;
 pub mod role_group_builder;
 
-pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> Resources<Prepared> {
+pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResources<Prepared> {
     let mut config_maps = vec![];
     let mut stateful_sets = vec![];
     let mut services = vec![];
@@ -33,7 +33,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> Resources<Prepa
 
     let pod_disruption_budgets = role_builder.build_pdb().into_iter().collect();
 
-    Resources {
+    KubernetesResources {
         stateful_sets,
         services,
         config_maps,

@@ -111,7 +111,7 @@ spec:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
       serviceAccountName: opensearch-serviceaccount
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 180
       volumes:
       - configMap:
           defaultMode: 420
@@ -261,7 +261,7 @@ spec:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
       serviceAccountName: opensearch-serviceaccount
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 120
       volumes:
       - configMap:
           defaultMode: 420

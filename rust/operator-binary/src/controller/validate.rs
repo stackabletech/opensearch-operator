@@ -1,12 +1,16 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, num::TryFromIntError, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};
-use stackable_operator::kube::{Resource, ResourceExt};
+use stackable_operator::{
+    kube::{Resource, ResourceExt},
+    role_utils::RoleGroup,
+    time::Duration,
+};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{ProductVersion, RoleGroupName, ValidatedCluster};
+use super::{ProductVersion, RoleGroupName, ValidatedCluster, ValidatedOpenSearchConfig};
 use crate::{
-    crd::v1alpha1,
+    crd::v1alpha1::{self, OpenSearchConfig},
     framework::{
         ClusterName,
         role_utils::{RoleGroupConfig, with_validated_config},
@@ -38,10 +42,17 @@ pub enum Error {
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
     },
+
+    #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
+    TerminationGracePeriodTooLong {
+        source: TryFromIntError,
+        duration: Duration,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+// TODO split
 // no client needed
 pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluster> {
     let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
@@ -59,13 +70,38 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
         let role_group_name =
             RoleGroupName::from_str(raw_role_group_name).context(ParseRoleGroupNameSnafu)?;
 
-        let validated_role_group = with_validated_config(
+        let merged_role_group: RoleGroup<OpenSearchConfig, _> = with_validated_config(
             role_group_config,
             &cluster.spec.nodes,
             &v1alpha1::OpenSearchConfig::default_config(),
         )
         .context(ValidateOpenSearchConfigSnafu)?;
-        let validated_role_group_config = RoleGroupConfig::from(validated_role_group);
+
+        let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
+
+        let termination_grace_period_seconds = graceful_shutdown_timeout
+            .as_secs()
+            .try_into()
+            .context(TerminationGracePeriodTooLongSnafu {
+                duration: graceful_shutdown_timeout,
+            })?;
+
+        let validated_config = ValidatedOpenSearchConfig {
+            node_roles: merged_role_group.config.config.node_roles,
+            resources: merged_role_group.config.config.resources,
+            termination_grace_period_seconds,
+        };
+
+        let validated_role_group_config = RoleGroupConfig {
+            // Kubernetes defaults to 1 if not set
+            replicas: merged_role_group.replicas.unwrap_or(1),
+            config: validated_config,
+            config_overrides: merged_role_group.config.config_overrides,
+            env_overrides: merged_role_group.config.env_overrides,
+            cli_overrides: merged_role_group.config.cli_overrides,
+            pod_overrides: merged_role_group.config.pod_overrides,
+            product_specific_common_config: merged_role_group.config.product_specific_common_config,
+        };
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }

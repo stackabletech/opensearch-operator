@@ -45,23 +45,6 @@ impl<ProductSpecificCommonConfig, T> RoleGroupConfig<ProductSpecificCommonConfig
     }
 }
 
-impl<ProductSpecificCommonConfig, T> From<RoleGroup<T, ProductSpecificCommonConfig>>
-    for RoleGroupConfig<ProductSpecificCommonConfig, T>
-{
-    fn from(value: RoleGroup<T, ProductSpecificCommonConfig>) -> Self {
-        RoleGroupConfig {
-            // Kubernetes defaults to 1 if not set
-            replicas: value.replicas.unwrap_or(1),
-            config: value.config.config,
-            config_overrides: value.config.config_overrides,
-            env_overrides: value.config.env_overrides,
-            cli_overrides: value.config.cli_overrides,
-            pod_overrides: value.config.pod_overrides,
-            product_specific_common_config: value.config.product_specific_common_config,
-        }
-    }
-}
-
 // RoleGroup::validate_config with fixed types
 pub fn validate_config<C, ProductSpecificCommonConfig, T, U>(
     role_group: &RoleGroup<T, ProductSpecificCommonConfig>,

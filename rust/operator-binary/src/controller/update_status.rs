@@ -8,7 +8,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{Applied, ContextNames, Resources};
+use super::{Applied, ContextNames, KubernetesResources};
 use crate::crd::v1alpha1::{self, OpenSearchClusterStatus};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -36,7 +36,7 @@ pub async fn update_status(
     client: &Client,
     names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
-    applied_resources: Resources<Applied>,
+    applied_resources: KubernetesResources<Applied>,
 ) -> Result<()> {
     let mut stateful_set_condition_builder = StatefulSetConditionBuilder::default();
     for stateful_set in applied_resources.stateful_sets {
