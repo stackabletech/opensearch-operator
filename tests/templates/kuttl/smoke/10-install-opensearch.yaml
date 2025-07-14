@@ -17,7 +17,6 @@ spec:
             storage:
               data:
                 capacity: 100Mi
-          gracefulShutdownTimeout: 3m
         replicas: 3
         podOverrides:
           spec:

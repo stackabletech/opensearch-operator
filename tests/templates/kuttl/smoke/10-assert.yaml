@@ -1,6 +1,7 @@
 # All fields are checked that are set by the operator.
 # This helps to detect unintentional changes.
 # The maintenance effort should be okay as long as it is only done in the smoke test.
+# TODO  Check individual field in unit tests
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
@@ -45,6 +46,17 @@ spec:
         cluster_manager: "true"
         stackable.tech/vendor: Stackable
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: nodes
+                  app.kubernetes.io/instance: opensearch
+                  app.kubernetes.io/name: opensearch
+              topologyKey: kubernetes.io/hostname
+            weight: 1
       containers:
       - command:
         - /usr/share/opensearch/opensearch-docker-entrypoint.sh
@@ -111,7 +123,7 @@ spec:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
       serviceAccountName: opensearch-serviceaccount
-      terminationGracePeriodSeconds: 180
+      terminationGracePeriodSeconds: 120
       volumes:
       - configMap:
           defaultMode: 420
@@ -196,6 +208,17 @@ spec:
         remote_cluster_client: "true"
         stackable.tech/vendor: Stackable
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: nodes
+                  app.kubernetes.io/instance: opensearch
+                  app.kubernetes.io/name: opensearch
+              topologyKey: kubernetes.io/hostname
+            weight: 1
       containers:
       - command:
         - /usr/share/opensearch/opensearch-docker-entrypoint.sh

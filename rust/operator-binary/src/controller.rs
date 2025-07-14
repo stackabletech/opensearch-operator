@@ -5,7 +5,7 @@ use build::build;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::product_image_selection::ProductImage,
+    commons::{affinity::StackableAffinity, product_image_selection::ProductImage},
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service, ServiceAccount},
@@ -28,7 +28,7 @@ use crate::{
     },
     framework::{
         ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
-        OperatorName, ProductName, ProductVersion, RoleGroupName,
+        OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName,
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
     },
 };
@@ -103,6 +103,7 @@ type OpenSearchRoleGroupConfig =
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
+    pub affinity: StackableAffinity,
     pub node_roles: NodeRoles,
     pub resources: stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>,
     pub termination_grace_period_seconds: i64,
@@ -125,6 +126,10 @@ pub struct ValidatedCluster {
 }
 
 impl ValidatedCluster {
+    pub fn role_name() -> RoleName {
+        RoleName::from_str("nodes").expect("should be a valid role name")
+    }
+
     pub fn is_single_node(&self) -> bool {
         self.node_count() == 1
     }
@@ -233,7 +238,7 @@ pub async fn reconcile(
     // dereference (client required)
 
     // validate (no client required)
-    let validated_cluster = validate(cluster).context(ValidateClusterSnafu)?;
+    let validated_cluster = validate(&context.names, cluster).context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());

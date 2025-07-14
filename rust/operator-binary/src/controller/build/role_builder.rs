@@ -22,7 +22,7 @@ use crate::{
     controller::{ContextNames, ValidatedCluster},
     crd::v1alpha1,
     framework::{
-        RoleName,
+        IsLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
@@ -33,20 +33,14 @@ use crate::{
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 
 pub struct RoleBuilder<'a> {
-    role_name: RoleName,
     cluster: ValidatedCluster,
     context_names: &'a ContextNames,
     resource_names: ResourceNames,
 }
 
 impl<'a> RoleBuilder<'a> {
-    pub fn new(
-        role_name: RoleName,
-        cluster: ValidatedCluster,
-        context_names: &'a ContextNames,
-    ) -> RoleBuilder<'a> {
+    pub fn new(cluster: ValidatedCluster, context_names: &'a ContextNames) -> RoleBuilder<'a> {
         RoleBuilder {
-            role_name: role_name.clone(),
             cluster: cluster.clone(),
             context_names,
             resource_names: ResourceNames {
@@ -64,7 +58,6 @@ impl<'a> RoleBuilder<'a> {
             .iter()
             .map(|(role_group_name, role_group_config)| {
                 RoleGroupBuilder::new(
-                    self.role_name.clone(),
                     self.resource_names.service_account_name(),
                     self.cluster.clone(),
                     role_group_name.clone(),
@@ -154,7 +147,7 @@ impl<'a> RoleBuilder<'a> {
                 pod_disruption_budget_builder_with_role(
                     &self.cluster,
                     &self.context_names.product_name,
-                    &self.role_name,
+                    &ValidatedCluster::role_name(),
                     &self.context_names.operator_name,
                     &self.context_names.controller_name,
                 )
@@ -184,8 +177,8 @@ impl<'a> RoleBuilder<'a> {
         // Well-known Kubernetes labels
         let mut labels = Labels::role_selector(
             &self.cluster,
-            &self.context_names.product_name.to_string(),
-            &self.role_name.to_string(),
+            &self.context_names.product_name.to_label_value(),
+            &ValidatedCluster::role_name().to_label_value(),
         )
         .unwrap();
 

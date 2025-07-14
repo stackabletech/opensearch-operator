@@ -3,6 +3,7 @@ use std::{slice, str::FromStr};
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
     commons::{
+        affinity::{StackableAffinity, StackableAffinityFragment, affinity_between_role_pods},
         cluster_operation::ClusterOperation,
         product_image_selection::ProductImage,
         resources::{
@@ -14,7 +15,7 @@ use stackable_operator::{
         fragment::Fragment,
         merge::{Atomic, Merge},
     },
-    k8s_openapi::apimachinery::pkg::api::resource::Quantity,
+    k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
@@ -24,7 +25,10 @@ use stackable_operator::{
 };
 use strum::Display;
 
-use crate::framework::role_utils::GenericProductSpecificCommonConfig;
+use crate::framework::{
+    ClusterName, IsLabelValue, ProductName, RoleName,
+    role_utils::GenericProductSpecificCommonConfig,
+};
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
@@ -112,15 +116,18 @@ pub mod versioned {
         serde(rename_all = "camelCase")
     )]
     pub struct OpenSearchConfig {
-        pub node_roles: NodeRoles,
-
         #[fragment_attrs(serde(default))]
-        pub resources: Resources<StorageConfig>,
+        pub affinity: StackableAffinity,
 
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the
         /// operator documentation for details.
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Duration,
+
+        pub node_roles: NodeRoles,
+
+        #[fragment_attrs(serde(default))]
+        pub resources: Resources<StorageConfig>,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -163,8 +170,33 @@ impl HasStatusCondition for v1alpha1::OpenSearchCluster {
 }
 
 impl v1alpha1::OpenSearchConfig {
-    pub fn default_config() -> v1alpha1::OpenSearchConfigFragment {
+    pub fn default_config(
+        product_name: &ProductName,
+        cluster_name: &ClusterName,
+        role_name: &RoleName,
+    ) -> v1alpha1::OpenSearchConfigFragment {
         v1alpha1::OpenSearchConfigFragment {
+            affinity: StackableAffinityFragment {
+                pod_affinity: None,
+                pod_anti_affinity: Some(PodAntiAffinity {
+                    preferred_during_scheduling_ignored_during_execution: Some(vec![
+                        affinity_between_role_pods(
+                            &product_name.to_label_value(),
+                            &cluster_name.to_label_value(),
+                            &role_name.to_label_value(),
+                            1,
+                        ),
+                    ]),
+                    required_during_scheduling_ignored_during_execution: None,
+                }),
+                node_affinity: None,
+                node_selector: None,
+            },
+            // Default taken from the Helm chart, see
+            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L364
+            graceful_shutdown_timeout: Some(
+                Duration::from_str("2m").expect("should be a valid duration"),
+            ),
             // Defaults taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
             node_roles: Some(NodeRoles(vec![
@@ -198,11 +230,6 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
-            // Default taken from the Helm chart, see
-            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L364
-            graceful_shutdown_timeout: Some(
-                Duration::from_str("2m").expect("should be a valid duration"),
-            ),
         }
     }
 }

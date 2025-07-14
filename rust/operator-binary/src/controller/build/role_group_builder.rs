@@ -5,9 +5,9 @@ use stackable_operator::{
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
-                ConfigMap, ConfigMapVolumeSource, Container, ContainerPort, PodSecurityContext,
-                PodSpec, PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec,
-                TCPSocketAction, Volume, VolumeMount,
+                Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
+                PodSecurityContext, PodSpec, PodTemplateSpec, Probe, Service, ServicePort,
+                ServiceSpec, TCPSocketAction, Volume, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -20,7 +20,7 @@ use super::node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig};
 use crate::{
     controller::{ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster},
     framework::{
-        RoleGroupName, RoleName,
+        RoleGroupName,
         builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector},
         role_group_utils::ResourceNames,
@@ -39,7 +39,6 @@ const DATA_VOLUME_NAME: &str = "data";
 const OPENSEARCH_BASE_PATH: &str = "/usr/share/opensearch";
 
 pub struct RoleGroupBuilder<'a> {
-    role_name: RoleName,
     service_account_name: String,
     cluster: ValidatedCluster,
     node_config: NodeConfig,
@@ -51,7 +50,6 @@ pub struct RoleGroupBuilder<'a> {
 
 impl<'a> RoleGroupBuilder<'a> {
     pub fn new(
-        role_name: RoleName,
         service_account_name: String,
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
@@ -60,11 +58,9 @@ impl<'a> RoleGroupBuilder<'a> {
         discovery_service_name: String,
     ) -> RoleGroupBuilder<'a> {
         RoleGroupBuilder {
-            role_name: role_name.clone(),
             service_account_name,
             cluster: cluster.clone(),
             node_config: NodeConfig::new(
-                role_name.clone(),
                 cluster.clone(),
                 role_group_config.clone(),
                 discovery_service_name,
@@ -74,7 +70,7 @@ impl<'a> RoleGroupBuilder<'a> {
             context_names,
             resource_names: ResourceNames {
                 cluster_name: cluster.name.clone(),
-                role_name,
+                role_name: ValidatedCluster::role_name(),
                 role_group_name,
             },
         }
@@ -136,6 +132,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(
+                // TODO Prefix the key
                 Label::try_from((format!("{node_role}"), "true".to_string()))
                     .expect("should be a valid label"),
             );
@@ -155,7 +152,24 @@ impl<'a> RoleGroupBuilder<'a> {
         let mut pod_template = PodTemplateSpec {
             metadata: Some(metadata),
             spec: Some(PodSpec {
+                affinity: Some(Affinity {
+                    node_affinity: self.role_group_config.config.affinity.node_affinity.clone(),
+                    pod_affinity: self.role_group_config.config.affinity.pod_affinity.clone(),
+                    pod_anti_affinity: self
+                        .role_group_config
+                        .config
+                        .affinity
+                        .pod_anti_affinity
+                        .clone(),
+                }),
                 containers: vec![container],
+                node_selector: self
+                    .role_group_config
+                    .config
+                    .affinity
+                    .node_selector
+                    .clone()
+                    .map(|wrapped| wrapped.node_selector),
                 security_context: Some(PodSecurityContext {
                     fs_group: Some(1000),
                     ..PodSecurityContext::default()
@@ -326,7 +340,7 @@ impl<'a> RoleGroupBuilder<'a> {
             &self.cluster.product_version,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
-            &self.role_name,
+            &ValidatedCluster::role_name(),
             &self.role_group_name,
         )
     }
@@ -335,7 +349,7 @@ impl<'a> RoleGroupBuilder<'a> {
         role_group_selector(
             &self.cluster,
             &self.context_names.product_name,
-            &self.role_name,
+            &ValidatedCluster::role_name(),
             &self.role_group_name,
         )
     }

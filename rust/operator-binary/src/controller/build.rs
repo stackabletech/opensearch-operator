@@ -1,9 +1,8 @@
-use std::{marker::PhantomData, str::FromStr};
+use std::marker::PhantomData;
 
 use role_builder::RoleBuilder;
 
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
-use crate::framework::RoleName;
 
 pub mod node_config;
 pub mod role_builder;
@@ -14,9 +13,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
     let mut stateful_sets = vec![];
     let mut services = vec![];
 
-    let role_name = RoleName::from_str("nodes").expect("should be a valid role name");
-
-    let role_builder = RoleBuilder::new(role_name, cluster.clone(), names);
+    let role_builder = RoleBuilder::new(cluster.clone(), names);
 
     for role_group_builder in role_builder.role_group_builders() {
         config_maps.push(role_group_builder.build_config_map());

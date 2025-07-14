@@ -5,7 +5,7 @@ use super::ValidatedCluster;
 use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
-    framework::{RoleName, builder::pod::container::EnvVarSet, role_group_utils},
+    framework::{builder::pod::container::EnvVarSet, role_group_utils},
 };
 
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
@@ -67,7 +67,6 @@ pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
 pub struct NodeConfig {
-    role_name: RoleName,
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
     discovery_service_name: String,
@@ -77,13 +76,11 @@ pub struct NodeConfig {
 // variables.
 impl NodeConfig {
     pub fn new(
-        role_name: RoleName,
         cluster: ValidatedCluster,
         role_group_config: OpenSearchRoleGroupConfig,
         discovery_service_name: String,
     ) -> Self {
         Self {
-            role_name,
             cluster,
             role_group_config,
             discovery_service_name,
@@ -221,7 +218,7 @@ impl NodeConfig {
             for (role_group_name, role_group_config) in cluster_manager_configs {
                 let role_group_resource_names = role_group_utils::ResourceNames {
                     cluster_name: self.cluster.name.clone(),
-                    role_name: self.role_name.clone(),
+                    role_name: ValidatedCluster::role_name(),
                     role_group_name,
                 };
 
@@ -249,7 +246,10 @@ mod tests {
     };
 
     use stackable_operator::{
-        commons::{product_image_selection::ProductImage, resources::Resources},
+        commons::{
+            affinity::StackableAffinity, product_image_selection::ProductImage,
+            resources::Resources,
+        },
         k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector, PodTemplateSpec},
         kube::api::ObjectMeta,
         role_utils::GenericRoleConfig,
@@ -257,6 +257,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        controller::ValidatedOpenSearchConfig,
         crd::NodeRoles,
         framework::{ClusterName, ProductVersion, role_utils::GenericProductSpecificCommonConfig},
     };
@@ -277,13 +278,14 @@ mod tests {
             role_config: GenericRoleConfig::default(),
             role_group_configs: BTreeMap::new(),
         };
-        let role_name = RoleName::from_str("nodes").expect("should be a valid role name");
 
         let role_group_config = OpenSearchRoleGroupConfig {
             replicas: 1,
-            config: v1alpha1::OpenSearchConfig {
+            config: ValidatedOpenSearchConfig {
+                affinity: StackableAffinity::default(),
                 node_roles: NodeRoles::default(),
                 resources: Resources::default(),
+                termination_grace_period_seconds: 30,
             },
             config_overrides: HashMap::default(),
             env_overrides: [("TEST".to_owned(), "value".to_owned())].into(),
@@ -293,7 +295,6 @@ mod tests {
         };
 
         let node_config = NodeConfig::new(
-            role_name,
             cluster,
             role_group_config,
             "my-opensearch-cluster-manager".to_owned(),

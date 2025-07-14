@@ -8,7 +8,9 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use super::{ProductVersion, RoleGroupName, ValidatedCluster, ValidatedOpenSearchConfig};
+use super::{
+    ContextNames, ProductVersion, RoleGroupName, ValidatedCluster, ValidatedOpenSearchConfig,
+};
 use crate::{
     crd::v1alpha1::{self, OpenSearchConfig},
     framework::{
@@ -54,7 +56,10 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 // TODO split
 // no client needed
-pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluster> {
+pub fn validate(
+    names: &ContextNames,
+    cluster: &v1alpha1::OpenSearchCluster,
+) -> Result<ValidatedCluster> {
     let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
     let cluster_name = ClusterName::from_str(&raw_cluster_name).context(ParseClusterNameSnafu)?;
 
@@ -73,7 +78,11 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
         let merged_role_group: RoleGroup<OpenSearchConfig, _> = with_validated_config(
             role_group_config,
             &cluster.spec.nodes,
-            &v1alpha1::OpenSearchConfig::default_config(),
+            &v1alpha1::OpenSearchConfig::default_config(
+                &names.product_name,
+                &cluster_name,
+                &ValidatedCluster::role_name(),
+            ),
         )
         .context(ValidateOpenSearchConfigSnafu)?;
 
@@ -87,6 +96,7 @@ pub fn validate(cluster: &v1alpha1::OpenSearchCluster) -> Result<ValidatedCluste
             })?;
 
         let validated_config = ValidatedOpenSearchConfig {
+            affinity: merged_role_group.config.config.affinity,
             node_roles: merged_role_group.config.config.node_roles,
             resources: merged_role_group.config.config.resources,
             termination_grace_period_seconds,
