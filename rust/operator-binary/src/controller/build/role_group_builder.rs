@@ -19,10 +19,11 @@ use stackable_operator::{
 use super::node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig};
 use crate::{
     controller::{ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster},
+    crd::v1alpha1,
     framework::{
         RoleGroupName,
         builder::meta::ownerreference_from_resource,
-        kvp::label::{recommended_labels, role_group_selector},
+        kvp::label::{recommended_labels, role_group_selector, role_selector},
         role_group_utils::ResourceNames,
     },
 };
@@ -104,7 +105,6 @@ impl<'a> RoleGroupBuilder<'a> {
             .resources
             .storage
             .data
-            // TODO Compare name with Helm chart
             .build_pvc(DATA_VOLUME_NAME, Some(vec!["ReadWriteOnce"]));
 
         let spec = StatefulSetSpec {
@@ -131,11 +131,7 @@ impl<'a> RoleGroupBuilder<'a> {
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
-            node_role_labels.insert(
-                // TODO Prefix the key
-                Label::try_from((format!("{node_role}"), "true".to_string()))
-                    .expect("should be a valid label"),
-            );
+            node_role_labels.insert(Self::build_node_role_label(node_role));
         }
 
         let metadata = ObjectMetaBuilder::new()
@@ -195,6 +191,32 @@ impl<'a> RoleGroupBuilder<'a> {
         pod_template.merge_from(self.role_group_config.pod_overrides.clone());
 
         pod_template
+    }
+
+    pub fn cluster_manager_labels(
+        cluster: &ValidatedCluster,
+        context_names: &ContextNames,
+    ) -> Labels {
+        let mut labels = role_selector(
+            cluster,
+            &context_names.product_name,
+            &ValidatedCluster::role_name(),
+        );
+
+        labels.insert(Self::build_node_role_label(
+            &v1alpha1::NodeRole::ClusterManager,
+        ));
+
+        labels
+    }
+
+    fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
+        // TODO Check the maximum length at compile-time
+        Label::try_from((
+            format!("stackable.tech/opensearch-role.{node_role}"),
+            "true".to_string(),
+        ))
+        .expect("should be a valid label")
     }
 
     fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {

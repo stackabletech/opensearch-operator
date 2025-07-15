@@ -33,6 +33,20 @@ pub fn recommended_labels(
         .expect("Labels should be created because all given parameters produce valid label values")
 }
 
+/// Infallible variant of `Labels::role_selector`
+pub fn role_selector(
+    owner: &(impl Resource + IsLabelValue),
+    product_name: &ProductName,
+    role_name: &RoleName,
+) -> Labels {
+    Labels::role_selector(
+        owner,
+        &product_name.to_label_value(),
+        &role_name.to_label_value(),
+    )
+    .expect("Labels should be created because all given parameters produce valid label values")
+}
+
 /// Infallible variant of `Labels::role_group_selector`
 pub fn role_group_selector(
     owner: &(impl Resource + IsLabelValue),

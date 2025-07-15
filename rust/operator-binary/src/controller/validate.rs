@@ -9,13 +9,14 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{
-    ContextNames, ProductVersion, RoleGroupName, ValidatedCluster, ValidatedOpenSearchConfig,
+    ContextNames, OpenSearchRoleGroupConfig, ProductVersion, RoleGroupName, ValidatedCluster,
+    ValidatedOpenSearchConfig,
 };
 use crate::{
-    crd::v1alpha1::{self, OpenSearchConfig},
+    crd::v1alpha1::{self, OpenSearchConfig, OpenSearchConfigFragment},
     framework::{
         ClusterName,
-        role_utils::{RoleGroupConfig, with_validated_config},
+        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
     },
 };
 
@@ -54,10 +55,9 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-// TODO split
 // no client needed
 pub fn validate(
-    names: &ContextNames,
+    context_names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
 ) -> Result<ValidatedCluster> {
     let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
@@ -75,43 +75,8 @@ pub fn validate(
         let role_group_name =
             RoleGroupName::from_str(raw_role_group_name).context(ParseRoleGroupNameSnafu)?;
 
-        let merged_role_group: RoleGroup<OpenSearchConfig, _> = with_validated_config(
-            role_group_config,
-            &cluster.spec.nodes,
-            &v1alpha1::OpenSearchConfig::default_config(
-                &names.product_name,
-                &cluster_name,
-                &ValidatedCluster::role_name(),
-            ),
-        )
-        .context(ValidateOpenSearchConfigSnafu)?;
-
-        let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
-
-        let termination_grace_period_seconds = graceful_shutdown_timeout
-            .as_secs()
-            .try_into()
-            .context(TerminationGracePeriodTooLongSnafu {
-                duration: graceful_shutdown_timeout,
-            })?;
-
-        let validated_config = ValidatedOpenSearchConfig {
-            affinity: merged_role_group.config.config.affinity,
-            node_roles: merged_role_group.config.config.node_roles,
-            resources: merged_role_group.config.config.resources,
-            termination_grace_period_seconds,
-        };
-
-        let validated_role_group_config = RoleGroupConfig {
-            // Kubernetes defaults to 1 if not set
-            replicas: merged_role_group.replicas.unwrap_or(1),
-            config: validated_config,
-            config_overrides: merged_role_group.config.config_overrides,
-            env_overrides: merged_role_group.config.env_overrides,
-            cli_overrides: merged_role_group.config.cli_overrides,
-            pod_overrides: merged_role_group.config.pod_overrides,
-            product_specific_common_config: merged_role_group.config.product_specific_common_config,
-        };
+        let validated_role_group_config =
+            validate_role_group_config(context_names, &cluster_name, cluster, role_group_config)?;
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
@@ -125,5 +90,48 @@ pub fn validate(
         uid,
         role_config: cluster.spec.nodes.role_config.clone(),
         role_group_configs,
+    })
+}
+
+fn validate_role_group_config(
+    context_names: &ContextNames,
+    cluster_name: &ClusterName,
+    cluster: &v1alpha1::OpenSearchCluster,
+    role_group_config: &RoleGroup<OpenSearchConfigFragment, GenericProductSpecificCommonConfig>,
+) -> Result<OpenSearchRoleGroupConfig> {
+    let merged_role_group: RoleGroup<OpenSearchConfig, _> = with_validated_config(
+        role_group_config,
+        &cluster.spec.nodes,
+        &v1alpha1::OpenSearchConfig::default_config(
+            &context_names.product_name,
+            cluster_name,
+            &ValidatedCluster::role_name(),
+        ),
+    )
+    .context(ValidateOpenSearchConfigSnafu)?;
+
+    let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
+    let termination_grace_period_seconds = graceful_shutdown_timeout.as_secs().try_into().context(
+        TerminationGracePeriodTooLongSnafu {
+            duration: graceful_shutdown_timeout,
+        },
+    )?;
+
+    let validated_config = ValidatedOpenSearchConfig {
+        affinity: merged_role_group.config.config.affinity,
+        node_roles: merged_role_group.config.config.node_roles,
+        resources: merged_role_group.config.config.resources,
+        termination_grace_period_seconds,
+    };
+
+    Ok(RoleGroupConfig {
+        // Kubernetes defaults to 1 if not set
+        replicas: merged_role_group.replicas.unwrap_or(1),
+        config: validated_config,
+        config_overrides: merged_role_group.config.config_overrides,
+        env_overrides: merged_role_group.config.env_overrides,
+        cli_overrides: merged_role_group.config.cli_overrides,
+        pod_overrides: merged_role_group.config.pod_overrides,
+        product_specific_common_config: merged_role_group.config.product_specific_common_config,
     })
 }

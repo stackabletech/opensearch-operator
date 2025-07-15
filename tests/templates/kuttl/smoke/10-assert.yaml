@@ -43,7 +43,7 @@ spec:
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: cluster-manager
         app.kubernetes.io/version: 3.0.0
-        cluster_manager: "true"
+        stackable.tech/opensearch-role.cluster_manager: "true"
         stackable.tech/vendor: Stackable
     spec:
       affinity:
@@ -203,9 +203,9 @@ spec:
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: data
         app.kubernetes.io/version: 3.0.0
-        data: "true"
-        ingest: "true"
-        remote_cluster_client: "true"
+        stackable.tech/opensearch-role.data: "true"
+        stackable.tech/opensearch-role.ingest: "true"
+        stackable.tech/opensearch-role.remote_cluster_client: "true"
         stackable.tech/vendor: Stackable
     spec:
       affinity:
@@ -455,6 +455,11 @@ metadata:
     app.kubernetes.io/version: 3.0.0
     stackable.tech/vendor: Stackable
   name: opensearch
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
   ports:
   - name: http
@@ -467,7 +472,10 @@ spec:
     targetPort: 9300
   publishNotReadyAddresses: true
   selector:
-    cluster_manager: "true"
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/name: opensearch
+    stackable.tech/opensearch-role.cluster_manager: "true"
   type: ClusterIP
 ---
 apiVersion: v1

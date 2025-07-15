@@ -20,7 +20,6 @@ use super::role_group_builder::{
 };
 use crate::{
     controller::{ContextNames, ValidatedCluster},
-    crd::v1alpha1,
     framework::{
         IsLabelValue,
         builder::{
@@ -113,18 +112,15 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(self.resource_names.discovery_service_name());
 
-        let service_selector = [(
-            v1alpha1::NodeRole::ClusterManager.to_string(),
-            "true".to_owned(),
-        )]
-        .into();
+        let service_selector =
+            RoleGroupBuilder::cluster_manager_labels(&self.cluster, self.context_names);
 
         let service_spec = ServiceSpec {
             // Internal communication does not need to be exposed
             type_: Some("ClusterIP".to_string()),
             cluster_ip: Some("None".to_string()),
             ports: Some(ports),
-            selector: Some(service_selector),
+            selector: Some(service_selector.into()),
             publish_not_ready_addresses: Some(true),
             ..ServiceSpec::default()
         };
