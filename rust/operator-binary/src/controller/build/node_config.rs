@@ -167,7 +167,7 @@ impl NodeConfig {
     ///
     /// "zen" is the default if `{DISCOVERY_TYPE}` is not set.
     /// It is nevertheless explicitly set here.
-    /// see https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/discovery/DiscoveryModule.java#L88-L89
+    /// see <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/discovery/DiscoveryModule.java#L88-L89>
     ///
     /// "single-node" disables the bootstrap checks, like validating the JVM and discovery
     /// configurations.
@@ -181,14 +181,14 @@ impl NodeConfig {
 
     /// Configuration for `cluster.initial_cluster_manager_nodes` which replaces
     /// `cluster.initial_master_nodes`, see
-    /// https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93.
+    /// <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93>.
     ///
     /// According to
-    /// https://docs.opensearch.org/docs/3.0/install-and-configure/configuring-opensearch/discovery-gateway-settings/,
+    /// <https://docs.opensearch.org/docs/3.0/install-and-configure/configuring-opensearch/discovery-gateway-settings/>,
     /// it contains "a list of cluster-manager-eligible nodes used to bootstrap the cluster."
     ///
     /// However, the documentation for Elasticsearch is more detailed and contains the following
-    /// notes (see https://www.elastic.co/guide/en/elasticsearch/reference/9.0/modules-discovery-settings.html):
+    /// notes (see <https://www.elastic.co/guide/en/elasticsearch/reference/9.0/modules-discovery-settings.html>):
     /// * Remove this setting once the cluster has formed, and never set it again for this cluster.
     /// * Do not configure this setting on master-ineligible nodes.
     /// * Do not configure this setting on nodes joining an existing cluster.
@@ -196,7 +196,7 @@ impl NodeConfig {
     /// * Do not configure this setting when performing a full-cluster restart.
     ///
     /// The OpenSearch Helm chart only sets master nodes but does not handle the other cases (see
-    /// https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/templates/statefulset.yaml#L414-L415),
+    /// <https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/templates/statefulset.yaml#L414-L415>),
     /// so they are also ignored here for the moment.
     fn initial_cluster_manager_nodes(&self) -> String {
         if !self.cluster.is_single_node()
@@ -231,7 +231,7 @@ impl NodeConfig {
             pod_names.join(",")
         } else {
             // This setting is not allowed on single node cluster, see
-            // https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136
+            // <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136>
             String::new()
         }
     }
