@@ -1,15 +1,31 @@
+use std::{str::FromStr, sync::Arc};
+
 use clap::Parser as _;
-use crd::OpenSearchCluster;
+use crd::{OpenSearchCluster, v1alpha1};
+use framework::OperatorName;
+use futures::StreamExt;
 use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{
     YamlSchema as _,
     cli::{Command, ProductOperatorRun},
+    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    kube::{
+        core::DeserializeGuard,
+        runtime::{
+            Controller,
+            events::{Recorder, Reporter},
+            watcher,
+        },
+    },
+    logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
+mod controller;
 mod crd;
+mod framework;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -35,6 +51,11 @@ pub enum Error {
     SerializeCrd {
         source: stackable_operator::shared::yaml::Error,
     },
+
+    #[snafu(display("failed to create Kubernetes client"))]
+    CreateClient {
+        source: stackable_operator::client::Error,
+    },
 }
 
 #[derive(clap::Parser)]
@@ -57,9 +78,9 @@ async fn main() -> Result<()> {
         }
         Command::Run(ProductOperatorRun {
             product_config: _,
-            watch_namespace: _,
+            watch_namespace,
             telemetry_arguments,
-            cluster_info_opts: _,
+            cluster_info_opts,
         }) => {
             let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments)
                 .init()
@@ -74,6 +95,65 @@ async fn main() -> Result<()> {
                 "Starting {description}",
                 description = built_info::PKG_DESCRIPTION
             );
+
+            let operator_name = OperatorName::from_str("opensearch.stackable.tech")
+                .expect("should be a valid operator name");
+
+            let client = stackable_operator::client::initialize_operator(
+                Some(format!("{operator_name}")),
+                &cluster_info_opts,
+            )
+            .await
+            .context(CreateClientSnafu)?;
+
+            let controller_context = controller::Context::new(client.clone(), operator_name);
+            let full_controller_name = controller_context.full_controller_name();
+
+            let event_recorder = Arc::new(Recorder::new(
+                client.as_kube_client(),
+                Reporter {
+                    controller: full_controller_name.clone(),
+                    instance: None,
+                },
+            ));
+
+            let controller = Controller::new(
+                watch_namespace.get_api::<DeserializeGuard<v1alpha1::OpenSearchCluster>>(&client),
+                watcher::Config::default(),
+            );
+            controller
+                .owns(
+                    watch_namespace.get_api::<Service>(&client),
+                    watcher::Config::default(),
+                )
+                .owns(
+                    watch_namespace.get_api::<StatefulSet>(&client),
+                    watcher::Config::default(),
+                )
+                .shutdown_on_signal()
+                .run(
+                    controller::reconcile,
+                    controller::error_policy,
+                    Arc::new(controller_context),
+                )
+                .for_each_concurrent(
+                    16, // concurrency limit
+                    |result| {
+                        // The event_recorder needs to be shared across all invocations, so that
+                        // events are correctly aggregated
+                        let event_recorder = event_recorder.clone();
+                        let full_controller_name = full_controller_name.clone();
+                        async move {
+                            report_controller_reconciled(
+                                &event_recorder,
+                                &full_controller_name,
+                                &result,
+                            )
+                            .await;
+                        }
+                    },
+                )
+                .await;
         }
     }
 

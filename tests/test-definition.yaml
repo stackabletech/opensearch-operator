@@ -1,0 +1,34 @@
+---
+dimensions:
+  - name: opensearch
+    values:
+      - 3.0.0
+  - name: openshift
+    values:
+      - "false"
+tests:
+  - name: smoke
+    dimensions:
+      - opensearch
+      - openshift
+suites:
+  - name: nightly
+    patch:
+      - dimensions:
+          - name: opensearch
+            expr: last
+  - name: smoke-latest
+    select:
+      - smoke
+    patch:
+      - dimensions:
+          - expr: last
+  - name: openshift
+    patch:
+      - dimensions:
+          - expr: last
+      - dimensions:
+          - name: openshift
+            expr: "true"
+          - name: opensearch
+            expr: last
