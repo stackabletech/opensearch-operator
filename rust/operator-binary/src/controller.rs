@@ -77,6 +77,10 @@ pub enum Error {
     #[snafu(display("failed to deserialize cluster definition"))]
     DeserializeClusterDefinition {
         // boxed because otherwise Clippy warns about a large enum variant
+        #[snafu(source(from(
+            stackable_operator::kube::core::error_boundary::InvalidObject,
+            Box::new
+        )))]
         source: Box<stackable_operator::kube::core::error_boundary::InvalidObject>,
     },
 
@@ -232,7 +236,6 @@ pub async fn reconcile(
         .0
         .as_ref()
         .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
-        .map_err(Box::new)
         .context(DeserializeClusterDefinitionSnafu)?;
 
     // dereference (client required)
