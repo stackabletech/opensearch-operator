@@ -340,11 +340,17 @@ metadata:
     app.kubernetes.io/version: 3.0.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 data:
   opensearch.yml: |-
     cluster.name: "opensearch"
     discovery.type: "zen"
     network.host: "0.0.0.0"
+    node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
@@ -368,11 +374,17 @@ metadata:
     app.kubernetes.io/version: 3.0.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 data:
   opensearch.yml: |-
     cluster.name: "opensearch"
     discovery.type: "zen"
     network.host: "0.0.0.0"
+    node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
