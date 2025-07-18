@@ -53,6 +53,9 @@ spec:
     configOverrides:
       # TODO Add the required options to the operator
       opensearch.yml:
+        # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
+        # vm.max_map_count would have to be increased to 262144 on the node.
+        node.store.allow_mmap: "false"
         # TODO Check that this is safe despite the warning in the documentation
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
