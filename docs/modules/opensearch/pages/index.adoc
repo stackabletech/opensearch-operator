@@ -1,11 +1,11 @@
-= Stackable Operator for Apache Superset
-:description: Stackable Operator for Apache Superset manages Superset clusters on Kubernetes for data exploration, SQL connections, and visualization.
-:keywords: Stackable operator, Apache Superset, Kubernetes, operator, data science, data exploration
-:superset: https://superset.apache.org/
+= Stackable Operator for OpenSearch
+:description: Stackable Operator for OpenSearch manages OpenSearch clusters on Kubernetes for data ingestion and search
+:keywords: Stackable operator, OpenSearch, Kubernetes, operator, data science, data exploration, search
+:opensearch: https://opensearch.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
-:github: https://github.com/stackabletech/superset-operator/
-:crd: {crd-docs-base-url}/superset-operator/{crd-docs-version}/
-:crd-supersetcluster: {crd-docs}/superset.stackable.tech/supersetcluster/v1alpha1/
+:github: https://github.com/stackabletech/opensearch-operator/
+:crd: {crd-docs-base-url}/opensearch-operator/{crd-docs-version}/
+:crd-opensearchcluster: {crd-docs}/opensearch.stackable.tech/opensearchcluster/v1alpha1/
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
@@ -13,86 +13,51 @@
 * {feature-tracker}[Feature Tracker {external-link-icon}^]
 * {crd}[CRD documentation {external-link-icon}^]
 
-The Stackable operator for {superset}[Apache Superset] deploys and manages Superset clusters on Kubernetes.
-Superset is a data exploration and visualization tool that connects to SQL-based data sources.
-Store your data in Apache Druid or Trino, and manage your Druid and Trino instances with the Stackable operators for xref:druid:index.adoc[Apache Druid] or xref:trino:index.adoc[Trino].
-This operator helps you manage your Superset instances on Kubernetes efficiently.
+The Stackable operator for {opensearch}[OpenSearch] deploys and manages OpenSearch clusters on Kubernetes.
+OpenSearch is a powerful search and analytics engine built on Apache Lucene.
+This operator helps you manage your OpenSearch instances on Kubernetes efficiently.
 
 == Getting started
 
-Get started using Superset with Stackable operator by following the xref:getting_started/index.adoc[].
-It guides you through installing the operator alongside a PostgreSQL database, connecting to your Superset instance and analyzing some preloaded example data.
+Get started using OpenSearch with the Stackable operator by following the xref:getting_started/index.adoc[].
+It guides you through installing the operator, connecting to your OpenSearch instance and analyzing some preloaded example data.
 
 == Operator model
 
-The operator manages two {crs}[custom resources]: The _SupersetCluster_ and _DruidConnection_.
-It creates a number of different Kubernetes resources based on the custom resources.
+The operator manages the _OpenSearchCluster_ resource.
+It creates a number of different Kubernetes resources based on this {crs}[custom resource].
 
 === Custom resources
 
-The SupersetCluster is the main resource for the configuration of the Superset instance.
-The resource defines only one xref:concepts:roles-and-role-groups.adoc[role], the `node`.
+The OpenSearchCluster is the resource for the configuration of the OpenSearch instance.
+The resource defines only one xref:concepts:roles-and-role-groups.adoc[role], the `nodes`.
 The various configuration options are explained in the xref:usage-guide/index.adoc[].
 It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
-
-DruidConnection resources link a Superset and Druid instance.
-It lets you define this connection in the familiar way of deploying a resource (instead of configuring the connection via the Superset UI or API).
-The operator configures the connection between Druid and the Superset instance.
 
 === Kubernetes resources
 
 Based on the custom resources you define, the operator creates ConfigMaps, StatefulSets and Services.
 
-image::superset_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
+image::opensearch_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
-The Job created for the DruidConnnection resource is not shown.
 
 For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the RoleGroup.
-Every Pod in the StatefulSet has two containers: the main container running Superset and a sidecar container gathering metrics for xref:operators:monitoring.adoc[].
-The operator creates a Service for the `node` role as well as a single service per role group.
+For every RoleGroup, a Service is created, as well as one for the whole cluster that references the cluster manager nodes.
 
 Additionally, a ConfigMap is created for each RoleGroup.
-These ConfigMaps contains two files: `log_config.py` and `superset_config.py` which contain logging and general Superset configuration respectively.
-
-== Required external component: Metastore SQL database
-
-Superset requires an SQL database in which to store its metadata, dashboards and users.
-The xref:getting_started/index.adoc[] guides you through installing an example database with a Superset instance that you can use to get started, but is not suitable for production use.
-Follow the setup instructions for one of the xref:required-external-components.adoc[supported databases] for a production database.
-
-== Connecting to data sources
-
-Superset does not store its own data, instead it connects to other products where data is stored.
-On the Stackable Platform the two commonly used choices are xref:druid:index.adoc[Apache Druid] and xref:trino:index.adoc[Trino].
-For Druid there is a way to xref:usage-guide/connecting-druid.adoc[connect a Druid instance declaratively] with a custom resource.
-For Trino this is on the roadmap.
-Have a look at the demos linked <<demos, below>> for examples of using Superset with Druid or Trino.
-
-== [[demos]]Demos
-
-Many of the Stackable xref:demos:index.adoc[demos] use Superset in the stack for data visualization and explaration.
-The demos come in two main variants.
-
-=== With Druid
-
-The xref:demos:nifi-kafka-druid-earthquake-data.adoc[] and xref:demos:nifi-kafka-druid-water-level-data.adoc[] demos
-show Superset connected to xref:druid:index.adoc[Druid], exploring earthquake and water level data respectively.
-
-=== With Trino
-
-The xref:demos:spark-k8s-anomaly-detection-taxi-data.adoc[], xref:demos:trino-taxi-data.adoc[], xref:demos:trino-iceberg.adoc[] and xref:demos:data-lakehouse-iceberg-trino-spark.adoc[] demos all use a xref:trino:index.adoc[Trino] instance on top of S3 storage that hold data to analyze. Superset is connected to Trino to analyze a variety of different datasets.
+These ConfigMaps contain configuration files like `opensearch.yml`.
 
 == Supported versions
 
-The Stackable operator for Apache Superset currently supports the Superset versions listed below.
-To use a specific Superset version in your SupersetCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
+The Stackable operator for OpenSearch currently supports the OpenSearch versions listed below.
+To use a specific OpenSearch version in your OpenSearchCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
 The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
 
 include::partial$supported-versions.adoc[]
 
 == Useful links
 
-* The {github}[superset-operator {external-link-icon}^] GitHub repository
+* The {github}[opensearch-operator {external-link-icon}^] GitHub repository
 * The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
-* The {crd-supersetcluster}[SupersetCluster {external-link-icon}^] CRD documentation
+* The {crd-opensearchcluster}[OpenSearchCluster {external-link-icon}^] CRD documentation
