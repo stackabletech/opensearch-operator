@@ -1,7 +1,7 @@
 = Getting started
 
-This guide helps you get started with Superset using the Stackable Operator.
-It covers the installation of the Operator and its dependencies, setting up your first Superset instance, connecting to it, and exploring sample data.
+This guide helps you get started with OpenSearch using the Stackable Operator.
+It covers the installation of the operator and its dependencies, setting up your first OpenSearch instance, connecting to it, and exploring sample data.
 
 == Prerequisites
 
@@ -21,4 +21,4 @@ Resource sizing depends on cluster type(s), usage and scope, but as a starting p
 The guide is divided into two steps:
 
 * xref:getting_started/installation.adoc[Installing the Operators].
-* xref:getting_started/first_steps.adoc[Setting up the Superset instance and connecting to it].
+* xref:getting_started/first_steps.adoc[Setting up the OpenSearch instance and connecting to it].

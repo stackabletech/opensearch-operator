@@ -1,10 +1,10 @@
 = Installation
 
-On this page you will install the Stackable Superset Operator as well as the commons, secret and listener operators which are required by all Stackable Operators.
+On this page you will install the Stackable OpenSearch Operator as well as the commons, secret and listener operators which are required by all Stackable Operators.
 
 == Stackable Operators
 
-There are multiple ways to install the Stackable Operator for Apache Zookeeper.
+There are multiple ways to install the Stackable Operator for OpenSearch.
 `stackablectl` is the preferred way but Helm is also supported.
 OpenShift users may prefer installing the operator from the RedHat Certified Operator catalog using the OpenShift web console.
 
@@ -16,7 +16,7 @@ stackablectl (recommended)::
 `stackablectl` is the command line tool to interact with Stackable operators and our recommended way to install
 Operators. Follow the xref:management:stackablectl:installation.adoc[installation steps] for your platform.
 
-After you have installed `stackablectl`, run the following command to install all Operators necessary for Superset:
+After you have installed `stackablectl`, run the following command to install all Operators necessary for OpenSearch:
 
 [source,bash]
 ----
@@ -45,11 +45,11 @@ Install the Stackable Operators:
 include::example$getting_started/getting_started.sh[tag=helm-install-operators]
 ----
 
-Helm will deploy the operators in a Kubernetes Deployment and apply the CRDs for the Superset service (as well as the CRDs for the required operators).
-You are now ready to deploy Superset in Kubernetes.
+Helm will deploy the operators in a Kubernetes Deployment and apply the CRDs for the OpenSearch service (as well as the CRDs for the required operators).
+You are now ready to deploy OpenSearch in Kubernetes.
 --
 ====
 
 == What's next
 
-xref:getting_started/first_steps.adoc[Deploy a Superset instance and connect to it].
+xref:getting_started/first_steps.adoc[Deploy an OpenSearch instance and connect to it].

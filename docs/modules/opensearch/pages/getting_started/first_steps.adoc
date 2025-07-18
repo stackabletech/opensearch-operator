@@ -1,107 +1,83 @@
 = First steps
 
-Once you have followed the steps in  xref:getting_started/installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a Superset instance.
+Once you have followed the steps in  xref:getting_started/installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a OpenSearch instance.
 
-== Database for the Superset metadata
+== Security plugin configuration
 
-Superset metadata (slices, connections, tables, dashboards etc.) is stored in an SQL database.
-
-For testing, you can set up a PostgreSQL database with these commands:
-
-[source,bash]
-include::example$getting_started/getting_started.sh[tag=install-bitnami-psql]
-
-WARNING: This setup is not suitable for use in production.
-Refer to the xref:required-external-components[supported databases] for production-ready database setup instructions.
-
-== Secret with Superset credentials
-
-You need to create a secret with the required credentials (database connection credentials and an admin account for Superset).
-Create a file called `superset-credentials.yaml`:
+The configuration for the OpenSearch security plugin must be provided in a separate resource, e.g. a Secret:
 
 [source,yaml]
-include::example$getting_started/superset-credentials.yaml[]
+----
+include::example$getting_started/opensearch-security-config.yaml[]
+----
 
 Apply the Secret:
 
 [source,bash]
-include::example$getting_started/getting_started.sh[tag=apply-superset-credentials]
+----
+include::example$getting_started/getting_started.sh[tag=apply-security-config]
+----
 
-The `connections.secretKey` will be used for securely signing the session cookies and can be used by the extensions for any other security-related needs.
-It should be a long, random string.
+The passwords in `internal_users.yml` are hashes using the bcrypt algorithm.
+Such a hash can be e.g. generated with `htpasswd`:
 
-`connections.sqlalchemyDatabaseUri` must contain the connection string to the SQL database storing the Superset metadata.
+[source,bash]
+----
+$ htpasswd -nbBC 10 admin AJVFsGJBbpT6mChnq
+admin:$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+----
 
-The `adminUser` fields are used to create an admin user.
-If using non-default authentication (e.g., LDAP), the admin user is disabled.
+== Creation of OpenSearch nodes
 
-== Creation of a Superset node
-
-A Superset node must be created as a custom resource, create a file called `superset.yaml`:
+OpenSearch nodes must be created as a custom resource; Create a file called `opensearch.yaml`:
 
 [source,yaml]
-include::example$getting_started/superset.yaml[]
+----
+include::example$getting_started/opensearch.yaml[]
+----
 
 And apply it:
 
 [source,bash]
-include::example$getting_started/getting_started.sh[tag=apply-superset-cluster]
-
+----
+include::example$getting_started/getting_started.sh[tag=apply-cluster]
+----
 
 `metadata.name` contains the name of the Superset cluster.
 
-The previously created secret must be referenced in `spec.clusterConfig.credentialsSecret`.
+The previously created security plugin configuration must be referenced via `podOverrides`.
 
-The `rowLimit` configuration option defines the row limit when requesting chart data.
-
-The `webserverTimeout` configuration option defines the maximum number of seconds a Superset request can take before timing out.
-These settings affect the maximum duration a query to an underlying datasource can take.
-If you get timeout errors before your query returns the result you may need to increase this timeout.
-
-You need to wait for the Superset node to finish deploying. You can do so with this command:
+You need to wait for the OpenSearch nodes to finish deploying.
+You can do so with this command:
 
 [source,bash]
-include::example$getting_started/getting_started.sh[tag=wait-superset]
+----
+include::example$getting_started/getting_started.sh[tag=await-cluster]
+----
 
-== Connecting to the web interface
+== Connecting to the HTTP endpoint
 
-Once the Superset node is created and the database is initialized, you can open Superset in your browser.
+Once the OpenSearch nodes are created, you can use the REST API of OpenSearch.
 
-To forward the Superset port (`8088`) to localhost, run:
+To forward the HTTP port (`9200`) to localhost, run:
 
 [source,bash]
+----
 include::example$getting_started/getting_started.sh[tag=port-forwarding]
+----
 
-Then, open `http://localhost:8088` in your browser and log in with the admin credentials from the Kubernetes secret.
+== Using the REST API
 
-image::getting_started/superset-login.png[Login screen of Superset]
-
-Superset is now ready for use.
-If you want to load sample data and dashboards and explore Superset's functionality, proceed to the next step.
-
-== Loading examples and accessing example dashboards
-
-To have some data to play with and some dashboards to explore, Superset comes with some example data that you can load.
-To do so, create a file `superset-load-examples-job.yaml` with this content:
+You can use the REST API as follows:
 
 [source,bash]
-include::example$getting_started/superset-load-examples-job.yaml[]
-
-This Kubernetes Job uses the same connection information and credentials as the Superset instance to load the example data.
-Run the Job and wait for it to finish with the following command:
-
-[source,bash]
-include::example$getting_started/getting_started.sh[tag=load-examples]
-
-The Job will take a few minutes to terminate.
-Afterwards, check back again on the web interface.
-New dashboards should be available:
-
-image::getting_started/superset-dashboard.png[Superset dashboard showing birth names]
+----
+include::example$getting_started/getting_started.sh[tag=rest-api]
+----
 
 Great!
-Now you can explore this sample data, run queries on it or create your own dashboards.
+Now you can create your own indexes, populate them with data and search for it.
 
 == What's next
 
-Check the xref:usage-guide/index.adoc[] to find out more about configuring your Superset instance or have a look at the Superset documentation to https://superset.apache.org/docs/creating-charts-dashboards/creating-your-first-dashboard[create your first dashboard].
+Check the xref:usage-guide/index.adoc[] to find out more about configuring your OpenSearch instance or have a look at the OpenSearch documentation to https://docs.opensearch.org/docs/latest/getting-started/[ingest, search or visualize your data with OpenSearch Dashboards].
