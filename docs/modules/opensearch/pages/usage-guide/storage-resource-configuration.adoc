@@ -1,16 +1,40 @@
 = Storage and resource configuration
-:description: Superset resource configuration: default CPU and memory requests for HA setup with guidance for adapting production resource needs.
+:description: Configure storage and resource allocation for OpenSearch nodes using Stackable Operator, including PersistentVolumeClaims, CPU, memory, and storage defaults.
+
+== Storage for data volumes
+
+You can mount volumes where data is stored by specifying https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for each individual role group:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config:
+        resources:
+          storage:
+            logDirs:
+              capacity: 50Gi
+----
+
+In the above example, all OpenSearch nodes in the default role group store data (the location of the property `path.data`) on a `50Gi` volume.
+
+If nothing is configured in the custom resource for a certain role group, then by default each Pod has a `8Gi` large local volume mount for the data location.
+
+On role groups with only the `cluster_manager` role, you probably want to decrease this value, but increase it on role groups with the `data` role.
 
 == Resource Requests
 
-include::concepts:stackable_resource_requests.adoc[]
+include::home:concepts:stackable_resource_requests.adoc[]
 
-A minimal HA setup consisting of 2 Superset instances has the following
-https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+A minimal HA setup consisting of 3 nodes has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
 
-* `1300m` CPU request
-* `3800m` CPU limit
-* `2384Mi` memory request and limit
+* `300m` CPU request
+* `1200m` CPU limit
+* `4800Mi` memory request and limit
+
+Of course, additional services require additional resources.
+For Stackable components, see the corresponding documentation on further resource requirements.
 
 Corresponding to the values above, the operator uses the following resource defaults:
 
@@ -22,10 +46,12 @@ nodes:
       config:
         resources:
           cpu:
-            min: '300m'
-            max: "1200m"
+            min: "1"
+            max: "4"
           memory:
-            limit: '1000Mi'
+            limit: 2Gi
+          storage:
+            data: 8Gi
 ----
 
 WARNING: The default values are _most likely_ not sufficient to run a production cluster. Please adapt according to your requirements.
