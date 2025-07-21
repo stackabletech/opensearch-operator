@@ -1,5 +1,0 @@
-= Monitoring
-:description: The managed Superset instances are automatically configured to export Prometheus metrics.
-
-The managed Superset instances are automatically configured to export Prometheus metrics.
-See xref:operators:monitoring.adoc[] for more details.
