@@ -32,7 +32,7 @@ It creates a number of different Kubernetes resources based on this {crs}[custom
 The OpenSearchCluster is the resource for the configuration of the OpenSearch instance.
 The resource defines only one xref:concepts:roles-and-role-groups.adoc[role], the `nodes`.
 The various configuration options are explained in the xref:usage-guide/index.adoc[].
-It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage], xref:usage-guide/security.adoc[security], xref:usage-guide/logging.adoc[logging] and more.
+It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage] and more.
 
 === Kubernetes resources
 
