@@ -4,4 +4,4 @@
 
 The usage guide covers various aspects of configuring OpenSearch and interconnection with other tools.
 
-Learn about defining the amount of xref:usage-guide/storage-resource-configuration.adoc[resources] OpenSearch uses.
+Learn about xref:usage-guide/node-roles.adoc[] or defining the amount of xref:usage-guide/storage-resource-configuration.adoc[resources] OpenSearch uses.
