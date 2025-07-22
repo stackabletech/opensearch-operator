@@ -25,17 +25,17 @@ or via docker:
 [source]
 ----
 docker run \
---name superset-operator \
+--name opensearch-operator \
 --network host \
 --env KUBECONFIG=/home/stackable/.kube/config \
 --env KUBERNETES_CLUSTER_DOMAIN=mycluster.local \
 --mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
-oci.stackable.tech/sdp/superset-operator:0.0.0-dev
+oci.stackable.tech/sdp/opensearch-operator:0.0.0-dev
 ----
 
 == PRODUCT_CONFIG
 
-*Default value*: `/etc/stackable/superset-operator/config-spec/properties.yaml`
+*Default value*: `/etc/stackable/opensearch-operator/config-spec/properties.yaml`
 
 *Required*: false
 
@@ -44,19 +44,19 @@ oci.stackable.tech/sdp/superset-operator:0.0.0-dev
 [source]
 ----
 export PRODUCT_CONFIG=/foo/bar/properties.yaml
-stackable-superset-operator run
+stackable-opensearch-operator run
 ----
 
 or via docker:
 
 ----
 docker run \
-    --name superset-operator \
+    --name opensearch-operator \
     --network host \
     --env KUBECONFIG=/home/stackable/.kube/config \
     --env PRODUCT_CONFIG=/my/product/config.yaml \
     --mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
-    oci.stackable.tech/sdp/superset-operator:0.0.0-dev
+    oci.stackable.tech/sdp/opensearch-operator:0.0.0-dev
 ----
 
 == WATCH_NAMESPACE
@@ -72,7 +72,7 @@ The operator will **only** watch for resources in the provided namespace `test`:
 [source]
 ----
 export WATCH_NAMESPACE=test
-stackable-superset-operator run
+stackable-opensearch-operator run
 ----
 
 or via docker:
@@ -80,10 +80,10 @@ or via docker:
 [source]
 ----
 docker run \
---name superset-operator \
+--name opensearch-operator \
 --network host \
 --env KUBECONFIG=/home/stackable/.kube/config \
 --env WATCH_NAMESPACE=test \
 --mount type=bind,source="$HOME/.kube/config",target="/home/stackable/.kube/config" \
-oci.stackable.tech/sdp/superset-operator:0.0.0-dev
+oci.stackable.tech/sdp/opensearch-operator:0.0.0-dev
 ----
