@@ -136,9 +136,10 @@ spec:
                         nodeRoles:
                           items:
                             enum:
+                              - cluster_manager
+                              - coordinating_only
                               - data
                               - ingest
-                              - cluster_manager
                               - remote_cluster_client
                               - warm
                               - search
@@ -327,9 +328,10 @@ spec:
                               nodeRoles:
                                 items:
                                   enum:
+                                    - cluster_manager
+                                    - coordinating_only
                                     - data
                                     - ingest
-                                    - cluster_manager
                                     - remote_cluster_client
                                     - warm
                                     - search

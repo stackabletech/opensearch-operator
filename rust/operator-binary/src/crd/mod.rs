@@ -84,12 +84,14 @@ pub mod versioned {
         // see https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/node/DiscoveryNodeRole.java#L341-L346
 
         // TODO https://github.com/Peternator7/strum/issues/113
+        #[strum(serialize = "cluster_manager")]
+        ClusterManager,
+        #[strum(serialize = "coordinating_only")]
+        CoordinatingOnly,
         #[strum(serialize = "data")]
         Data,
         #[strum(serialize = "ingest")]
         Ingest,
-        #[strum(serialize = "cluster_manager")]
-        ClusterManager,
         #[strum(serialize = "remote_cluster_client")]
         RemoteClusterClient,
         #[strum(serialize = "warm")]
