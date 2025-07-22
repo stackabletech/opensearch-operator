@@ -4,17 +4,31 @@ You can configure the graceful shutdown as described in xref:concepts:operations
 
 == Nodes
 
-As a default, Superset nodes have `2 minutes` to shut down gracefully.
+As a default, OpenSearch nodes have 2 minutes to shut down gracefully.
 
-The Superset node process will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
+The OpenSearch node process will receive a `SIGTERM` signal when Kubernetes wants to terminate the Pod.
 It will log the received signal as shown in the log below and initiate a graceful shutdown.
-After the graceful shutdown timeout runs out, and the process still didn't exit, Kubernetes will issue a `SIGKILL` signal.
+After the graceful shutdown timeout runs out, and the process still did not exit, Kubernetes will issue a `SIGKILL` signal.
 
 [source,text]
 ----
-superset [2023-11-08 13:14:39 +0000] [206] [INFO] Handling signal: term
-metrics ts=2023-11-08T13:14:39.818Z caller=main.go:553 level=info msg="Received os signal, exiting" signal=terminated
-superset [2023-11-08 13:14:39 +0000] [207] [INFO] Worker exiting (pid: 207)
-superset Loaded your LOCAL configuration at [/stackable/app/pythonpath/superset_config.py]
-superset [2023-11-08 13:14:40 +0000] [206] [INFO] Shutting down: Master
+[o.o.s.a.r.AuditMessageRouter] Closing AuditMessageRouter
+[o.o.n.Node               ] stopping ...
+[o.o.s.a.s.SinkProvider   ] Closing DebugSink
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-3}{jcXCasAwSf6wTxND431bnw}{KFX1ua4GQpOZc1wdfY5RdA}{10.244.0.22}{10.244.0.22:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} disconnected
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-0}{_HWwfRHWSk-0l2FIYWZerw}{voEOdPrxRsifVO0fema60Q}{10.244.0.26}{10.244.0.26:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} disconnected
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-3}{jcXCasAwSf6wTxND431bnw}{KFX1ua4GQpOZc1wdfY5RdA}{10.244.0.22}{10.244.0.22:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} marking
+
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-2}{NudYVGdNSbClz-e09TVElg}{MmWiswEsQo6MpuDG47a6Ag}{10.244.0.24}{10.244.0.24:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} disconnected
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-1}{NSxqrrevSIOtCIWz9Hd9vw}{qHNTBP4NTqe09_-9ZqnUJQ}{10.244.0.25}{10.244.0.25:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} disconnected
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-0}{_HWwfRHWSk-0l2FIYWZerw}{voEOdPrxRsifVO0fema60Q}{10.244.0.26}{10.244.0.26:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} marking
+
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-1}{NSxqrrevSIOtCIWz9Hd9vw}{qHNTBP4NTqe09_-9ZqnUJQ}{10.244.0.25}{10.244.0.25:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} marking
+
+[o.o.c.c.FollowersChecker ] FollowerChecker{discoveryNode={simple-opensearch-nodes-default-2}{NudYVGdNSbClz-e09TVElg}{MmWiswEsQo6MpuDG47a6Ag}{10.244.0.24}{10.244.0.24:9300}{dimr}{shard_indexing_pressure_enabled=true}, failureCountSinceLastSuccess=0, [cluster.fault_detection.follower_check.retry_count]=3} marking
+
+[o.o.n.Node               ] stopped
+[o.o.n.Node               ] closing ...
+[o.o.s.a.i.AuditLogImpl   ] Closing AuditLogImpl
+[o.o.n.Node               ] closed
 ----
