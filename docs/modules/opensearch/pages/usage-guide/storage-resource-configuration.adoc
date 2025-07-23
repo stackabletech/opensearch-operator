@@ -9,7 +9,7 @@ You can mount volumes where data is stored by specifying https://kubernetes.io/d
 ----
 nodes:
   roleGroups:
-    default:
+    data:
       config:
         resources:
           storage:
@@ -17,11 +17,11 @@ nodes:
               capacity: 50Gi
 ----
 
-In the above example, all OpenSearch nodes in the default role group store data (the location of the property `path.data`) on a `50Gi` volume.
+In the example above, all OpenSearch nodes in the data role group store data (the location of the property `path.data`) on a `50Gi` volume.
 
 If nothing is configured in the custom resource for a certain role group, then by default each Pod has a `8Gi` large local volume mount for the data location.
 
-On role groups with only the `cluster_manager` role, you probably want to decrease this value, but increase it on role groups with the `data` role.
+On role groups with only the `cluster_manager` node role, you probably want to decrease this value, but increase it on role groups with the `data` node role.
 
 == Resource Requests
 

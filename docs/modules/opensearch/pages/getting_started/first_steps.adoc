@@ -1,6 +1,6 @@
 = First steps
 
-Once you have followed the steps in  xref:getting_started/installation.adoc[] for the Operator and its dependencies, you will now go through the steps to set up and connect to a OpenSearch instance.
+Once you have followed the steps in  xref:getting_started/installation.adoc[] for the operator and its dependencies, you will now go through the steps to set up and connect to a OpenSearch instance.
 
 == Security plugin configuration
 
@@ -43,7 +43,7 @@ And apply it:
 include::example$getting_started/getting_started.sh[tag=apply-cluster]
 ----
 
-`metadata.name` contains the name of the Superset cluster.
+`metadata.name` contains the name of the OpenSearch cluster.
 
 The previously created security plugin configuration must be referenced via `podOverrides`.
 

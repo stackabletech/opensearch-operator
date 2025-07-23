@@ -9,7 +9,7 @@ IMPORTANT: Overriding certain properties which are set by the operator (such as 
 == Configuration Properties
 
 For a role or role group, at the same level of `config`, you can specify `configOverrides` for the `opensearch.yml`.
-For example, if you want to enable role-based access to the REST management API for the role `all_access`, then adapt the `nodes` section of the cluster resource as follows:
+For example, if you want to enable role-based access to the REST management API for the role `all_access`, then adapt the cluster resource as follows:
 
 [source,yaml]
 ----

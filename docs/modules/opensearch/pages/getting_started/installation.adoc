@@ -52,4 +52,4 @@ You are now ready to deploy OpenSearch in Kubernetes.
 
 == What's next
 
-xref:getting_started/first_steps.adoc[Deploy an OpenSearch instance and connect to it].
+xref:getting_started/first_steps.adoc[Deploy an OpenSearch instance and connect to it]

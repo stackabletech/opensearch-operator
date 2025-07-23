@@ -4,7 +4,7 @@
 An OpenSearch node can fulfill different roles, e.g. it can manage the operation of a cluster or store and search data.
 
 All nodes are defined under the role `nodes`.
-The role config already defaults to a set of node roles:
+The role configuration already defaults to a set of node roles:
 
 [source,yaml]
 ----
@@ -65,4 +65,4 @@ The following roles are currently supported by the operator:
 * `search`
 * `warm`
 
-We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation] for an exlanation of the roles.
+We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation] for an explanation of the roles.

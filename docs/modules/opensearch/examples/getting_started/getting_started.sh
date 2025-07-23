@@ -4,9 +4,6 @@ set -euo pipefail
 # DO NOT EDIT THE SCRIPT
 # Instead, update the j2 template, and regenerate it for dev with `make render-docs`.
 
-# TODO (@NickLarsenNZ): Use bitnami/postgres chart, and add version var to the above list
-# See similar changes in: https://github.com/stackabletech/hive-operator/pull/489/commits/8189f196f018c009370ae9b07a3f9609ee2e8681
-
 # This script contains all the code snippets from the guide, as well as some assert tests
 # to test if the instructions in the guide work. The user *could* use it, but it is intended
 # for testing only.

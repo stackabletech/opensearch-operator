@@ -20,7 +20,7 @@ This operator helps you manage your OpenSearch instances on Kubernetes efficient
 == Getting started
 
 Get started using OpenSearch with the Stackable operator by following the xref:getting_started/index.adoc[].
-It guides you through installing the operator, connecting to your OpenSearch instance and analyzing some preloaded example data.
+It guides you through installing the operator, connecting to your OpenSearch instance and using the REST API to ingest and search for data.
 
 == Operator model
 
@@ -30,7 +30,7 @@ It creates a number of different Kubernetes resources based on this {crs}[custom
 === Custom resources
 
 The OpenSearchCluster is the resource for the configuration of the OpenSearch instance.
-The resource defines only one xref:concepts:roles-and-role-groups.adoc[role], the `nodes`.
+The resource defines only one xref:concepts:roles-and-role-groups.adoc#roles[role], the `nodes`.
 The various configuration options are explained in the xref:usage-guide/index.adoc[].
 It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage] and more.
 
@@ -42,10 +42,10 @@ image::opensearch_overview.drawio.svg[A diagram depicting the Kubernetes resourc
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
 
-For every xref:concepts:roles-and-role-groups.adoc#_role_groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the RoleGroup.
-For every RoleGroup, a Service is created, as well as one for the whole cluster that references the cluster manager nodes.
+For every xref:concepts:roles-and-role-groups.adoc#role-groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the role group.
+For every role group, a Service is created, as well as one for the whole cluster that references the cluster manager nodes.
 
-Additionally, a ConfigMap is created for each RoleGroup.
+Additionally, a ConfigMap is created for each role group.
 These ConfigMaps contain configuration files like `opensearch.yml`.
 
 == Supported versions
