@@ -1,0 +1,3 @@
+= CRD Reference
+
+Find all CRD references for the Stackable Operator for OpenSearch at: {crd-docs-base-url}/opensearch-operator/{crd-docs-version}

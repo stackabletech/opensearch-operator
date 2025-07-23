@@ -1,0 +1,63 @@
+= Stackable Operator for OpenSearch
+:description: Stackable Operator for OpenSearch manages OpenSearch clusters on Kubernetes for data ingestion and search
+:keywords: Stackable operator, OpenSearch, Kubernetes, operator, data science, data exploration, search
+:opensearch: https://opensearch.org/
+:crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+:github: https://github.com/stackabletech/opensearch-operator/
+:crd: {crd-docs-base-url}/opensearch-operator/{crd-docs-version}/
+:crd-opensearchcluster: {crd-docs}/opensearch.stackable.tech/opensearchcluster/v1alpha1/
+:feature-tracker: https://features.stackable.tech/unified
+
+[.link-bar]
+* {github}[GitHub {external-link-icon}^]
+* {feature-tracker}[Feature Tracker {external-link-icon}^]
+* {crd}[CRD documentation {external-link-icon}^]
+
+The Stackable operator for {opensearch}[OpenSearch] deploys and manages OpenSearch clusters on Kubernetes.
+OpenSearch is a powerful search and analytics engine built on Apache Lucene.
+This operator helps you manage your OpenSearch instances on Kubernetes efficiently.
+
+== Getting started
+
+Get started using OpenSearch with the Stackable operator by following the xref:getting_started/index.adoc[].
+It guides you through installing the operator, connecting to your OpenSearch instance and using the REST API to ingest and search for data.
+
+== Operator model
+
+The operator manages the _OpenSearchCluster_ resource.
+It creates a number of different Kubernetes resources based on this {crs}[custom resource].
+
+=== Custom resources
+
+The OpenSearchCluster is the resource for the configuration of the OpenSearch instance.
+The resource defines only one xref:concepts:roles-and-role-groups.adoc#roles[role], the `nodes`.
+The various configuration options are explained in the xref:usage-guide/index.adoc[].
+It helps you tune your cluster to your needs by configuring xref:usage-guide/storage-resource-configuration.adoc[resource usage] and more.
+
+=== Kubernetes resources
+
+Based on the custom resources you define, the operator creates ConfigMaps, StatefulSets and Services.
+
+image::opensearch_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
+
+The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
+
+For every xref:concepts:roles-and-role-groups.adoc#role-groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the role group.
+For every role group, a Service is created, as well as one for the whole cluster that references the cluster manager nodes.
+
+Additionally, a ConfigMap is created for each role group.
+These ConfigMaps contain configuration files like `opensearch.yml`.
+
+== Supported versions
+
+The Stackable operator for OpenSearch currently supports the OpenSearch versions listed below.
+To use a specific OpenSearch version in your OpenSearchCluster, you have to specify an image - this is explained in the xref:concepts:product-image-selection.adoc[] documentation.
+The operator also supports running images from a custom registry or running entirely customized images; both of these cases are explained under xref:concepts:product-image-selection.adoc[] as well.
+
+include::partial$supported-versions.adoc[]
+
+== Useful links
+
+* The {github}[opensearch-operator {external-link-icon}^] GitHub repository
+* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
+* The {crd-opensearchcluster}[OpenSearchCluster {external-link-icon}^] CRD documentation

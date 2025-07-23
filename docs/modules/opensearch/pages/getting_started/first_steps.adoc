@@ -1,0 +1,83 @@
+= First steps
+
+Once you have followed the steps in  xref:getting_started/installation.adoc[] for the operator and its dependencies, you will now go through the steps to set up and connect to an OpenSearch instance.
+
+== Security plugin configuration
+
+The configuration for the OpenSearch security plugin must be provided in a separate resource, e.g. a Secret:
+
+[source,yaml]
+----
+include::example$getting_started/opensearch-security-config.yaml[]
+----
+
+Apply the Secret:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=apply-security-config]
+----
+
+The passwords in `internal_users.yml` are hashes using the bcrypt algorithm.
+Such a hash can be e.g. generated with `htpasswd`:
+
+[source,bash]
+----
+$ htpasswd -nbBC 10 admin AJVFsGJBbpT6mChnq
+admin:$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+----
+
+== Creation of OpenSearch nodes
+
+OpenSearch nodes must be created as a custom resource; Create a file called `opensearch.yaml`:
+
+[source,yaml]
+----
+include::example$getting_started/opensearch.yaml[]
+----
+
+And apply it:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=apply-cluster]
+----
+
+`metadata.name` contains the name of the OpenSearch cluster.
+
+The previously created security plugin configuration must be referenced via `podOverrides`.
+
+You need to wait for the OpenSearch nodes to finish deploying.
+You can do so with this command:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=await-cluster]
+----
+
+== Connecting to the HTTP endpoint
+
+Once the OpenSearch nodes are created, you can use the REST API of OpenSearch.
+
+To forward the HTTP port (`9200`) to localhost, run:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=port-forwarding]
+----
+
+== Using the REST API
+
+You can use the REST API as follows:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=rest-api]
+----
+
+Great!
+Now you can create your own indexes, populate them with data and search for it.
+
+== What's next
+
+Check the xref:usage-guide/index.adoc[] to find out more about configuring your OpenSearch instance or have a look at the OpenSearch documentation to https://docs.opensearch.org/docs/latest/getting-started/[ingest, search or visualize your data with OpenSearch Dashboards].

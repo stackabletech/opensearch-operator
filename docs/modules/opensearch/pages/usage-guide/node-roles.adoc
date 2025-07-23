@@ -1,0 +1,68 @@
+= Assigning roles to nodes
+:description: Configure OpenSearch node roles
+
+An OpenSearch node can fulfill different roles, e.g. it can manage the operation of a cluster or store and search data.
+
+All nodes are defined under the role `nodes`.
+The role configuration already defaults to a set of node roles:
+
+[source,yaml]
+----
+nodes:
+  config:
+    nodeRoles:
+      - cluster_manager
+      - data
+      - ingest
+      - remote_cluster_client
+----
+
+If you deploy a cluster with the following specification, then 3 replicas with the roles `cluster_manager`, `data`, `ingest` and `remote_cluster_client` are deployed:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      replicas: 3
+----
+
+In a production cluster, you probably want to assign different roles to the nodes.
+This can be achieved by creating multiple role groups and configuring their node roles.
+The node roles configured at the role group level override the ones from the role level.
+
+For instance, if you want to deploy https://docs.opensearch.org/docs/latest/tuning-your-cluster/[the sample cluster from the OpenSearch documentation] that has one dedicated cluster manager node, one dedicated coordinating node and two data nodes, you could configure the role groups as follows:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    cluster-manager:
+      config:
+        nodeRoles:
+          - cluster_manager
+      replicas: 1
+    coordinating:
+      config:
+        nodeRoles:
+          - coordinating_only
+      replicas: 1
+    data:
+      config:
+        nodeRoles:
+          - data
+          - ingest
+      replicas: 2
+----
+
+The following roles are currently supported by the operator:
+
+* `cluster_manager`
+* `coordinating_only`
+* `data`
+* `ingest`
+* `remote_cluster_client`
+* `search`
+* `warm`
+
+We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation] for an explanation of the roles.

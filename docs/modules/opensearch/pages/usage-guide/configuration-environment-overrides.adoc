@@ -1,0 +1,178 @@
+= Configuration & Environment Overrides
+
+The cluster definition also supports overriding configuration properties, environment variables and CLI parameters,
+either per role or per role group, where the more specific override (role group) has precedence over
+the less specific one (role).
+
+IMPORTANT: Overriding certain properties which are set by the operator (such as the `network.host`) can interfere with the operator and can lead to problems.
+
+== Configuration Properties
+
+For a role or role group, at the same level of `config`, you can specify `configOverrides` for the `opensearch.yml`.
+For example, if you want to enable role-based access to the REST management API for the role `all_access` (not to be confused with the OpenSearch node role), then adapt the cluster resource as follows:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config: {}
+      configOverrides:
+        opensearch.yml:
+          plugins.security.restapi.roles_enabled: all_access
+----
+
+Just as for the `config`, it is possible to specify this at the role level as well:
+
+[source,yaml]
+----
+nodes:
+  configOverrides:
+    opensearch.yml:
+      plugins.security.restapi.roles_enabled: all_access
+  roleGroups:
+    default:
+      config: {}
+----
+
+All override property values must be strings.
+They are added unchanged to the configuration file.
+Care must be taken to produce a valid configuration.
+
+For a list of configuration options, we refer to the
+https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index/[Configuring OpenSearch] section in the OpenSearch documentation.
+
+The file `opensearch.yml` is a YAML file, where deep structures are possible.
+On the other hand, `configOverrides` are only flat key-value pairs.
+Fortunately, this is not a problem because the OpenSearch YAML parser allows both representations.
+Keys can be flattened as follows:
+
+[source,yaml]
+----
+# File: opensearch.yml
+
+plugins.security.restapi.roles_enabled: all_access
+
+# is equivalent to
+
+plugins:
+  security:
+    restapi:
+      roles_enabled: all_access
+----
+
+Lists can be flattened as follows:
+
+[source,yaml]
+----
+# File: opensearch.yml
+
+# as a comma-separated list: <1>
+plugins.security.restapi.roles_enabled: role1,role2,role3
+
+# as a JSON list: <2>
+plugins.security.restapi.roles_enabled: ["role1", "role2", "role3"]
+
+# as an indexed flat list: <3>
+plugins.security.restapi.roles_enabled.0: role1
+plugins.security.restapi.roles_enabled.1: role2
+plugins.security.restapi.roles_enabled.2: role3
+
+# All options above are equivalent to
+
+plugins:
+  security:
+    restapi:
+      roles_enabled:
+        - role1
+        - role2
+        - role3
+----
+<1> Commas in list entries cannot be escaped.
+<2> The brackets must be escaped in `configOverrides` as follows: `"[\"role1\", \"role2\", \"role3\"]"`
+<3> Indexed flat lists are considered "legacy" in the OpenSearch code.
+// see https://github.com/opensearch-project/OpenSearch/blob/3.1.0/server/src/main/java/org/opensearch/common/settings/Settings.java#L1049
+
+Other types can be set as strings in `configOverrides` because OpenSearch parses them:
+
+[source,yaml]
+----
+# File: opensearch.yml
+
+# Boolean as string
+cluster.blocks.read_only: "true"
+
+# Integer as string
+cluster.max_shards_per_node: "10000"
+
+# Floating point as string
+cluster.routing.allocation.balance.index: "0.6"
+
+# Time unit as string
+cluster.info.update.interval: "10s"
+
+# The options above are equivalent to
+
+cluster.blocks.read_only: true
+cluster.max_shards_per_node: 10000
+cluster.routing.allocation.balance.index: 0.6
+cluster.info.update.interval: 10s
+----
+
+== Environment Variables
+
+In a similar fashion, environment variables can be (over)written.
+For example per role group:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config: {}
+      envOverrides:
+        OPENSEARCH_PATH_CONF: /etc/opensearch
+----
+
+or per role:
+
+[source,yaml]
+----
+nodes:
+  envOverrides:
+    OPENSEARCH_PATH_CONF: /etc/opensearch
+  roleGroups:
+    default:
+      config: {}
+----
+
+== CLI parameters
+
+CLI parameters can be set with `cliOverrides` per role group:
+
+[source,yaml]
+----
+nodes:
+  roleGroups:
+    default:
+      config: {}
+      cliOverrides:
+        --pidfile: /tmp/mypidfile.pid
+----
+
+or per role:
+
+[source,yaml]
+----
+nodes:
+  cliOverrides:
+    --pidfile: /tmp/mypidfile.pid
+  roleGroups:
+    default:
+      config: {}
+----
+
+== Pod overrides
+
+The OpenSearch operator also supports Pod overrides, allowing you to override any property that you can set on a Kubernetes Pod.
+Read the xref:concepts:overrides.adoc#pod-overrides[Pod overrides documentation] to learn more about this feature.
