@@ -69,7 +69,7 @@ done
 
 echo "Waiting on OpenSearch StatefulSet ..."
 # tag::await-cluster[]
-kubectl rollout status --watch statefulset/simple-opensearch-nodes-default --timeout 300s
+kubectl rollout status --watch statefulset/simple-opensearch-nodes-default --timeout 600s
 # end::await-cluster[]
 
 # wait a bit for the port to open
