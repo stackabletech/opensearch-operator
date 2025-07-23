@@ -1,6 +1,6 @@
 = First steps
 
-Once you have followed the steps in  xref:getting_started/installation.adoc[] for the operator and its dependencies, you will now go through the steps to set up and connect to a OpenSearch instance.
+Once you have followed the steps in  xref:getting_started/installation.adoc[] for the operator and its dependencies, you will now go through the steps to set up and connect to an OpenSearch instance.
 
 == Security plugin configuration
 
