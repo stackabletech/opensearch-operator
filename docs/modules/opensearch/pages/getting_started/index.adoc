@@ -1,7 +1,7 @@
 = Getting started
 
 This guide helps you get started with OpenSearch using the Stackable Operator.
-It covers the installation of the operator and its dependencies, setting up your first OpenSearch instance, connecting to it, and ingest and search for data.
+It covers the installation of the operator and its dependencies, setting up your first OpenSearch instance, connecting to it, and ingesting and searching for data.
 
 == Prerequisites
 

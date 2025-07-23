@@ -37,7 +37,7 @@ nodes:
 
 All override property values must be strings.
 They are added unchanged to the configuration file.
-So care must be taken to produce a valid configuration.
+Care must be taken to produce a valid configuration.
 
 For a list of configuration options, we refer to the
 https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index/[Configuring OpenSearch] section in the OpenSearch documentation.
