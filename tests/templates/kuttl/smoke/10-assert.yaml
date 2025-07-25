@@ -10,9 +10,185 @@ timeout: 600
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  generation: 1
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: cluster-manager
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
+  podManagementPolicy: Parallel
   replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch
+      app.kubernetes.io/role-group: cluster-manager
+  serviceName: opensearch-nodes-cluster-manager-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: cluster-manager
+        app.kubernetes.io/version: 3.1.0
+        stackable.tech/opensearch-role.cluster_manager: "true"
+        stackable.tech/vendor: Stackable
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: nodes
+                  app.kubernetes.io/instance: opensearch
+                  app.kubernetes.io/name: opensearch
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - command:
+        - /stackable/opensearch//opensearch-docker-entrypoint.sh
+        env:
+        - name: DISABLE_INSTALL_DEMO_CONFIG
+          value: "true"
+        - name: cluster.initial_cluster_manager_nodes
+          value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
+        - name: discovery.seed_hosts
+          value: opensearch
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: node.roles
+          value: cluster_manager
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: opensearch
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "4"
+            memory: 2Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        startupProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /stackable/opensearch//config/opensearch.yml
+          name: config
+          readOnly: true
+          subPath: opensearch.yml
+        - mountPath: /stackable/opensearch//data
+          name: data
+        - mountPath: /stackable/listener
+          name: listener
+        - mountPath: /stackable/opensearch/config/opensearch-security
+          name: security-config
+          readOnly: true
+        - mountPath: /stackable/opensearch/config/tls
+          name: tls
+          readOnly: true
+      securityContext:
+        fsGroup: 1000
+      serviceAccount: opensearch-serviceaccount
+      serviceAccountName: opensearch-serviceaccount
+      terminationGracePeriodSeconds: 120
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: opensearch-nodes-cluster-manager
+        name: config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: secrets.stackable.tech
+              volumeMode: Filesystem
+        name: tls
+      - name: security-config
+        secret:
+          defaultMode: 420
+          secretName: opensearch-security-config
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Mi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      annotations:
+        listeners.stackable.tech/listener-name: opensearch-nodes-cluster-manager
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: cluster-manager
+        app.kubernetes.io/version: none
+        stackable.tech/vendor: Stackable
+      name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+      volumeMode: Filesystem
+    status:
+      phase: Pending
 status:
   readyReplicas: 3
   replicas: 3
@@ -20,9 +196,190 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  generation: 1
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: data
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
+  podManagementPolicy: Parallel
   replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch
+      app.kubernetes.io/role-group: data
+  serviceName: opensearch-nodes-data-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: data
+        app.kubernetes.io/version: 3.1.0
+        stackable.tech/opensearch-role.data: "true"
+        stackable.tech/opensearch-role.ingest: "true"
+        stackable.tech/opensearch-role.remote_cluster_client: "true"
+        stackable.tech/vendor: Stackable
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: nodes
+                  app.kubernetes.io/instance: opensearch
+                  app.kubernetes.io/name: opensearch
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - command:
+        - /stackable/opensearch//opensearch-docker-entrypoint.sh
+        env:
+        - name: DISABLE_INSTALL_DEMO_CONFIG
+          value: "true"
+        - name: cluster.initial_cluster_manager_nodes
+        - name: discovery.seed_hosts
+          value: opensearch
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: node.roles
+          value: ingest,data,remote_cluster_client
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: opensearch
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: "4"
+            memory: 2Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        startupProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: http
+          timeoutSeconds: 3
+        volumeMounts:
+        - mountPath: /stackable/opensearch//config/opensearch.yml
+          name: config
+          readOnly: true
+          subPath: opensearch.yml
+        - mountPath: /stackable/opensearch//data
+          name: data
+        - mountPath: /stackable/listener
+          name: listener
+        - mountPath: /stackable/opensearch/config/opensearch-security
+          name: security-config
+          readOnly: true
+        - mountPath: /stackable/opensearch/config/tls
+          name: tls
+          readOnly: true
+      securityContext:
+        fsGroup: 1000
+      serviceAccount: opensearch-serviceaccount
+      serviceAccountName: opensearch-serviceaccount
+      terminationGracePeriodSeconds: 120
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: opensearch-nodes-data
+        name: config
+      - ephemeral:
+          volumeClaimTemplate:
+            metadata:
+              annotations:
+                secrets.stackable.tech/class: tls
+                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: "1"
+              storageClassName: secrets.stackable.tech
+              volumeMode: Filesystem
+        name: tls
+      - name: security-config
+        secret:
+          defaultMode: 420
+          secretName: opensearch-security-config
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      annotations:
+        listeners.stackable.tech/listener-name: opensearch-nodes-data
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: data
+        app.kubernetes.io/version: none
+        stackable.tech/vendor: Stackable
+      name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+      volumeMode: Filesystem
+    status:
+      phase: Pending
 status:
   readyReplicas: 2
   replicas: 2
@@ -30,9 +387,69 @@ status:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: cluster-manager
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+data:
+  opensearch.yml: |-
+    cluster.name: "opensearch"
+    discovery.type: "zen"
+    network.host: "0.0.0.0"
+    node.store.allow_mmap: "false"
+    plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
+    plugins.security.nodes_dn: ["CN=generated certificate for pod"]
+    plugins.security.ssl.http.enabled: "true"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.transport.enabled: "true"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: data
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+data:
+  opensearch.yml: |-
+    cluster.name: "opensearch"
+    discovery.type: "zen"
+    network.host: "0.0.0.0"
+    node.store.allow_mmap: "false"
+    plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
+    plugins.security.nodes_dn: ["CN=generated certificate for pod"]
+    plugins.security.ssl.http.enabled: "true"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.transport.enabled: "true"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"

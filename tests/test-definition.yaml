@@ -11,6 +11,10 @@ tests:
     dimensions:
       - opensearch
       - openshift
+  - name: external-access
+    dimensions:
+      - opensearch
+      - openshift
 suites:
   - name: nightly
     patch:

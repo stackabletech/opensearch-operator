@@ -13,12 +13,8 @@ spec:
         config:
           nodeRoles:
             - cluster_manager
-          resources:
-            storage:
-              data:
-                capacity: 100Mi
-          listenerClass: external-stable
-        replicas: 3
+          listenerClass: test-external-stable-$NAMESPACE
+        replicas: 1
         podOverrides:
           spec:
             volumes:
@@ -31,15 +27,9 @@ spec:
       data:
         config:
           nodeRoles:
-            - ingest
             - data
-            - remote_cluster_client
-          resources:
-            storage:
-              data:
-                capacity: 2Gi
-          listenerClass: cluster-internal
-        replicas: 2
+          listenerClass: test-external-unstable-$NAMESPACE
+        replicas: 1
         podOverrides:
           spec:
             volumes:

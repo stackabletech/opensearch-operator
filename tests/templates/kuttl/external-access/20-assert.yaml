@@ -1,0 +1,49 @@
+# All fields are checked that are set by the operator.
+# This helps to detect unintentional changes.
+# The maintenance effort should be okay as long as it is only done in the smoke test.
+# TODO  Check individual field in unit tests
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-cluster-manager
+spec:
+  replicas: 1
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-data
+spec:
+  replicas: 1
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-nodes-cluster-manager
+spec:
+  type: NodePort # external-stable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-nodes-data
+spec:
+  type: NodePort # external-unstable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+spec:
+  type: ClusterIP
