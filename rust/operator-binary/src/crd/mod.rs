@@ -30,6 +30,8 @@ use crate::framework::{
     role_utils::GenericProductSpecificCommonConfig,
 };
 
+const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
 
@@ -130,6 +132,10 @@ pub mod versioned {
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
+
+        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+        #[serde(default = "default_listener_class")]
+        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -160,6 +166,10 @@ pub mod versioned {
         #[serde(default)]
         pub conditions: Vec<ClusterCondition>,
     }
+}
+
+fn default_listener_class() -> String {
+    DEFAULT_LISTENER_CLASS.to_string()
 }
 
 impl HasStatusCondition for v1alpha1::OpenSearchCluster {
@@ -232,6 +242,7 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
+            listener_class: Some("cluster-internal".to_string()),
         }
     }
 }

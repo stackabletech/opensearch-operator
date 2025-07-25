@@ -286,6 +286,7 @@ mod tests {
                 node_roles: NodeRoles::default(),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
+                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: HashMap::default(),
             env_overrides: [("TEST".to_owned(), "value".to_owned())].into(),

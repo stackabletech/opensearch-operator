@@ -5,8 +5,8 @@ metadata:
   name: opensearch
 spec:
   image:
-    custom: opensearchproject/opensearch:3.0.0
-    productVersion: 3.0.0
+    productVersion: 3.1.0
+    pullPolicy: IfNotPresent
   nodes:
     roleGroups:
       cluster-manager:
@@ -17,6 +17,7 @@ spec:
             storage:
               data:
                 capacity: 100Mi
+          listenerClass: external-stable
         replicas: 3
         podOverrides:
           spec:
@@ -26,7 +27,7 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch-cluster-manager,service=opensearch-nodes-cluster-manager
+                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
       data:
         config:
           nodeRoles:
@@ -37,6 +38,7 @@ spec:
             storage:
               data:
                 capacity: 2Gi
+          listenerClass: external-stable
         replicas: 2
         podOverrides:
           spec:
@@ -46,7 +48,7 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data
+                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
     envOverrides:
       # TODO Make these the defaults in the image
       DISABLE_INSTALL_DEMO_CONFIG: "true"
@@ -59,24 +61,26 @@ spec:
         # TODO Check that this is safe despite the warning in the documentation
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: /usr/share/opensearch/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: /usr/share/opensearch/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: /usr/share/opensearch/config/tls/ca.crt
+        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
         plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: /usr/share/opensearch/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: /usr/share/opensearch/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: /usr/share/opensearch/config/tls/ca.crt
+        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     podOverrides:
       spec:
         containers:
           - name: opensearch
+            command:
+              - /stackable/opensearch/opensearch-docker-entrypoint.sh
             volumeMounts:
               - name: security-config
-                mountPath: /usr/share/opensearch/config/opensearch-security
+                mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
               - name: tls
-                # The Java policy allows reading from /usr/share/opensearch/config.
-                mountPath: /usr/share/opensearch/config/tls
+                mountPath: /stackable/opensearch/config/tls
                 readOnly: true
         securityContext:
           fsGroup: 1000

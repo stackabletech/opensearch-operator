@@ -1,13 +1,20 @@
 use stackable_operator::{
-    builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
+    builder::{
+        meta::ObjectMetaBuilder,
+        pod::{
+            container::ContainerBuilder,
+            volume::{ListenerOperatorVolumeSourceBuilder, ListenerReference},
+        },
+    },
+    crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
         api::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
-                PodSecurityContext, PodSpec, PodTemplateSpec, Probe, Service, ServicePort,
-                ServiceSpec, TCPSocketAction, Volume, VolumeMount,
+                PersistentVolumeClaim, PodSecurityContext, PodSpec, PodTemplateSpec, Probe,
+                Service, ServicePort, ServiceSpec, TCPSocketAction, Volume, VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
@@ -36,8 +43,11 @@ pub const TRANSPORT_PORT: u16 = 9300;
 const CONFIG_VOLUME_NAME: &str = "config";
 const DATA_VOLUME_NAME: &str = "data";
 
+const LISTENER_VOLUME_NAME: &str = "listener";
+const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+
 // Path in opensearchproject/opensearch:3.0.0
-const OPENSEARCH_BASE_PATH: &str = "/usr/share/opensearch";
+const OPENSEARCH_BASE_PATH: &str = "/stackable/opensearch/";
 
 pub struct RoleGroupBuilder<'a> {
     service_account_name: String,
@@ -107,6 +117,27 @@ impl<'a> RoleGroupBuilder<'a> {
             .data
             .build_pvc(DATA_VOLUME_NAME, Some(vec!["ReadWriteOnce"]));
 
+        let listener_group_name = self.resource_names.listener_service_name();
+
+        // Listener endpoints for the all rolegroups will use persistent
+        // volumes so that load balancers can hard-code the target
+        // addresses. This will be the case even when no class is set (and
+        // the value defaults to cluster-internal) as the address should
+        // still be consistent.
+        let listener_volume_claim_template = ListenerOperatorVolumeSourceBuilder::new(
+            &ListenerReference::ListenerName(listener_group_name),
+            // TODO should be unversioned
+            &self.recommended_labels(),
+        )
+        .expect("should be a listener group name")
+        .build_pvc(LISTENER_VOLUME_NAME.to_string())
+        .expect("should be a valid annotation");
+
+        let pvcs: Option<Vec<PersistentVolumeClaim>> = Some(vec![
+            data_volume_claim_template,
+            listener_volume_claim_template,
+        ]);
+
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
             pod_management_policy: Some("Parallel".to_string()),
@@ -117,7 +148,7 @@ impl<'a> RoleGroupBuilder<'a> {
             },
             service_name: Some(self.resource_names.headless_service_name()),
             template,
-            volume_claim_templates: Some(vec![data_volume_claim_template]),
+            volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()
         };
 
@@ -271,6 +302,11 @@ impl<'a> RoleGroupBuilder<'a> {
                     name: DATA_VOLUME_NAME.to_owned(),
                     ..VolumeMount::default()
                 },
+                VolumeMount {
+                    mount_path: LISTENER_VOLUME_DIR.to_owned(),
+                    name: LISTENER_VOLUME_NAME.to_owned(),
+                    ..VolumeMount::default()
+                },
             ])
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .add_container_ports(vec![
@@ -335,6 +371,33 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(service_spec),
             status: None,
         }
+    }
+
+    pub fn build_listener(&self) -> listener::v1alpha1::Listener {
+        let metadata =
+            self.common_metadata(self.resource_names.listener_service_name(), Labels::new());
+
+        let listener_class = self.role_group_config.config.listener_class.to_owned();
+
+        listener::v1alpha1::Listener {
+            metadata,
+            spec: listener::v1alpha1::ListenerSpec {
+                class_name: Some(listener_class),
+                ports: Some(self.listener_ports()),
+                ..listener::v1alpha1::ListenerSpec::default()
+            },
+            status: None,
+        }
+    }
+
+    /// We only use the http port here and intentionally omit
+    /// the metrics one.
+    fn listener_ports(&self) -> Vec<listener::v1alpha1::ListenerPort> {
+        vec![listener::v1alpha1::ListenerPort {
+            name: HTTP_PORT_NAME.to_string(),
+            port: HTTP_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        }]
     }
 
     fn common_metadata(

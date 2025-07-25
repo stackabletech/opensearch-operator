@@ -122,6 +122,7 @@ fn validate_role_group_config(
         node_roles: merged_role_group.config.config.node_roles,
         resources: merged_role_group.config.config.resources,
         termination_grace_period_seconds,
+        listener_class: merged_role_group.config.config.listener_class,
     };
 
     Ok(RoleGroupConfig {
