@@ -242,7 +242,7 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
-            listener_class: Some("cluster-internal".to_string()),
+            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
         }
     }
 }
