@@ -16,7 +16,17 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: opensearch-nodes-data
+  name: opensearch-nodes-data1
+spec:
+  replicas: 1
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-data2
 spec:
   replicas: 1
 status:
@@ -33,9 +43,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: opensearch-nodes-data
+  name: opensearch-nodes-data1
 spec:
   type: NodePort # external-unstable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-nodes-data2
+spec:
+  type: ClusterIP # cluster-internal
 ---
 apiVersion: v1
 kind: Service
