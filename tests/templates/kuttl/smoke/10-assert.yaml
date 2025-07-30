@@ -519,6 +519,11 @@ metadata:
     app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
 spec:
   ports:
   - name: http
