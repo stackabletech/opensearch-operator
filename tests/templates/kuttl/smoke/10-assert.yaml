@@ -59,7 +59,7 @@ spec:
             weight: 1
       containers:
       - command:
-        - /stackable/opensearch//opensearch-docker-entrypoint.sh
+        - /stackable/opensearch/opensearch-docker-entrypoint.sh
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -107,11 +107,11 @@ spec:
             port: http
           timeoutSeconds: 3
         volumeMounts:
-        - mountPath: /stackable/opensearch//config/opensearch.yml
+        - mountPath: /stackable/opensearch/config/opensearch.yml
           name: config
           readOnly: true
           subPath: opensearch.yml
-        - mountPath: /stackable/opensearch//data
+        - mountPath: /stackable/opensearch/data
           name: data
         - mountPath: /stackable/listener
           name: listener
@@ -195,7 +195,6 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  generation: 1
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -247,7 +246,7 @@ spec:
             weight: 1
       containers:
       - command:
-        - /stackable/opensearch//opensearch-docker-entrypoint.sh
+        - /stackable/opensearch/opensearch-docker-entrypoint.sh
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -294,11 +293,11 @@ spec:
             port: http
           timeoutSeconds: 3
         volumeMounts:
-        - mountPath: /stackable/opensearch//config/opensearch.yml
+        - mountPath: /stackable/opensearch/config/opensearch.yml
           name: config
           readOnly: true
           subPath: opensearch.yml
-        - mountPath: /stackable/opensearch//data
+        - mountPath: /stackable/opensearch/data
           name: data
         - mountPath: /stackable/listener
           name: listener
@@ -337,10 +336,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: opensearch-security-config
-  updateStrategy:
-    rollingUpdate:
-      partition: 0
-    type: RollingUpdate
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -452,3 +447,150 @@ data:
     plugins.security.ssl.transport.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: cluster-manager
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
+  name: opensearch-nodes-cluster-manager-headless
+spec:
+  ports:
+  - name: http
+    port: 9200
+    protocol: TCP
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    protocol: TCP
+    targetPort: 9300
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: cluster-manager
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: data
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
+  name: opensearch-nodes-data-headless
+spec:
+  ports:
+  - name: http
+    port: 9200
+    protocol: TCP
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    protocol: TCP
+    targetPort: 9300
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: data
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
+  name: opensearch
+spec:
+  ports:
+  - name: http
+    port: 9200
+    protocol: TCP
+    targetPort: 9200
+  - name: transport
+    port: 9300
+    protocol: TCP
+    targetPort: 9300
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/name: opensearch
+    stackable.tech/opensearch-role.cluster_manager: "true"
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
+  name: opensearch-serviceaccount
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: 3.1.0
+    stackable.tech/vendor: Stackable
+  name: opensearch-rolebinding
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: opensearch-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: opensearch-serviceaccount
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+  name: opensearch-nodes
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nodes
+      app.kubernetes.io/instance: opensearch
+      app.kubernetes.io/name: opensearch

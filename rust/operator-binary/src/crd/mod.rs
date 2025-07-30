@@ -168,10 +168,6 @@ pub mod versioned {
     }
 }
 
-fn default_listener_class() -> String {
-    DEFAULT_LISTENER_CLASS.to_string()
-}
-
 impl HasStatusCondition for v1alpha1::OpenSearchCluster {
     fn conditions(&self) -> Vec<ClusterCondition> {
         match &self.status {
