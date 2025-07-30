@@ -131,7 +131,7 @@ impl<'a> RoleGroupBuilder<'a> {
             &self
                 .recommended_labels(ProductVersion::from_str("none").expect("version is supplied")),
         )
-        .expect("should be a listener group name")
+        .expect("should return Ok independent of the given parameters")
         .build_pvc(LISTENER_VOLUME_NAME.to_string())
         .expect("should be a valid annotation");
 
