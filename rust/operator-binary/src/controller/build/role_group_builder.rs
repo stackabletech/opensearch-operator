@@ -49,7 +49,7 @@ const LISTENER_VOLUME_NAME: &str = "listener";
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 // Path in opensearchproject/opensearch:3.0.0
-const OPENSEARCH_BASE_PATH: &str = "/stackable/opensearch/";
+const OPENSEARCH_BASE_PATH: &str = "/stackable/opensearch";
 
 pub struct RoleGroupBuilder<'a> {
     service_account_name: String,
