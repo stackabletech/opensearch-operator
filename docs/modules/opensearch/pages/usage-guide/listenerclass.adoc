@@ -11,7 +11,7 @@ spec:
     roleGroups:
       cluster-manager:
         config:
-          listenerClass: external-stable
+          listenerClass: external-stable  # <1>
 ----
 <1> Specify a ListenerClass, such as `external-stable`, `external-unstable`, or `cluster-internal` (the default setting is `cluster-internal`) at role-group level.
 This can be set for all role-groups individually.
