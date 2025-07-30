@@ -10,7 +10,6 @@ timeout: 600
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  generation: 1
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
