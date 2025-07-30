@@ -5,7 +5,12 @@ metadata:
   name: opensearch
 spec:
   image:
-    productVersion: 3.1.0
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['opensearch'] }}"
+{% endif %}
     pullPolicy: IfNotPresent
   nodes:
     roleGroups:
@@ -52,6 +57,7 @@ spec:
     envOverrides:
       # TODO Make these the defaults in the image
       DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
     configOverrides:
       # TODO Add the required options to the operator
       opensearch.yml:
@@ -61,13 +67,13 @@ spec:
         # TODO Check that this is safe despite the warning in the documentation
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
         plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
         plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     podOverrides:
       spec:
@@ -75,10 +81,10 @@ spec:
           - name: opensearch
             volumeMounts:
               - name: security-config
-                mountPath: /stackable/opensearch/config/opensearch-security
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
                 readOnly: true
               - name: tls
-                mountPath: /stackable/opensearch/config/tls
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
                 readOnly: true
         securityContext:
           fsGroup: 1000
