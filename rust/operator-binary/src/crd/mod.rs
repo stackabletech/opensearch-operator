@@ -134,7 +134,7 @@ pub mod versioned {
         pub resources: Resources<StorageConfig>,
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
-        #[serde(default = "default_listener_class")]
+        #[fragment_attrs(serde(default))]
         pub listener_class: String,
     }
 
