@@ -133,7 +133,7 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
 
-        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the webserver.
+        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
         #[serde(default = "default_listener_class")]
         pub listener_class: String,
     }
