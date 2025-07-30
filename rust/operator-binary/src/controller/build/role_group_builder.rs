@@ -1,13 +1,5 @@
-use std::str::FromStr;
-
 use stackable_operator::{
-    builder::{
-        meta::ObjectMetaBuilder,
-        pod::{
-            container::ContainerBuilder,
-            volume::{ListenerOperatorVolumeSourceBuilder, ListenerReference},
-        },
-    },
+    builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -30,9 +22,10 @@ use crate::{
     controller::{ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster},
     crd::v1alpha1,
     framework::{
-        ProductVersion, RoleGroupName,
+        RoleGroupName,
         builder::meta::ownerreference_from_resource,
         kvp::label::{recommended_labels, role_group_selector, role_selector},
+        listener::listener_pvc,
         role_group_utils::ResourceNames,
     },
 };
@@ -126,14 +119,11 @@ impl<'a> RoleGroupBuilder<'a> {
         // addresses. This will be the case even when no class is set (and
         // the value defaults to cluster-internal) as the address should
         // still be consistent.
-        let listener_volume_claim_template = ListenerOperatorVolumeSourceBuilder::new(
-            &ListenerReference::ListenerName(listener_group_name),
-            &self
-                .recommended_labels(ProductVersion::from_str("none").expect("version is supplied")),
-        )
-        .expect("should return Ok independent of the given parameters")
-        .build_pvc(LISTENER_VOLUME_NAME.to_string())
-        .expect("should be a valid annotation");
+        let listener_volume_claim_template = listener_pvc(
+            listener_group_name,
+            &self.recommended_labels(),
+            LISTENER_VOLUME_NAME.to_string(),
+        );
 
         let pvcs: Option<Vec<PersistentVolumeClaim>> = Some(vec![
             data_volume_claim_template,
@@ -168,7 +158,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
 
         let metadata = ObjectMetaBuilder::new()
-            .with_labels(self.recommended_labels(self.cluster.product_version.clone()))
+            .with_labels(self.recommended_labels())
             .with_labels(node_role_labels)
             .build();
 
@@ -415,16 +405,16 @@ impl<'a> RoleGroupBuilder<'a> {
                 None,
                 Some(true),
             ))
-            .with_labels(self.recommended_labels(self.cluster.product_version.clone()))
+            .with_labels(self.recommended_labels())
             .with_labels(extra_labels)
             .build()
     }
 
-    fn recommended_labels(&self, product_version: ProductVersion) -> Labels {
+    fn recommended_labels(&self) -> Labels {
         recommended_labels(
             &self.cluster,
             &self.context_names.product_name,
-            &product_version,
+            &self.cluster.product_version,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
             &ValidatedCluster::role_name(),
