@@ -12,6 +12,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
     let mut config_maps = vec![];
     let mut stateful_sets = vec![];
     let mut services = vec![];
+    let mut listeners = vec![];
 
     let role_builder = RoleBuilder::new(cluster.clone(), names);
 
@@ -19,6 +20,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         config_maps.push(role_group_builder.build_config_map());
         stateful_sets.push(role_group_builder.build_stateful_set());
         services.push(role_group_builder.build_headless_service());
+        listeners.push(role_group_builder.build_listener());
     }
 
     let cluster_manager_service = role_builder.build_cluster_manager_service();
@@ -33,6 +35,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
     KubernetesResources {
         stateful_sets,
         services,
+        listeners,
         config_maps,
         service_accounts,
         role_bindings,

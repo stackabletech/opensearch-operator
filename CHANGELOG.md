@@ -16,5 +16,7 @@ All notable changes to this project will be documented in this file.
   - Resources (CPU, memory, storage)
   - PodDisruptionBudgets
   - Replicas
+- Add Listener support ([#17]).
 
 [#10]: https://github.com/stackabletech/opensearch-operator/pull/10
+[#17]: https://github.com/stackabletech/opensearch-operator/pull/17

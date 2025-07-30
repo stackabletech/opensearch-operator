@@ -13,12 +13,8 @@ spec:
         config:
           nodeRoles:
             - cluster_manager
-          resources:
-            storage:
-              data:
-                capacity: 100Mi
-          listenerClass: external-stable
-        replicas: 3
+          listenerClass: test-external-stable-$NAMESPACE
+        replicas: 1
         podOverrides:
           spec:
             volumes:
@@ -28,18 +24,12 @@ spec:
                     metadata:
                       annotations:
                         secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
-      data:
+      data1:
         config:
           nodeRoles:
-            - ingest
             - data
-            - remote_cluster_client
-          resources:
-            storage:
-              data:
-                capacity: 2Gi
-          listenerClass: cluster-internal
-        replicas: 2
+          listenerClass: test-external-unstable-$NAMESPACE
+        replicas: 1
         podOverrides:
           spec:
             volumes:
@@ -48,7 +38,22 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
+                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data1-headless
+      data2:
+        config:
+          nodeRoles:
+            - data
+          listenerClass: test-cluster-internal-$NAMESPACE
+        replicas: 1
+        podOverrides:
+          spec:
+            volumes:
+              - name: tls
+                ephemeral:
+                  volumeClaimTemplate:
+                    metadata:
+                      annotations:
+                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data2-headless
     envOverrides:
       # TODO Make these the defaults in the image
       DISABLE_INSTALL_DEMO_CONFIG: "true"

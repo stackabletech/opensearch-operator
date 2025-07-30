@@ -16,7 +16,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
   ownerReferences:
@@ -42,7 +42,7 @@ spec:
         app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: cluster-manager
-        app.kubernetes.io/version: 3.0.0
+        app.kubernetes.io/version: 3.1.0
         stackable.tech/opensearch-role.cluster_manager: "true"
         stackable.tech/vendor: Stackable
     spec:
@@ -59,7 +59,7 @@ spec:
             weight: 1
       containers:
       - command:
-        - /usr/share/opensearch/opensearch-docker-entrypoint.sh
+        - /stackable/opensearch/opensearch-docker-entrypoint.sh
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -74,8 +74,8 @@ spec:
               fieldPath: metadata.name
         - name: node.roles
           value: cluster_manager
-        image: opensearchproject/opensearch:3.0.0
-        imagePullPolicy: Always
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
         name: opensearch
         ports:
         - containerPort: 9200
@@ -107,16 +107,18 @@ spec:
             port: http
           timeoutSeconds: 3
         volumeMounts:
-        - mountPath: /usr/share/opensearch/config/opensearch.yml
+        - mountPath: /stackable/opensearch/config/opensearch.yml
           name: config
           readOnly: true
           subPath: opensearch.yml
-        - mountPath: /usr/share/opensearch/data
+        - mountPath: /stackable/opensearch/data
           name: data
-        - mountPath: /usr/share/opensearch/config/opensearch-security
+        - mountPath: /stackable/listener
+          name: listener
+        - mountPath: /stackable/opensearch/config/opensearch-security
           name: security-config
           readOnly: true
-        - mountPath: /usr/share/opensearch/config/tls
+        - mountPath: /stackable/opensearch/config/tls
           name: tls
           readOnly: true
       securityContext:
@@ -134,8 +136,7 @@ spec:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch-cluster-manager,service=opensearch-nodes-cluster-manager
-              creationTimestamp: null
+                secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
             spec:
               accessModes:
               - ReadWriteOnce
@@ -163,6 +164,30 @@ spec:
       volumeMode: Filesystem
     status:
       phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      annotations:
+        listeners.stackable.tech/listener-name: opensearch-nodes-cluster-manager
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: cluster-manager
+        app.kubernetes.io/version: 3.1.0
+        stackable.tech/vendor: Stackable
+      name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+      volumeMode: Filesystem
+    status:
+      phase: Pending
 status:
   readyReplicas: 3
   replicas: 3
@@ -176,7 +201,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
   ownerReferences:
@@ -202,7 +227,7 @@ spec:
         app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: data
-        app.kubernetes.io/version: 3.0.0
+        app.kubernetes.io/version: 3.1.0
         stackable.tech/opensearch-role.data: "true"
         stackable.tech/opensearch-role.ingest: "true"
         stackable.tech/opensearch-role.remote_cluster_client: "true"
@@ -221,7 +246,7 @@ spec:
             weight: 1
       containers:
       - command:
-        - /usr/share/opensearch/opensearch-docker-entrypoint.sh
+        - /stackable/opensearch/opensearch-docker-entrypoint.sh
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -235,8 +260,8 @@ spec:
               fieldPath: metadata.name
         - name: node.roles
           value: ingest,data,remote_cluster_client
-        image: opensearchproject/opensearch:3.0.0
-        imagePullPolicy: Always
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
         name: opensearch
         ports:
         - containerPort: 9200
@@ -268,16 +293,18 @@ spec:
             port: http
           timeoutSeconds: 3
         volumeMounts:
-        - mountPath: /usr/share/opensearch/config/opensearch.yml
+        - mountPath: /stackable/opensearch/config/opensearch.yml
           name: config
           readOnly: true
           subPath: opensearch.yml
-        - mountPath: /usr/share/opensearch/data
+        - mountPath: /stackable/opensearch/data
           name: data
-        - mountPath: /usr/share/opensearch/config/opensearch-security
+        - mountPath: /stackable/listener
+          name: listener
+        - mountPath: /stackable/opensearch/config/opensearch-security
           name: security-config
           readOnly: true
-        - mountPath: /usr/share/opensearch/config/tls
+        - mountPath: /stackable/opensearch/config/tls
           name: tls
           readOnly: true
       securityContext:
@@ -295,8 +322,7 @@ spec:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data
-              creationTimestamp: null
+                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
             spec:
               accessModes:
               - ReadWriteOnce
@@ -324,6 +350,30 @@ spec:
       volumeMode: Filesystem
     status:
       phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      annotations:
+        listeners.stackable.tech/listener-name: opensearch-nodes-data
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: data
+        app.kubernetes.io/version: 3.1.0
+        stackable.tech/vendor: Stackable
+      name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+      volumeMode: Filesystem
+    status:
+      phase: Pending
 status:
   readyReplicas: 2
   replicas: 2
@@ -337,7 +387,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
   ownerReferences:
@@ -352,15 +402,16 @@ data:
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "/usr/share/opensearch/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "/usr/share/opensearch/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "/usr/share/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "/usr/share/opensearch/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "/usr/share/opensearch/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "/usr/share/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -371,7 +422,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
   ownerReferences:
@@ -386,15 +437,16 @@ data:
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "/usr/share/opensearch/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "/usr/share/opensearch/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "/usr/share/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "/usr/share/opensearch/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "/usr/share/opensearch/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "/usr/share/opensearch/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/opensearch/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/opensearch/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/opensearch/config/tls/ca.crt"
 ---
 apiVersion: v1
 kind: Service
@@ -405,7 +457,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager-headless
 spec:
@@ -435,7 +487,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data-headless
 spec:
@@ -464,7 +516,7 @@ metadata:
     app.kubernetes.io/instance: opensearch
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch
   ownerReferences:
@@ -498,7 +550,7 @@ metadata:
     app.kubernetes.io/instance: opensearch
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-serviceaccount
   ownerReferences:
@@ -515,7 +567,7 @@ metadata:
     app.kubernetes.io/instance: opensearch
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
-    app.kubernetes.io/version: 3.0.0
+    app.kubernetes.io/version: 3.1.0
     stackable.tech/vendor: Stackable
   name: opensearch-rolebinding
   ownerReferences:

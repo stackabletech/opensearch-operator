@@ -65,6 +65,16 @@ impl ResourceNames {
 
         format!("{}{SUFFIX}", self.qualified_role_group_name())
     }
+
+    pub fn listener_service_name(&self) -> String {
+        // Compile-time check
+        const _: () = assert!(
+            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= MAX_OBJECT_NAME_LENGTH,
+            "The listener name `<cluster_name>-<role_name>-<role_group_name>` must not exceed 253 characters."
+        );
+
+        self.qualified_role_group_name()
+    }
 }
 
 #[cfg(test)]

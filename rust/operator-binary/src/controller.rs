@@ -6,6 +6,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{affinity::StackableAffinity, product_image_selection::ProductImage},
+    crd::listener::v1alpha1::Listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service, ServiceAccount},
@@ -111,6 +112,7 @@ pub struct ValidatedOpenSearchConfig {
     pub node_roles: NodeRoles,
     pub resources: stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>,
     pub termination_grace_period_seconds: i64,
+    pub listener_class: String,
 }
 
 // validated and converted to validated and safe types
@@ -275,6 +277,7 @@ struct Applied;
 struct KubernetesResources<T> {
     stateful_sets: Vec<StatefulSet>,
     services: Vec<Service>,
+    listeners: Vec<Listener>,
     config_maps: Vec<ConfigMap>,
     service_accounts: Vec<ServiceAccount>,
     role_bindings: Vec<RoleBinding>,

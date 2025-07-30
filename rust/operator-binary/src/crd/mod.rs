@@ -30,6 +30,8 @@ use crate::framework::{
     role_utils::GenericProductSpecificCommonConfig,
 };
 
+const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
 
@@ -130,6 +132,10 @@ pub mod versioned {
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
+
+        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
+        #[fragment_attrs(serde(default))]
+        pub listener_class: String,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -232,6 +238,7 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
+            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
         }
     }
 }

@@ -62,6 +62,8 @@ impl<'a> Applier<'a> {
 
         let services = self.add_resources(resources.services).await?;
 
+        let listeners = self.add_resources(resources.listeners).await?;
+
         let config_maps = self.add_resources(resources.config_maps).await?;
 
         let service_accounts = self.add_resources(resources.service_accounts).await?;
@@ -78,6 +80,7 @@ impl<'a> Applier<'a> {
         Ok(KubernetesResources {
             stateful_sets,
             services,
+            listeners,
             config_maps,
             service_accounts,
             role_bindings,
