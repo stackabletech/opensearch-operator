@@ -16,6 +16,22 @@ impl EnvVarSet {
         Self::default()
     }
 
+    pub fn get_env_var(&self, env_var_name: impl Into<EnvVarName>) -> Option<&EnvVar> {
+        self.0.get(&env_var_name.into())
+    }
+
+    pub fn add_env_var(mut self, env_var: EnvVar) -> Self {
+        self.0.insert(env_var.name.clone(), env_var);
+
+        self
+    }
+
+    pub fn merge(mut self, mut env_var_set: EnvVarSet) -> Self {
+        self.0.append(&mut env_var_set.0);
+
+        self
+    }
+
     pub fn with_values<I, K, V>(self, env_vars: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,

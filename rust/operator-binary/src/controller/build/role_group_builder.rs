@@ -41,8 +41,7 @@ const DATA_VOLUME_NAME: &str = "data";
 const LISTENER_VOLUME_NAME: &str = "listener";
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
-// Path in opensearchproject/opensearch:3.0.0
-const OPENSEARCH_BASE_PATH: &str = "/stackable/opensearch";
+const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 pub struct RoleGroupBuilder<'a> {
     service_account_name: String,
@@ -271,18 +270,32 @@ impl<'a> RoleGroupBuilder<'a> {
             ..Probe::default()
         };
 
+        let env_vars = self.node_config.environment_variables();
+
+        // Use `OPENSEARCH_HOME` from envOverrides or default to `DEFAULT_OPENSEARCH_HOME`.
+        let opensearch_home = env_vars
+            .get_env_var("OPENSEARCH_HOME")
+            .and_then(|env_var| env_var.value.clone())
+            .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned());
+        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `{OPENSEARCH_HOME}/config`,
+        // i.e. depend on `OPENSEARCH_HOME`.
+        let opensearch_path_conf = env_vars
+            .get_env_var("OPENSEARCH_PATH_CONF")
+            .and_then(|env_var| env_var.value.clone())
+            .unwrap_or(format!("{opensearch_home}/config"));
+
         ContainerBuilder::new("opensearch")
             .expect("should be a valid container name")
             .image_from_product_image(&product_image)
             .command(vec![format!(
-                "{OPENSEARCH_BASE_PATH}/opensearch-docker-entrypoint.sh"
+                "{opensearch_home}/opensearch-docker-entrypoint.sh"
             )])
             .args(role_group_config.cli_overrides_to_vec())
-            .add_env_vars(self.node_config.environment_variables().into())
+            .add_env_vars(env_vars.into())
             .add_volume_mounts([
                 VolumeMount {
                     mount_path: format!(
-                        "{OPENSEARCH_BASE_PATH}/config/{CONFIGURATION_FILE_OPENSEARCH_YML}"
+                        "{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"
                     ),
                     name: CONFIG_VOLUME_NAME.to_owned(),
                     read_only: Some(true),
@@ -290,7 +303,7 @@ impl<'a> RoleGroupBuilder<'a> {
                     ..VolumeMount::default()
                 },
                 VolumeMount {
-                    mount_path: format!("{OPENSEARCH_BASE_PATH}/data"),
+                    mount_path: format!("{opensearch_home}/data"),
                     name: DATA_VOLUME_NAME.to_owned(),
                     ..VolumeMount::default()
                 },

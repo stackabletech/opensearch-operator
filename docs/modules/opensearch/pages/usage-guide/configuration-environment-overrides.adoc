@@ -131,7 +131,7 @@ nodes:
     default:
       config: {}
       envOverrides:
-        OPENSEARCH_PATH_CONF: /etc/opensearch
+        OPENSEARCH_HOME: /usr/share/opensearch
 ----
 
 or per role:
@@ -140,11 +140,20 @@ or per role:
 ----
 nodes:
   envOverrides:
-    OPENSEARCH_PATH_CONF: /etc/opensearch
+    OPENSEARCH_HOME: /usr/share/opensearch
   roleGroups:
     default:
       config: {}
 ----
+
+The environment variables `OPENSEARCH_HOME` and `OPENSEARCH_PATH_CONF` are worth mentioning.
+`OPENSEARCH_HOME` contains the path in the image where OpenSearch is installed.
+`OPENSEARCH_PATH_CONF` contains the path with the OpenSearch configuration files.
+They are usually set in the image.
+In the Stackable image, `OPENSEARCH_HOME` is set to `/stackable/opensearch` and `OPENSEARCH_PATH_CONF` to `$\{OPENSEARCH_HOME}/config`.
+The operator must also know the values of these environment variables to mount volumes to the correct paths.
+Since the operator cannot read the values from the image, it assumes the ones from the Stackable image.
+If you use a custom image with different paths, you can override one or both of these environment variables as shown in the example above.
 
 == CLI parameters
 
