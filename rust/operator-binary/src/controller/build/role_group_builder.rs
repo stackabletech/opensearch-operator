@@ -233,7 +233,8 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
-        // TODO Check the maximum length at compile-time
+        // It is not possible to check the infallibility of the following statement at
+        // compile-time. Instead, it is tested in `tests::test_build_node_role_label`.
         Label::try_from((
             format!("stackable.tech/opensearch-role.{node_role}"),
             "true".to_string(),
@@ -442,5 +443,19 @@ impl<'a> RoleGroupBuilder<'a> {
             &ValidatedCluster::role_name(),
             &self.role_group_name,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use crate::{controller::build::role_group_builder::RoleGroupBuilder, crd::v1alpha1};
+
+    #[test]
+    fn test_build_node_role_label() {
+        for node_role in v1alpha1::NodeRole::iter() {
+            RoleGroupBuilder::build_node_role_label(&node_role);
+        }
     }
 }

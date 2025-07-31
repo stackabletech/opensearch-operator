@@ -23,7 +23,7 @@ use stackable_operator::{
     time::Duration,
     versioned::versioned,
 };
-use strum::Display;
+use strum::{Display, EnumIter};
 
 use crate::framework::{
     ClusterName, IsLabelValue, ProductName, RoleName,
@@ -76,7 +76,17 @@ pub mod versioned {
     // https://github.com/opensearch-project/ml-commons/blob/3.0.0.0/plugin/src/main/java/org/opensearch/ml/plugin/MachineLearningPlugin.java#L394.
     // If such a plugin is added, then this enumeration must be extended accordingly.
     #[derive(
-        Clone, Debug, Deserialize, Display, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize,
+        Clone,
+        Debug,
+        Deserialize,
+        Display,
+        EnumIter,
+        Eq,
+        JsonSchema,
+        Ord,
+        PartialEq,
+        PartialOrd,
+        Serialize,
     )]
     // The OpenSearch configuration uses snake_case. To make it easier to match the log output of
     // OpenSearch with this cluster configuration, snake_case is also used here.
