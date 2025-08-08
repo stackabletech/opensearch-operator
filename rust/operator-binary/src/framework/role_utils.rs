@@ -11,7 +11,7 @@ use stackable_operator::{
     schemars::JsonSchema,
 };
 
-use super::ProductName;
+use super::{ProductName, builder::pod::container::EnvVarSet};
 use crate::framework::{ClusterName, MAX_OBJECT_NAME_LENGTH, kvp::label::MAX_LABEL_VALUE_LENGTH};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
@@ -27,7 +27,7 @@ pub struct RoleGroupConfig<ProductSpecificCommonConfig, T> {
     pub replicas: u16,
     pub config: T,
     pub config_overrides: HashMap<String, HashMap<String, String>>,
-    pub env_overrides: HashMap<String, String>,
+    pub env_overrides: EnvVarSet,
     pub cli_overrides: BTreeMap<String, String>,
     pub pod_overrides: PodTemplateSpec,
     // allow(dead_code) is not necessary anymore when moved to operator-rs
