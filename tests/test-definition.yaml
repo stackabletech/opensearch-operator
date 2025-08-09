@@ -25,6 +25,11 @@ tests:
       - opensearch
       - openshift
       - opensearch_home
+  - name: ldap
+    dimensions:
+      - opensearch
+      - openshift
+      - opensearch_home
 suites:
   - name: nightly
     patch:
