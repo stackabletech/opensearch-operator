@@ -33,8 +33,9 @@ pub enum Error {
     },
 }
 
-// TODO The maximum length of objects differs.
 /// Maximum length of a DNS subdomain name as defined in RFC 1123.
+/// The object names of most types, e.g. ConfigMap and StatefulSet, must not exceed this limit.
+/// However, there are kinds that allow longer object names, e.g. ClusterRole.
 #[allow(dead_code)]
 pub const MAX_OBJECT_NAME_LENGTH: usize = 253;
 
