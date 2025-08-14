@@ -2,8 +2,11 @@ use std::marker::PhantomData;
 
 use role_builder::RoleBuilder;
 
+use crate::controller::build::job_builder::JobBuilder;
+
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
 
+pub mod job_builder;
 pub mod node_config;
 pub mod role_builder;
 pub mod role_group_builder;
@@ -13,8 +16,10 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
     let mut stateful_sets = vec![];
     let mut services = vec![];
     let mut listeners = vec![];
+    let mut jobs = vec![];
 
     let role_builder = RoleBuilder::new(cluster.clone(), names);
+    let job_builder = JobBuilder::new(cluster.clone(), names);
 
     for role_group_builder in role_builder.role_group_builders() {
         config_maps.push(role_group_builder.build_config_map());
@@ -32,6 +37,8 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
 
     let pod_disruption_budgets = role_builder.build_pdb().into_iter().collect();
 
+    jobs.push(job_builder.build_run_securityadmin_job());
+
     KubernetesResources {
         stateful_sets,
         services,
@@ -40,6 +47,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         service_accounts,
         role_bindings,
         pod_disruption_budgets,
+        jobs,
         status: PhantomData,
     }
 }

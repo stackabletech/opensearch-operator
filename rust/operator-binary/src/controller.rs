@@ -5,10 +5,13 @@ use build::build;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::{affinity::StackableAffinity, product_image_selection::ProductImage},
+    commons::{
+        affinity::StackableAffinity, networking::DomainName, product_image_selection::ProductImage,
+    },
     crd::listener::v1alpha1::Listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
+        batch::v1::Job,
         core::v1::{ConfigMap, Service, ServiceAccount},
         policy::v1::PodDisruptionBudget,
         rbac::v1::RoleBinding,
@@ -43,6 +46,7 @@ pub struct ContextNames {
     pub product_name: ProductName,
     pub operator_name: OperatorName,
     pub controller_name: ControllerName,
+    pub cluster_domain_name: DomainName,
 }
 
 pub struct Context {
@@ -52,6 +56,7 @@ pub struct Context {
 
 impl Context {
     pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
+        let cluster_domain_name = client.kubernetes_cluster_info.cluster_domain.clone();
         Context {
             client,
             names: ContextNames {
@@ -60,6 +65,7 @@ impl Context {
                 operator_name,
                 controller_name: ControllerName::from_str("opensearchcluster")
                     .expect("should be a valid controller name"),
+                cluster_domain_name,
             },
         }
     }
@@ -282,5 +288,6 @@ struct KubernetesResources<T> {
     service_accounts: Vec<ServiceAccount>,
     role_bindings: Vec<RoleBinding>,
     pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    jobs: Vec<Job>,
     status: PhantomData<T>,
 }
