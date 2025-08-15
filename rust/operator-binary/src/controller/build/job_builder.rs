@@ -1,7 +1,10 @@
 use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
-        pod::{container::ContainerBuilder, resources::ResourceRequirementsBuilder},
+        pod::{
+            container::ContainerBuilder, resources::ResourceRequirementsBuilder,
+            volume::SecretFormat,
+        },
     },
     k8s_openapi::api::{
         batch::v1::{Job, JobSpec},
@@ -14,17 +17,20 @@ use stackable_operator::{
         Label, Labels,
         consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
     },
+    time::Duration,
 };
 
 use crate::{
     controller::{ContextNames, ValidatedCluster},
     framework::{
-        IsLabelValue, builder::meta::ownerreference_from_resource, role_utils::ResourceNames,
+        IsLabelValue,
+        builder::{meta::ownerreference_from_resource, volume::build_tls_volume},
+        role_utils::ResourceNames,
     },
 };
 
 const RUN_SECURITYADMIN_CERT_VOLUME_NAME: &str = "tls";
-const RUN_SECURITYADMIN_CERT_VOLUME_MOUNT: &str = "/stackable/cert";
+const RUN_SECURITYADMIN_CERT_VOLUME_MOUNT: &str = "/stackable/tls-client";
 const SECURITY_CONFIG_VOLUME_NAME: &str = "security-config";
 const SECURITY_CONFIG_VOLUME_MOUNT: &str = "/stackable/opensearch/config/opensearch-security";
 const RUN_SECURITYADMIN_CONTAINER_NAME: &str = "run-securityadmin";
@@ -61,11 +67,11 @@ impl<'a> JobBuilder<'a> {
         let args = [
             "plugins/opensearch-security/tools/securityadmin.sh".to_string(),
             "-cacert".to_string(),
-            "config/tls-client/ca.crt".to_string(),
+            "/stackable/tls-client/ca.crt".to_string(),
             "-cert".to_string(),
-            "config/tls-client/tls.crt".to_string(),
+            "/stackable/tls-client/tls.crt".to_string(),
             "-key".to_string(),
-            "config/tls-client/tls.key".to_string(),
+            "/stackable/tls-client/tls.key".to_string(),
             "--hostname".to_string(),
             self.opensearch_master_fqdn(),
             "--configdir".to_string(),
@@ -105,20 +111,29 @@ impl<'a> JobBuilder<'a> {
             metadata: Some(metadata.clone()),
             spec: Some(PodSpec {
                 containers: vec![container],
-
                 security_context: Some(PodSecurityContext {
                     fs_group: Some(1000),
                     ..PodSecurityContext::default()
                 }),
+                restart_policy: Some("OnFailure".to_string()),
                 service_account_name: Some(self.resource_names.service_account_name()),
-                volumes: Some(vec![Volume {
-                    name: SECURITY_CONFIG_VOLUME_NAME.to_owned(),
-                    secret: Some(SecretVolumeSource {
-                        secret_name: Some("opensearch-security-config".to_string()),
-                        ..Default::default()
-                    }),
-                    ..Volume::default()
-                }]),
+                volumes: Some(vec![
+                    Volume {
+                        name: SECURITY_CONFIG_VOLUME_NAME.to_owned(),
+                        secret: Some(SecretVolumeSource {
+                            secret_name: Some("opensearch-security-config".to_string()),
+                            ..Default::default()
+                        }),
+                        ..Volume::default()
+                    },
+                    build_tls_volume(
+                        RUN_SECURITYADMIN_CERT_VOLUME_NAME,
+                        Vec::<String>::new(),
+                        SecretFormat::TlsPem,
+                        &Duration::from_days_unchecked(15),
+                        None,
+                    ),
+                ]),
                 ..PodSpec::default()
             }),
         };

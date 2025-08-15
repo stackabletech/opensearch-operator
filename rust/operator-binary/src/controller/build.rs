@@ -2,9 +2,8 @@ use std::marker::PhantomData;
 
 use role_builder::RoleBuilder;
 
-use crate::controller::build::job_builder::JobBuilder;
-
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
+use crate::controller::build::job_builder::JobBuilder;
 
 pub mod job_builder;
 pub mod node_config;
