@@ -258,7 +258,10 @@ mod tests {
     use super::*;
     use crate::{
         controller::ValidatedOpenSearchConfig,
-        crd::NodeRoles,
+        crd::{
+            NodeRoles,
+            v1alpha1::{OpenSearchClusterConfig, OpenSearchTls},
+        },
         framework::{ClusterName, ProductVersion, role_utils::GenericProductSpecificCommonConfig},
     };
 
@@ -275,6 +278,11 @@ mod tests {
                 .expect("should be a valid ClusterName"),
             namespace: "default".to_owned(),
             uid: "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            cluster_config: OpenSearchClusterConfig {
+                tls: OpenSearchTls {
+                    secret_class: "my-tls-secret-class".to_owned(),
+                },
+            },
             role_config: GenericRoleConfig::default(),
             role_group_configs: BTreeMap::new(),
         };

@@ -25,6 +25,18 @@ spec:
             spec:
               description: A OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
               properties:
+                clusterConfig:
+                  properties:
+                    tls:
+                      properties:
+                        secretClass:
+                          default: tls
+                          description: 'Only affects client connections. This setting controls: - If TLS encryption is used at all - Which cert the servers should use to authenticate themselves against the client'
+                          type: string
+                      type: object
+                  required:
+                    - tls
+                  type: object
                 clusterOperation:
                   default:
                     reconciliationPaused: false
@@ -461,6 +473,7 @@ spec:
                     - roleGroups
                   type: object
               required:
+                - clusterConfig
                 - image
                 - nodes
               type: object

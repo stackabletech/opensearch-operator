@@ -66,17 +66,18 @@ impl<'a> JobBuilder<'a> {
 
         let args = [
             "plugins/opensearch-security/tools/securityadmin.sh".to_string(),
+            "--hostname".to_string(),
+            self.opensearch_master_fqdn(),
+            "--configdir".to_string(),
+            "config/opensearch-security/".to_string(),
             "-cacert".to_string(),
             "/stackable/tls-client/ca.crt".to_string(),
             "-cert".to_string(),
             "/stackable/tls-client/tls.crt".to_string(),
             "-key".to_string(),
             "/stackable/tls-client/tls.key".to_string(),
-            "--hostname".to_string(),
-            self.opensearch_master_fqdn(),
-            "--configdir".to_string(),
-            "config/opensearch-security/".to_string(),
         ];
+
         let mut cb = ContainerBuilder::new(RUN_SECURITYADMIN_CONTAINER_NAME)
             .expect("should be a valid container name");
         let container = cb
@@ -84,15 +85,15 @@ impl<'a> JobBuilder<'a> {
             .command(vec!["sh".to_string(), "-c".to_string()])
             .args(vec![args.join(" ")])
             // The VolumeMount for the secret operator key store certificates
-            .add_volume_mounts([
-                VolumeMount {
-                    mount_path: RUN_SECURITYADMIN_CERT_VOLUME_MOUNT.to_owned(),
-                    name: RUN_SECURITYADMIN_CERT_VOLUME_NAME.to_owned(),
-                    ..VolumeMount::default()
-                },
+            .add_volume_mounts(vec![
                 VolumeMount {
                     mount_path: SECURITY_CONFIG_VOLUME_MOUNT.to_owned(),
                     name: SECURITY_CONFIG_VOLUME_NAME.to_owned(),
+                    ..VolumeMount::default()
+                },
+                VolumeMount {
+                    mount_path: RUN_SECURITYADMIN_CERT_VOLUME_MOUNT.to_owned(),
+                    name: RUN_SECURITYADMIN_CERT_VOLUME_NAME.to_owned(),
                     ..VolumeMount::default()
                 },
             ])
@@ -106,7 +107,6 @@ impl<'a> JobBuilder<'a> {
                     .build(),
             )
             .build();
-
         let pod_template = PodTemplateSpec {
             metadata: Some(metadata.clone()),
             spec: Some(PodSpec {
@@ -128,6 +128,7 @@ impl<'a> JobBuilder<'a> {
                     },
                     build_tls_volume(
                         RUN_SECURITYADMIN_CERT_VOLUME_NAME,
+                        &self.cluster.cluster_config.tls.secret_class,
                         Vec::<String>::new(),
                         SecretFormat::TlsPem,
                         &Duration::from_days_unchecked(15),

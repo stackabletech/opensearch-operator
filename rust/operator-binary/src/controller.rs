@@ -28,7 +28,7 @@ use validate::validate;
 use crate::{
     crd::{
         NodeRoles,
-        v1alpha1::{self},
+        v1alpha1::{self, OpenSearchClusterConfig},
     },
     framework::{
         ClusterName, ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue,
@@ -132,6 +132,7 @@ pub struct ValidatedCluster {
     pub name: ClusterName,
     pub namespace: String,
     pub uid: String,
+    pub cluster_config: OpenSearchClusterConfig,
     pub role_config: GenericRoleConfig,
     // "validated" means that labels are valid and no ugly rolegroup name broke them
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,

@@ -6,13 +6,14 @@ use stackable_operator::{
 
 pub fn build_tls_volume(
     volume_name: &str,
+    tls_secret_class_name: &str,
     service_scopes: impl IntoIterator<Item = impl AsRef<str>>,
     secret_format: SecretFormat,
     requested_secret_lifetime: &Duration,
     listener_scope: Option<&str>,
 ) -> Volume {
     let mut secret_volume_source_builder =
-        SecretOperatorVolumeSourceBuilder::new("tls".to_string());
+        SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
 
     for scope in service_scopes {
         secret_volume_source_builder.with_service_scope(scope.as_ref());
@@ -28,7 +29,7 @@ pub fn build_tls_volume(
                 .with_format(secret_format)
                 .with_auto_tls_cert_lifetime(*requested_secret_lifetime)
                 .build()
-                .expect("volume should be built"),
+                .expect("volume should be built without parse errors"),
         )
         .build()
 }
