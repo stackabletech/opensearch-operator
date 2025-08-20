@@ -1,5 +1,8 @@
 use stackable_operator::{
-    builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
+    builder::{
+        meta::ObjectMetaBuilder,
+        pod::{container::ContainerBuilder, volume::SecretFormat},
+    },
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -15,6 +18,7 @@ use stackable_operator::{
     },
     kube::api::ObjectMeta,
     kvp::{Label, Labels},
+    time::Duration,
 };
 
 use super::node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig};
@@ -23,7 +27,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         RoleGroupName,
-        builder::meta::ownerreference_from_resource,
+        builder::{meta::ownerreference_from_resource, volume::build_tls_volume},
         kvp::label::{recommended_labels, role_group_selector, role_selector},
         listener::listener_pvc,
         role_group_utils::ResourceNames,
@@ -40,6 +44,8 @@ const DATA_VOLUME_NAME: &str = "data";
 
 const LISTENER_VOLUME_NAME: &str = "listener";
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+const TLS_VOLUME_NAME: &str = "tls";
+const TLS_VOLUME_DIR: &str = "/stackable/tls";
 
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
@@ -152,8 +158,13 @@ impl<'a> RoleGroupBuilder<'a> {
 
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
+        let mut service_scopes = vec![self.resource_names.headless_service_name()];
+
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
+            if let v1alpha1::NodeRole::ClusterManager = node_role {
+                service_scopes.push(self.cluster.name.to_string())
+            }
         }
 
         let metadata = ObjectMetaBuilder::new()
@@ -198,14 +209,24 @@ impl<'a> RoleGroupBuilder<'a> {
                         .config
                         .termination_grace_period_seconds,
                 ),
-                volumes: Some(vec![Volume {
-                    name: CONFIG_VOLUME_NAME.to_owned(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: self.resource_names.role_group_config_map(),
-                        ..Default::default()
-                    }),
-                    ..Volume::default()
-                }]),
+                volumes: Some(vec![
+                    Volume {
+                        name: CONFIG_VOLUME_NAME.to_owned(),
+                        config_map: Some(ConfigMapVolumeSource {
+                            name: self.resource_names.role_group_config_map(),
+                            ..Default::default()
+                        }),
+                        ..Volume::default()
+                    },
+                    build_tls_volume(
+                        TLS_VOLUME_NAME,
+                        &self.cluster.cluster_config.tls.secret_class,
+                        service_scopes,
+                        SecretFormat::TlsPem,
+                        &Duration::from_days_unchecked(15),
+                        Some(LISTENER_VOLUME_NAME),
+                    ),
+                ]),
                 ..PodSpec::default()
             }),
         };
@@ -310,6 +331,11 @@ impl<'a> RoleGroupBuilder<'a> {
                 VolumeMount {
                     mount_path: LISTENER_VOLUME_DIR.to_owned(),
                     name: LISTENER_VOLUME_NAME.to_owned(),
+                    ..VolumeMount::default()
+                },
+                VolumeMount {
+                    mount_path: TLS_VOLUME_DIR.to_owned(),
+                    name: TLS_VOLUME_NAME.to_owned(),
                     ..VolumeMount::default()
                 },
             ])
