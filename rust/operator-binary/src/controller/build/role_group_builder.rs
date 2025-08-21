@@ -1,3 +1,4 @@
+use serde_json::Map;
 use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
@@ -91,9 +92,13 @@ impl<'a> RoleGroupBuilder<'a> {
         let metadata =
             self.common_metadata(self.resource_names.role_group_config_map(), Labels::new());
 
+        let mut opensearch_yml = Map::new();
+        opensearch_yml.append(&mut self.node_config.static_opensearch_config());
+        opensearch_yml.append(&mut self.node_config.tls_config());
         let data = [(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config.static_opensearch_config(),
+            self.node_config
+                .build_config_file(CONFIGURATION_FILE_OPENSEARCH_YML, opensearch_yml),
         )]
         .into();
 

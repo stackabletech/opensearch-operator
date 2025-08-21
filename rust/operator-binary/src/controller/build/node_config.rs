@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
 use super::ValidatedCluster;
@@ -66,6 +66,32 @@ pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 /// type: list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
+/// type: string
+pub const TLS_HTTP_ENABLED: &str = "plugins.security.ssl.http.enabled";
+
+/// type: string
+pub const TLS_HTTP_PEMCERT_FILEPATH: &str = "plugins.security.ssl.http.pemcert_filepath";
+
+/// type: string
+pub const TLS_HTTP_PEMKEY_FILEPATH: &str = "plugins.security.ssl.http.pemkey_filepath";
+
+/// type: string
+pub const TLS_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
+    "plugins.security.ssl.http.pemtrustedcas_filepath";
+
+/// type: string
+pub const TLS_TRANSPORT_ENABLED: &str = "plugins.security.ssl.transport.enabled";
+
+/// type: string
+pub const TLS_TRANSPORT_PEMCERT_FILEPATH: &str = "plugins.security.ssl.transport.pemcert_filepath";
+
+/// type: string
+pub const TLS_TRANSPORT_PEMKEY_FILEPATH: &str = "plugins.security.ssl.transport.pemkey_filepath";
+
+/// type: string
+pub const TLS_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemtrustedcas_filepath";
+
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
@@ -88,9 +114,8 @@ impl NodeConfig {
     }
 
     /// static for the cluster
-    pub fn static_opensearch_config(&self) -> String {
-        let mut config = serde_json::Map::new();
-
+    pub fn static_opensearch_config(&self) -> Map<String, Value> {
+        let mut config = Map::new();
         config.insert(
             CONFIG_OPTION_CLUSTER_NAME.to_owned(),
             json!(self.cluster.name.to_string()),
@@ -111,10 +136,52 @@ impl NodeConfig {
                  json!(["CN=generated certificate for pod".to_owned()]),
              );
 
+        config
+    }
+
+    pub fn tls_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = Map::new();
+        // TLS config for HTTP port
+        config.insert(TLS_HTTP_ENABLED.to_owned(), json!("true".to_string()));
+        config.insert(
+            TLS_HTTP_PEMCERT_FILEPATH.to_owned(),
+            json!("/stackable/tls/tls.crt".to_string()),
+        );
+        config.insert(
+            TLS_HTTP_PEMKEY_FILEPATH.to_owned(),
+            json!("/stackable/tls/tls.key".to_string()),
+        );
+        config.insert(
+            TLS_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+            json!("/stackable/tls/ca.crt".to_string()),
+        );
+        // TLS config for TRANSPORT port
+        config.insert(TLS_TRANSPORT_ENABLED.to_owned(), json!("true".to_string()));
+        config.insert(
+            TLS_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
+            json!("/stackable/tls/tls.crt".to_string()),
+        );
+        config.insert(
+            TLS_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
+            json!("/stackable/tls/tls.key".to_string()),
+        );
+        config.insert(
+            TLS_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+            json!("/stackable/tls/ca.crt".to_string()),
+        );
+
+        config
+    }
+
+    pub fn build_config_file(
+        &self,
+        file_name: &str,
+        mut config: serde_json::Map<String, Value>,
+    ) -> String {
         for (setting, value) in self
             .role_group_config
             .config_overrides
-            .get(CONFIGURATION_FILE_OPENSEARCH_YML)
+            .get(file_name)
             .into_iter()
             .flatten()
         {
