@@ -67,6 +67,28 @@ pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
 /// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_DISABLE_INSTALL_DEMO: &str = "DISABLE_INSTALL_DEMO_CONFIG";
+
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_TYPE: &str = "plugins.security.audit.type";
+
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_LOG4J_LEVEL: &str =
+    "plugins.security.audit.config.log4j.level";
+
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_LOG4J_LOGGER_NAME: &str =
+    "plugins.security.audit.config.log4j.logger_name";
+
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_RESTAPI_ROLES_ENABLED: &str =
+    "plugins.security.restapi.roles_enabled";
+
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX: &str =
+    "allow_default_init_securityindex";
+
+/// type: string
 pub const TLS_HTTP_ENABLED: &str = "plugins.security.ssl.http.enabled";
 
 /// type: string
@@ -139,7 +161,7 @@ impl NodeConfig {
         config
     }
 
-    pub fn tls_config(&self) -> serde_json::Map<String, Value> {
+    pub fn tls_config(&self) -> Map<String, Value> {
         let mut config = Map::new();
         // TLS config for HTTP port
         config.insert(TLS_HTTP_ENABLED.to_owned(), json!("true".to_string()));
@@ -168,6 +190,32 @@ impl NodeConfig {
         config.insert(
             TLS_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
             json!("/stackable/tls/ca.crt".to_string()),
+        );
+
+        config
+    }
+
+    pub fn security_config(&self) -> Map<String, Value> {
+        let mut config = Map::new();
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_TYPE.to_owned(),
+            json!("log4j".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_LOG4J_LEVEL.to_owned(),
+            json!("INFO".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_LOG4J_LOGGER_NAME.to_owned(),
+            json!("oseaudit".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_RESTAPI_ROLES_ENABLED.to_owned(),
+            json!("all_access".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX.to_owned(),
+            json!("true".to_string()),
         );
 
         config
@@ -208,6 +256,7 @@ impl NodeConfig {
                 CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES,
                 self.initial_cluster_manager_nodes(),
             )
+            .with_value(CONFIG_OPTION_PLUGINS_SECURITY_DISABLE_INSTALL_DEMO, "true")
             .with_value(
                 CONFIG_OPTION_NODE_ROLES,
                 self.role_group_config
@@ -381,6 +430,11 @@ mod tests {
         // TODO Test EnvVarSet and compare EnvVarSets
         assert_eq!(
             vec![
+                EnvVar {
+                    name: "DISABLE_INSTALL_DEMO_CONFIG".to_owned(),
+                    value: Some("true".to_owned()),
+                    value_from: None
+                },
                 EnvVar {
                     name: "TEST".to_owned(),
                     value: Some("value".to_owned()),

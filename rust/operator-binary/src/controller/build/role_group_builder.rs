@@ -95,6 +95,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let mut opensearch_yml = Map::new();
         opensearch_yml.append(&mut self.node_config.static_opensearch_config());
         opensearch_yml.append(&mut self.node_config.tls_config());
+        opensearch_yml.append(&mut self.node_config.security_config());
         let data = [(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
             self.node_config
