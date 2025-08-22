@@ -13,9 +13,11 @@ use super::{
     ValidatedOpenSearchConfig,
 };
 use crate::{
-    crd::v1alpha1::{self, OpenSearchConfig, OpenSearchConfigFragment},
+    crd::v1alpha1::{
+        self, OpenSearchClusterConfig, OpenSearchConfig, OpenSearchConfigFragment, OpenSearchTls,
+    },
     framework::{
-        ClusterName,
+        ClusterName, TlsSecretClassName,
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
     },
 };
@@ -40,6 +42,9 @@ pub enum Error {
 
     #[snafu(display("failed to set role-group name"))]
     ParseRoleGroupName { source: crate::framework::Error },
+
+    #[snafu(display("failed to set tls secret class"))]
+    ParseTlsSecretClassName { source: crate::framework::Error },
 
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
@@ -70,6 +75,8 @@ pub fn validate(
     let product_version = ProductVersion::from_str(cluster.spec.image.product_version())
         .context(ParseProductVersionSnafu)?;
 
+    let validated_cluster_config = validate_cluster_config(cluster.spec.cluster_config.clone())?;
+
     let mut role_group_configs = BTreeMap::new();
     for (raw_role_group_name, role_group_config) in &cluster.spec.nodes.role_groups {
         let role_group_name =
@@ -88,9 +95,22 @@ pub fn validate(
         name: cluster_name,
         namespace,
         uid,
+        cluster_config: validated_cluster_config,
         role_config: cluster.spec.nodes.role_config.clone(),
         role_group_configs,
     })
+}
+
+fn validate_cluster_config(
+    cluster_config: OpenSearchClusterConfig,
+) -> Result<OpenSearchClusterConfig> {
+    validate_tls_config(&cluster_config.tls)?;
+    Ok(cluster_config)
+}
+
+fn validate_tls_config(tls_config: &OpenSearchTls) -> Result<()> {
+    TlsSecretClassName::from_str(&tls_config.secret_class).context(ParseTlsSecretClassNameSnafu)?;
+    Ok(())
 }
 
 fn validate_role_group_config(

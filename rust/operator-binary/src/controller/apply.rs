@@ -72,6 +72,8 @@ impl<'a> Applier<'a> {
 
         let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
 
+        let jobs = self.add_resources(resources.jobs).await?;
+
         self.cluster_resources
             .delete_orphaned_resources(self.client)
             .await
@@ -85,6 +87,7 @@ impl<'a> Applier<'a> {
             service_accounts,
             role_bindings,
             pod_disruption_budgets,
+            jobs,
             status: PhantomData,
         })
     }

@@ -38,6 +38,9 @@ pub enum Error {
 #[allow(dead_code)]
 pub const MAX_OBJECT_NAME_LENGTH: usize = 253;
 
+#[allow(dead_code)]
+pub const MAX_ANNOTATION_LENGTH: usize = 253;
+
 /// Has a name that can be used as a DNS subdomain name as defined in RFC 1123.
 /// Most resource types, e.g. a Pod, require such a compliant name.
 pub trait HasObjectName {
@@ -172,7 +175,11 @@ attributed_string_type! {
     is_object_name,
     is_valid_label_value
 }
-
+attributed_string_type! {
+    TlsSecretClassName,
+    "The TLS SecretClass name",
+    (max_length = MAX_ANNOTATION_LENGTH - 30)
+}
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;

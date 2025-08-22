@@ -31,6 +31,7 @@ use crate::framework::{
 };
 
 const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+const TLS_DEFAULT_SECRET_CLASS: &str = "tls";
 
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
@@ -57,6 +58,9 @@ pub mod versioned {
         // no doc string - see ProductImage struct
         pub image: ProductImage,
 
+        // no doc string - see ProductImage struct
+        pub cluster_config: OpenSearchClusterConfig,
+
         // no doc string - see ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
@@ -64,6 +68,23 @@ pub mod versioned {
         /// OpenSearch nodes
         pub nodes:
             Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchClusterConfig {
+        pub tls: OpenSearchTls,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchTls {
+        /// Only affects client connections.
+        /// This setting controls:
+        /// - If TLS encryption is used at all
+        /// - Which cert the servers should use to authenticate themselves against the client
+        #[serde(default = "tls_secret_class_default")]
+        pub secret_class: String,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -241,6 +262,18 @@ impl v1alpha1::OpenSearchConfig {
             listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
         }
     }
+}
+
+impl Default for v1alpha1::OpenSearchTls {
+    fn default() -> Self {
+        v1alpha1::OpenSearchTls {
+            secret_class: tls_secret_class_default(),
+        }
+    }
+}
+
+fn tls_secret_class_default() -> String {
+    TLS_DEFAULT_SECRET_CLASS.to_string()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
