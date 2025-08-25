@@ -1,0 +1,66 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  image:
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+{% else %}
+    productVersion: "{{ test_scenario['values']['opensearch'] }}"
+{% endif %}
+    pullPolicy: IfNotPresent
+  nodes:
+    roleGroups:
+      default:
+        replicas: 3
+    envOverrides:
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
+    configOverrides:
+      opensearch.yml:
+        # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
+        # vm.max_map_count would have to be increased to 262144 on the node.
+        node.store.allow_mmap: "false"
+        plugins.security.allow_default_init_securityindex: "true"
+        plugins.security.ssl.transport.enabled: "true"
+        plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+        plugins.security.ssl.http.enabled: "true"
+        plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+    podOverrides:
+      spec:
+        containers:
+          - name: opensearch
+            volumeMounts:
+              - name: security-config
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
+                readOnly: true
+              - name: tls
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
+                readOnly: true
+        securityContext:
+          fsGroup: 1000
+        volumes:
+          - name: security-config
+            secret:
+              secretName: opensearch-security-config
+          - name: tls
+            ephemeral:
+              volumeClaimTemplate:
+                metadata:
+                  annotations:
+                    secrets.stackable.tech/class: tls
+                    secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-default-headless
+                spec:
+                  storageClassName: secrets.stackable.tech
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: "1"
