@@ -1,0 +1,149 @@
+= Monitoring
+:description: Use Prometheus to monitor OpenSearch
+
+OpenSearch clusters can be monitored with Prometheus, see also the general xref:operators:monitoring.adoc[] page.
+The Prometheus metrics are exposed on the HTTP port 9200 at the path `/_prometheus/metrics`.
+
+The role group services contain the corresponding labels and annotations:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-nodes-default-headless
+  labels:
+    prometheus.io/scrape: "true"
+  annotations:
+    prometheus.io/path: /_prometheus/metrics
+    prometheus.io/port: "9200"
+    prometheus.io/scheme: https
+    prometheus.io/scrape: "true"
+----
+
+If authentication is enabled in the OpenSearch security plugin, then the metrics endpoint is also secured.
+To make the metrics accessible for all users, especially Prometheus, anonymous authentication can be enabled and access to the monitoring statistics can be allowed for the role of the anonymous user:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-security-config
+stringData:
+  config.yml: |
+    ---
+    _meta:
+      type: config
+      config_version: 2
+    config:
+      dynamic:
+        authc:
+          basic_internal_auth_domain:
+            description: Authenticate via HTTP Basic against internal users database
+            http_enabled: true
+            transport_enabled: true
+            order: 1
+            http_authenticator:
+              type: basic
+              challenge: false # <1>
+            authentication_backend:
+              type: intern
+        authz: {}
+        http:
+          anonymous_auth_enabled: true # <2>
+  roles.yml: |
+    ---
+    _meta:
+      type: roles
+      config_version: 2
+    monitoring: # <3>
+      reserved: true
+      cluster_permissions:
+      - cluster:monitor/health
+      - cluster:monitor/nodes/info
+      - cluster:monitor/nodes/stats
+      - cluster:monitor/prometheus/metrics
+      - cluster:monitor/state
+      index_permissions:
+      - index_patterns:
+        - "*"
+        allowed_actions:
+        - indices:monitor/health
+        - indices:monitor/stats
+  roles_mapping.yml: |
+    ---
+    _meta:
+      type: rolesmapping
+      config_version: 2
+    monitoring: # <4>
+      backend_roles:
+      - opendistro_security_anonymous_backendrole
+----
+<1>  If anonymous authentication is enabled, then all defined HTTP authenticators are non-challenging.
+<2> Enable https://docs.opensearch.org/latest/security/access-control/anonymous-authentication/[anonymous authentication]
+<3> Create a role "monitoring" with the required permissions for the Prometheus endpoint
+<4> Map the role "monitoring" to the backend role "opendistro_security_anonymous_backendrole" that is assigned to the anonymous user
+
+If you use the https://prometheus-operator.dev/[Prometheus Operator] to install Prometheus, then you can define a https://prometheus-operator.dev/docs/api-reference/api/#monitoring.coreos.com/v1.ServiceMonitor[ServiceMonitor] to collect the metrics:
+
+[source,yaml]
+----
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: stackable-opensearch
+  labels:
+    release: prometheus-stack # <1>
+spec:
+  selector:
+    matchLabels: # <2>
+      prometheus.io/scrape: "true"
+  endpoints:
+  - relabelings:
+    - sourceLabels: # <3>
+      - __meta_kubernetes_service_annotation_prometheus_io_scheme
+      action: replace
+      targetLabel: __scheme__
+      regex: (https?)
+    - sourceLabels: # <4>
+      - __meta_kubernetes_service_annotation_prometheus_io_path
+      action: replace
+      targetLabel: __metrics_path__
+      regex: (.+)
+    - sourceLabels: # <5>
+      - __meta_kubernetes_pod_name
+      - __meta_kubernetes_service_name
+      - __meta_kubernetes_namespace
+      - __meta_kubernetes_service_annotation_prometheus_io_port
+      action: replace
+      targetLabel: __address__
+      regex: (.+);(.+);(.+);(\d+)
+      replacement: $1.$2.$3.svc.cluster.local:$4
+    tlsConfig: # <6>
+      ca:
+        configMap:
+          name: truststore
+          key: ca.crt
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore
+spec:
+  secretClassName: tls
+  format: tls-pem
+----
+<1> The `release` label must match the Helm release name.
+    This Helm release was installed with `helm install prometheus-stack oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack ...`.
+<2> Label selector to select the Kubernetes `Endpoints` objects to scrape metrics from.
+    The Endpoints inherit the labels from their Service.
+<3> Use the schema (`http` or `https`) from the Service annotation `prometheus.io/scheme`
+<4> Use the path (`/_prometheus/metrics`) from the Service annotation `prometheus.io/path`.
+    These values could also be hard-coded in the ServiceMonitor but it is better to use the ones provided by the operator if they change in the future.
+<5> Use the FQDN instead of the IP address because the IP address is not contained in the certificate.
+    The FQDN is constructed from the pod name, service name, namespace and the HTTP port provided in the Service annotation `prometheus.io/port`, e.g. `opensearch-nodes-default-0.opensearch-nodes-default-headless.my-namespace.svc.cluster.local:9200`.
+<6> If TLS is used and the CA is not already provided to Prometheus in another way, then it can be taken from a xref:secret-operator:truststore.adoc[] ConfigMap.
