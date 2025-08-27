@@ -365,7 +365,7 @@ impl<'a> RoleGroupBuilder<'a> {
     ///
     /// These annotations can be used in a ServiceMonitor.
     ///
-    /// see also https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036
+    /// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
     fn prometheus_annotations(tls_on_http_port_enabled: bool) -> Annotations {
         Annotations::try_from([
             (
