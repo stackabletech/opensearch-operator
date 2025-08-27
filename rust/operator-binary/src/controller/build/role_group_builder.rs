@@ -492,7 +492,7 @@ mod tests {
 
     #[test]
     pub fn test_prometheus_annotations() {
-        // Test that the function does not panic on all possible execution pathes
+        // Test that the function does not panic on all possible execution paths
         RoleGroupBuilder::prometheus_annotations(false);
         RoleGroupBuilder::prometheus_annotations(true);
     }
