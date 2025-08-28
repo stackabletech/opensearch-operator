@@ -251,7 +251,7 @@ impl NodeRoles {
         self.0.contains(node_role)
     }
 
-    pub fn iter(&self) -> slice::Iter<v1alpha1::NodeRole> {
+    pub fn iter(&self) -> slice::Iter<'_, v1alpha1::NodeRole> {
         self.0.iter()
     }
 }
