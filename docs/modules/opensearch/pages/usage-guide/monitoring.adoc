@@ -147,3 +147,5 @@ spec:
 <5> Use the FQDN instead of the IP address because the IP address is not contained in the certificate.
     The FQDN is constructed from the pod name, service name, namespace and the HTTP port provided in the Service annotation `prometheus.io/port`, e.g. `opensearch-nodes-default-0.opensearch-nodes-default-headless.my-namespace.svc.cluster.local:9200`.
 <6> If TLS is used and the CA is not already provided to Prometheus in another way, then it can be taken from a xref:secret-operator:truststore.adoc[] ConfigMap.
+    The TrustStore ConfigMap is updated whenever the CA is rotated.
+    In this case, Prometheus takes over the new certificate.
