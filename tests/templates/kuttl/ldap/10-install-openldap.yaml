@@ -19,7 +19,7 @@ spec:
       serviceAccountName: test-service-account
       containers:
         - name: openldap
-          image: docker.io/bitnami/openldap:2.5
+          image: bitnamilegacy/openldap:2.5
           env:
             - name: LDAP_ADMIN_USERNAME
               value: admin
