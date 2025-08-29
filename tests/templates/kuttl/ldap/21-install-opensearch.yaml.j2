@@ -17,6 +17,9 @@ spec:
       default:
         replicas: 3
     envOverrides:
+      # Only required for the official image
+      # The official image (built with https://github.com/opensearch-project/opensearch-build)
+      # installs a demo configuration if not disabled explicitly.
       DISABLE_INSTALL_DEMO_CONFIG: "true"
       OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
     configOverrides:
@@ -44,8 +47,6 @@ spec:
               - name: tls
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
                 readOnly: true
-        securityContext:
-          fsGroup: 1000
         volumes:
           - name: security-config
             secret:

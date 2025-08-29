@@ -1,7 +1,6 @@
 # All fields are checked that are set by the operator.
 # This helps to detect unintentional changes.
 # The maintenance effort should be okay as long as it is only done in the smoke test.
-# TODO  Check individual field in unit tests
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
@@ -404,7 +403,6 @@ data:
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
-    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
@@ -439,7 +437,6 @@ data:
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
-    plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
