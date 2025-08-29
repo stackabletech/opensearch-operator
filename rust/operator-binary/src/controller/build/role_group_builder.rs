@@ -13,8 +13,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kube::api::ObjectMeta,
-    kvp::{Label, Labels},
+    kvp::{Annotations, Label, Labels},
 };
 
 use super::node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig};
@@ -82,12 +81,13 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     pub fn build_config_map(&self) -> ConfigMap {
-        let metadata =
-            self.common_metadata(self.resource_names.role_group_config_map(), Labels::new());
+        let metadata = self
+            .common_metadata(self.resource_names.role_group_config_map())
+            .build();
 
         let data = [(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config.static_opensearch_config(),
+            self.node_config.static_opensearch_config_file(),
         )]
         .into();
 
@@ -99,7 +99,9 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     pub fn build_stateful_set(&self) -> StatefulSet {
-        let metadata = self.common_metadata(self.resource_names.stateful_set_name(), Labels::new());
+        let metadata = self
+            .common_metadata(self.resource_names.stateful_set_name())
+            .build();
 
         let template = self.build_pod_template();
 
@@ -350,8 +352,39 @@ impl<'a> RoleGroupBuilder<'a> {
         self.build_role_group_service(
             self.resource_names.headless_service_name(),
             ports,
-            Labels::new(),
+            Self::prometheus_labels(),
+            Self::prometheus_annotations(self.node_config.tls_on_http_port_enabled()),
         )
+    }
+
+    /// Common labels for Prometheus
+    fn prometheus_labels() -> Labels {
+        Labels::try_from([("prometheus.io/scrape", "true")]).expect("should be a valid label")
+    }
+
+    /// Common annotations for Prometheus
+    ///
+    /// These annotations can be used in a ServiceMonitor.
+    ///
+    /// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
+    fn prometheus_annotations(tls_on_http_port_enabled: bool) -> Annotations {
+        Annotations::try_from([
+            (
+                "prometheus.io/path".to_owned(),
+                "/_prometheus/metrics".to_owned(),
+            ),
+            ("prometheus.io/port".to_owned(), HTTP_PORT.to_string()),
+            (
+                "prometheus.io/scheme".to_owned(),
+                if tls_on_http_port_enabled {
+                    "https".to_owned()
+                } else {
+                    "http".to_owned()
+                },
+            ),
+            ("prometheus.io/scrape".to_owned(), "true".to_owned()),
+        ])
+        .expect("should be valid annotations")
     }
 
     fn build_role_group_service(
@@ -359,8 +392,13 @@ impl<'a> RoleGroupBuilder<'a> {
         service_name: impl Into<String>,
         ports: Vec<ServicePort>,
         extra_labels: Labels,
+        extra_annotations: Annotations,
     ) -> Service {
-        let metadata = self.common_metadata(service_name, extra_labels);
+        let metadata = self
+            .common_metadata(service_name)
+            .with_labels(extra_labels)
+            .with_annotations(extra_annotations)
+            .build();
 
         let service_spec = ServiceSpec {
             // Internal communication does not need to be exposed
@@ -380,8 +418,9 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     pub fn build_listener(&self) -> listener::v1alpha1::Listener {
-        let metadata =
-            self.common_metadata(self.resource_names.listener_service_name(), Labels::new());
+        let metadata = self
+            .common_metadata(self.resource_names.listener_service_name())
+            .build();
 
         let listener_class = self.role_group_config.config.listener_class.to_owned();
 
@@ -396,8 +435,6 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// We only use the http port here and intentionally omit
-    /// the metrics one.
     fn listener_ports(&self) -> Vec<listener::v1alpha1::ListenerPort> {
         vec![listener::v1alpha1::ListenerPort {
             name: HTTP_PORT_NAME.to_string(),
@@ -406,12 +443,10 @@ impl<'a> RoleGroupBuilder<'a> {
         }]
     }
 
-    fn common_metadata(
-        &self,
-        resource_name: impl Into<String>,
-        extra_labels: Labels,
-    ) -> ObjectMeta {
-        ObjectMetaBuilder::new()
+    fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
+        let mut builder = ObjectMetaBuilder::new();
+
+        builder
             .name(resource_name)
             .namespace(&self.cluster.namespace)
             .ownerreference(ownerreference_from_resource(
@@ -419,9 +454,9 @@ impl<'a> RoleGroupBuilder<'a> {
                 None,
                 Some(true),
             ))
-            .with_labels(self.recommended_labels())
-            .with_labels(extra_labels)
-            .build()
+            .with_labels(self.recommended_labels());
+
+        builder
     }
 
     fn recommended_labels(&self) -> Labels {
@@ -450,12 +485,26 @@ impl<'a> RoleGroupBuilder<'a> {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::{controller::build::role_group_builder::RoleGroupBuilder, crd::v1alpha1};
+    use super::RoleGroupBuilder;
+    use crate::crd::v1alpha1;
 
     #[test]
     fn test_build_node_role_label() {
         for node_role in v1alpha1::NodeRole::iter() {
             RoleGroupBuilder::build_node_role_label(&node_role);
         }
+    }
+
+    #[test]
+    pub fn test_prometheus_labels() {
+        // Test that the function does not panic
+        RoleGroupBuilder::prometheus_labels();
+    }
+
+    #[test]
+    pub fn test_prometheus_annotations() {
+        // Test that the function does not panic on all possible execution paths
+        RoleGroupBuilder::prometheus_annotations(false);
+        RoleGroupBuilder::prometheus_annotations(true);
     }
 }

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde_json::{Value, json};
 use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
@@ -91,7 +93,12 @@ impl NodeConfig {
     }
 
     /// static for the cluster
-    pub fn static_opensearch_config(&self) -> String {
+    pub fn static_opensearch_config_file(&self) -> String {
+        Self::to_yaml(self.static_opensearch_config())
+    }
+
+    /// static for the cluster
+    pub fn static_opensearch_config(&self) -> serde_json::Map<String, Value> {
         let mut config = serde_json::Map::new();
 
         config.insert(
@@ -127,7 +134,24 @@ impl NodeConfig {
         // Ensure a deterministic result
         config.sort_keys();
 
-        Self::to_yaml(config)
+        config
+    }
+
+    pub fn tls_on_http_port_enabled(&self) -> bool {
+        self.static_opensearch_config()
+            .get("plugins.security.ssl.http.enabled")
+            .and_then(Self::value_as_bool)
+            == Some(true)
+    }
+
+    pub fn value_as_bool(value: &Value) -> Option<bool> {
+        value.as_bool().or(
+            // OpenSearch parses the strings "true" and "false" as boolean, see
+            // https://github.com/opensearch-project/OpenSearch/blob/3.1.0/libs/common/src/main/java/org/opensearch/common/Booleans.java#L45-L84
+            value
+                .as_str()
+                .and_then(|value| FromStr::from_str(value).ok()),
+        )
     }
 
     /// different for every node
@@ -267,6 +291,43 @@ mod tests {
         crd::NodeRoles,
         framework::{ClusterName, ProductVersion, role_utils::GenericProductSpecificCommonConfig},
     };
+
+    #[test]
+    pub fn test_value_as_bool() {
+        // boolean
+        assert_eq!(Some(true), NodeConfig::value_as_bool(&Value::Bool(true)));
+        assert_eq!(Some(false), NodeConfig::value_as_bool(&Value::Bool(false)));
+
+        // valid strings
+        assert_eq!(
+            Some(true),
+            NodeConfig::value_as_bool(&Value::String("true".to_owned()))
+        );
+        assert_eq!(
+            Some(false),
+            NodeConfig::value_as_bool(&Value::String("false".to_owned()))
+        );
+
+        // invalid strings
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::String("True".to_owned()))
+        );
+
+        // invalid types
+        assert_eq!(None, NodeConfig::value_as_bool(&Value::Null));
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::Number(
+                serde_json::Number::from_i128(1).expect("should be a valid number")
+            ))
+        );
+        assert_eq!(None, NodeConfig::value_as_bool(&Value::Array(vec![])));
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::Object(serde_json::Map::new()))
+        );
+    }
 
     #[test]
     pub fn test_environment_variables() {

@@ -51,7 +51,7 @@ impl<'a> RoleBuilder<'a> {
 
     // TODO Only one builder function which calls the other ones?
 
-    pub fn role_group_builders(&self) -> Vec<RoleGroupBuilder> {
+    pub fn role_group_builders(&self) -> Vec<RoleGroupBuilder<'_>> {
         self.cluster
             .role_group_configs
             .iter()

@@ -1,0 +1,21 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: check-metrics
+spec:
+  template:
+    spec:
+      containers:
+        - name: check-metrics
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euo
+            - pipefail
+            - -c
+            - >
+              curl http://prometheus-operated:9090/api/v1/query?query=opensearch_cluster_nodes_number%7Bpod%3D%22opensearch-nodes-default-0%22%7D |
+              jq --exit-status '.data.result[0].value[1] == "3"'
+      serviceAccountName: test-service-account
+      restartPolicy: OnFailure

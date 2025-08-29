@@ -19,7 +19,9 @@ All notable changes to this project will be documented in this file.
 - Add Listener support ([#17]).
 - Make the environment variables `OPENSEARCH_HOME` and `OPENSEARCH_PATH_CONF` overridable, so that
   images can be used which have a different directory structure than the Stackable image ([#18]).
+- Add Prometheus labels and annotations to role-group services ([#26]).
 
 [#10]: https://github.com/stackabletech/opensearch-operator/pull/10
 [#17]: https://github.com/stackabletech/opensearch-operator/pull/17
 [#18]: https://github.com/stackabletech/opensearch-operator/pull/18
+[#26]: https://github.com/stackabletech/opensearch-operator/pull/26
