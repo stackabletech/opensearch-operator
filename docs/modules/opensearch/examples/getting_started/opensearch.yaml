@@ -5,39 +5,34 @@ metadata:
   name: simple-opensearch
 spec:
   image:
-    custom: opensearchproject/opensearch:3.1.0
     productVersion: 3.1.0
   nodes:
     roleGroups:
       default:
         replicas: 3
-    envOverrides:
-      DISABLE_INSTALL_DEMO_CONFIG: "true"
     configOverrides:
       opensearch.yml:
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.restapi.roles_enabled: all_access
         plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: /usr/share/opensearch/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: /usr/share/opensearch/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: /usr/share/opensearch/config/tls/ca.crt
+        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
         plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: /usr/share/opensearch/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: /usr/share/opensearch/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: /usr/share/opensearch/config/tls/ca.crt
+        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
     podOverrides:
       spec:
         containers:
           - name: opensearch
             volumeMounts:
               - name: security-config
-                mountPath: /usr/share/opensearch/config/opensearch-security
+                mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
               - name: tls
-                mountPath: /usr/share/opensearch/config/tls
+                mountPath: /stackable/opensearch/config/tls
                 readOnly: true
-        securityContext:
-          fsGroup: 1000
         volumes:
           - name: security-config
             secret:
@@ -48,7 +43,7 @@ spec:
                 metadata:
                   annotations:
                     secrets.stackable.tech/class: tls
-                    secrets.stackable.tech/scope: node,pod,service=simple-opensearch,service=simple-opensearch-nodes-default
+                    secrets.stackable.tech/scope: node,pod,service=simple-opensearch,service=simple-opensearch-nodes-default,service=simple-opensearch-nodes-default-headless
                 spec:
                   storageClassName: secrets.stackable.tech
                   accessModes:

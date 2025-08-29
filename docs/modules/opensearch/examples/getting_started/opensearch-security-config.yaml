@@ -14,7 +14,6 @@ stringData:
     _meta:
       type: allowlist
       config_version: 2
-
     config:
       enabled: false
   audit.yml: |
@@ -22,7 +21,6 @@ stringData:
     _meta:
       type: audit
       config_version: 2
-
     config:
       enabled: false
   config.yml: |
@@ -30,7 +28,6 @@ stringData:
     _meta:
       type: config
       config_version: 2
-
     config:
       dynamic:
         authc:
@@ -50,14 +47,12 @@ stringData:
     _meta:
       type: internalusers
       config_version: 2
-
     admin:
       hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
       reserved: true
       backend_roles:
-        - admin
+      - admin
       description: OpenSearch admin user
-
     kibanaserver:
       hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
       reserved: true
@@ -77,16 +72,14 @@ stringData:
     _meta:
       type: rolesmapping
       config_version: 2
-
     all_access:
       reserved: false
       backend_roles:
-        - admin
-
+      - admin
     kibana_server:
       reserved: true
       users:
-        - kibanaserver
+      - kibanaserver
   tenants.yml: |
     ---
     _meta:
