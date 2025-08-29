@@ -15,47 +15,16 @@ use crate::{
 
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-// TODO Document how to enter config_overrides of various types, e.g. string, list, boolean,
-// object, ...
-
-// Configuration file format
-//
-// This is not well documented.
-//
-// A list setting can be written as
-// - a comma-separated list, e.g.
-//   ```
-//   setting: a,b,c
-//   ```
-//   Commas in the values cannot be escaped.
-// - a JSON list, e.g.
-//   ```
-//   setting: ["a", "b", "c"]
-//   ```
-// - a YAML list, e.g.
-//   ```
-//   setting:
-//     - a
-//     - b
-//     - c
-//   ```
-// - a (legacy) flat list, e.g.
-//   ```
-//   setting.0: a
-//   setting.1: b
-//   setting.2: b
-//   ```
-
 /// type: string
 pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
 /// type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
     "cluster.initial_cluster_manager_nodes";
 
@@ -65,10 +34,10 @@ pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 /// type: string
 pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
 pub struct NodeConfig {
