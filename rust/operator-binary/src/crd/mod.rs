@@ -23,7 +23,7 @@ use stackable_operator::{
     time::Duration,
     versioned::versioned,
 };
-use strum::Display;
+use strum::{Display, EnumIter};
 
 use crate::framework::{
     ClusterName, IsLabelValue, ProductName, RoleName,
@@ -76,32 +76,34 @@ pub mod versioned {
     // https://github.com/opensearch-project/ml-commons/blob/3.0.0.0/plugin/src/main/java/org/opensearch/ml/plugin/MachineLearningPlugin.java#L394.
     // If such a plugin is added, then this enumeration must be extended accordingly.
     #[derive(
-        Clone, Debug, Deserialize, Display, Eq, JsonSchema, Ord, PartialEq, PartialOrd, Serialize,
+        Clone,
+        Debug,
+        Deserialize,
+        Display,
+        EnumIter,
+        Eq,
+        JsonSchema,
+        Ord,
+        PartialEq,
+        PartialOrd,
+        Serialize,
     )]
     // The OpenSearch configuration uses snake_case. To make it easier to match the log output of
     // OpenSearch with this cluster configuration, snake_case is also used here.
     #[serde(rename_all = "snake_case")]
+    #[strum(serialize_all = "snake_case")]
     pub enum NodeRole {
         // Built-in node roles
         // see https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/node/DiscoveryNodeRole.java#L341-L346
-
-        // TODO https://github.com/Peternator7/strum/issues/113
-        #[strum(serialize = "cluster_manager")]
         ClusterManager,
-        #[strum(serialize = "coordinating_only")]
         CoordinatingOnly,
-        #[strum(serialize = "data")]
         Data,
-        #[strum(serialize = "ingest")]
         Ingest,
-        #[strum(serialize = "remote_cluster_client")]
         RemoteClusterClient,
-        #[strum(serialize = "warm")]
         Warm,
 
         // Search node role
         // see https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/node/DiscoveryNodeRole.java#L313-L339
-        #[strum(serialize = "search")]
         Search,
     }
 
@@ -257,3 +259,29 @@ impl NodeRoles {
 }
 
 impl Atomic for NodeRoles {}
+
+#[cfg(test)]
+mod tests {
+    use crate::crd::v1alpha1;
+
+    #[test]
+    fn test_node_role() {
+        assert_eq!(
+            String::from("cluster_manager"),
+            v1alpha1::NodeRole::ClusterManager.to_string()
+        );
+        assert_eq!(
+            String::from("cluster_manager"),
+            format!("{}", v1alpha1::NodeRole::ClusterManager)
+        );
+        assert_eq!(
+            "\"cluster_manager\"",
+            serde_json::to_string(&v1alpha1::NodeRole::ClusterManager)
+                .expect("should be serializable")
+        );
+        assert_eq!(
+            v1alpha1::NodeRole::ClusterManager,
+            serde_json::from_str("\"cluster_manager\"").expect("should be deserializable")
+        );
+    }
+}

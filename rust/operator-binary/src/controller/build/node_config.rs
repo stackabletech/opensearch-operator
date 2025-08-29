@@ -7,52 +7,24 @@ use super::ValidatedCluster;
 use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
-    framework::{builder::pod::container::EnvVarSet, role_group_utils},
+    framework::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        role_group_utils,
+    },
 };
 
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-// TODO Document how to enter config_overrides of various types, e.g. string, list, boolean,
-// object, ...
-
-// Configuration file format
-//
-// This is not well documented.
-//
-// A list setting can be written as
-// - a comma-separated list, e.g.
-//   ```
-//   setting: a,b,c
-//   ```
-//   Commas in the values cannot be escaped.
-// - a JSON list, e.g.
-//   ```
-//   setting: ["a", "b", "c"]
-//   ```
-// - a YAML list, e.g.
-//   ```
-//   setting:
-//     - a
-//     - b
-//     - c
-//   ```
-// - a (legacy) flat list, e.g.
-//   ```
-//   setting.0: a
-//   setting.1: b
-//   setting.2: b
-//   ```
-
 /// type: string
 pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
 /// type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
     "cluster.initial_cluster_manager_nodes";
 
@@ -62,10 +34,10 @@ pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 /// type: string
 pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
-/// type: list of strings
+/// type: (comma-separated) list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
 pub struct NodeConfig {
@@ -156,17 +128,20 @@ impl NodeConfig {
         EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for `{INITIAL_CLUSTER_MANAGER_NODES}`.
-            .with_field_path(CONFIG_OPTION_NODE_NAME, FieldPathEnvVar::Name)
+            .with_field_path(
+                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
+                FieldPathEnvVar::Name,
+            )
             .with_value(
-                CONFIG_OPTION_DISCOVERY_SEED_HOSTS,
+                EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
                 &self.discovery_service_name,
             )
             .with_value(
-                CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES,
+                EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
                 self.initial_cluster_manager_nodes(),
             )
             .with_value(
-                CONFIG_OPTION_NODE_ROLES,
+                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
                 self.role_group_config
                     .config
                     .node_roles
@@ -177,7 +152,7 @@ impl NodeConfig {
                     // is safe.
                     .join(","),
             )
-            .with_values(self.role_group_config.env_overrides.clone())
+            .merge(self.role_group_config.env_overrides.clone())
     }
 
     fn to_yaml(kv: serde_json::Map<String, Value>) -> String {
@@ -274,7 +249,7 @@ mod tests {
             affinity::StackableAffinity, product_image_selection::ProductImage,
             resources::Resources,
         },
-        k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector, PodTemplateSpec},
+        k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::api::ObjectMeta,
         role_utils::GenericRoleConfig,
     };
@@ -350,7 +325,8 @@ mod tests {
                 listener_class: "cluster-internal".to_string(),
             },
             config_overrides: HashMap::default(),
-            env_overrides: [("TEST".to_owned(), "value".to_owned())].into(),
+            env_overrides: EnvVarSet::new()
+                .with_value(EnvVarName::from_str_unsafe("TEST"), "value"),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
@@ -364,44 +340,23 @@ mod tests {
 
         let env_vars = node_config.environment_variables();
 
-        // TODO Test EnvVarSet and compare EnvVarSets
         assert_eq!(
-            vec![
-                EnvVar {
-                    name: "TEST".to_owned(),
-                    value: Some("value".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "cluster.initial_cluster_manager_nodes".to_owned(),
-                    value: Some("".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "discovery.seed_hosts".to_owned(),
-                    value: Some("my-opensearch-cluster-manager".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "node.name".to_owned(),
-                    value: None,
-                    value_from: Some(EnvVarSource {
-                        config_map_key_ref: None,
-                        field_ref: Some(ObjectFieldSelector {
-                            api_version: None,
-                            field_path: "metadata.name".to_owned()
-                        }),
-                        resource_field_ref: None,
-                        secret_key_ref: None
-                    })
-                },
-                EnvVar {
-                    name: "node.roles".to_owned(),
-                    value: Some("".to_owned()),
-                    value_from: None
-                }
-            ],
-            <EnvVarSet as Into<Vec<EnvVar>>>::into(env_vars)
+            EnvVarSet::new()
+                .with_value(EnvVarName::from_str_unsafe("TEST"), "value",)
+                .with_value(
+                    EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
+                    "",
+                )
+                .with_value(
+                    EnvVarName::from_str_unsafe("discovery.seed_hosts"),
+                    "my-opensearch-cluster-manager",
+                )
+                .with_field_path(
+                    EnvVarName::from_str_unsafe("node.name"),
+                    FieldPathEnvVar::Name
+                )
+                .with_value(EnvVarName::from_str_unsafe("node.roles"), "",),
+            env_vars
         );
     }
 }

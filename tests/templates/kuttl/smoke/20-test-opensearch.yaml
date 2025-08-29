@@ -72,8 +72,6 @@ data:
 
     from opensearchpy import OpenSearch
 
-    # TODO Use a discovery ConfigMap
-
     host = 'opensearch'
     port = 9200
     auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
