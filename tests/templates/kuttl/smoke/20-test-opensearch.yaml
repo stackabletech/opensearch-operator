@@ -16,7 +16,7 @@ spec:
             - -c
           args:
             - |
-              pip install opensearch-py
+              pip install opensearch-py==3.0.0
               python scripts/test.py
           env:
             # required for pip install
