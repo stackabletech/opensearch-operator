@@ -91,8 +91,7 @@ data:
 
     response = client.indices.create(index=index_name)
 
-    print('\nCreating index:')
-    print(response)
+    print(f'Creating index; {response=}')
 
     # Add a document to the index
     response = client.index(
@@ -103,11 +102,9 @@ data:
       id = 1,
     )
 
-    print('\nAdding document:')
-    print(response)
+    print(f'Adding document; {response=}')
 
     # Delete the index.
     response = client.indices.delete(index=index_name)
 
-    print('\nDeleting index:')
-    print(response)
+    print(f'Deleting index; {response=}')
