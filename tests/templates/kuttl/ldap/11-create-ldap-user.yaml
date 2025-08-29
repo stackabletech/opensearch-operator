@@ -1,8 +1,105 @@
 ---
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: create-ldap-user
-commands:
-  - script: kubectl cp -n $NAMESPACE ./create_ldap_user.sh openldap-0:/tmp
-  - script: kubectl exec -n $NAMESPACE openldap-0 -- sh /tmp/create_ldap_user.sh
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-ldap-user
+          image: bitnamilegacy/openldap:2.5
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              ldapadd \
+                  -D cn=admin,dc=example,dc=org \
+                  -w admin \
+                  -f /stackable/ldap-users/integrationtest \
+                  || true
+
+              ldappasswd \
+                  -D cn=admin,dc=example,dc=org \
+                  -w admin \
+                  -s integrationtest \
+                  cn=integrationtest,ou=users,dc=example,dc=org
+
+              # Check that the user works
+              ldapsearch \
+                  -D cn=integrationtest,ou=users,dc=example,dc=org \
+                  -w integrationtest \
+                  -b ou=users,dc=example,dc=org
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: LDAPURI
+              value: ldaps://openldap.$(NAMESPACE).svc.cluster.local:1636/
+            - name: LDAPTLS_CACERT
+              value: /stackable/tls/ca.crt
+          volumeMounts:
+            - name: ldap-users
+              mountPath: /stackable/ldap-users
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: ldap-users
+          configMap:
+            name: ldap-users
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      serviceAccountName: test-service-account
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ldap-users
+data:
+  integrationtest: |
+    dn: cn=integrationtest,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    cn: integrationtest
+    uid: integrationtest
+    givenName: Stackable
+    sn: Integration-Test
+    mail: integrationtest@stackable.de
+    uidNumber: 16842
+    gidNumber: 100
+    homeDirectory: /home/integrationtest
+    loginShell: /bin/bash
+    userPassword: {crypt}x
+    shadowLastChange: 0
+    shadowMax: 0
+    shadowWarning: 0
