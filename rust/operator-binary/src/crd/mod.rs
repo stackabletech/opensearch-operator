@@ -35,9 +35,9 @@ const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
 #[versioned(version(name = "v1alpha1"))]
 pub mod versioned {
 
-    /// A OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch.
-    /// Find more information on how to use it and the resources that the operator generates in the
-    /// [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
+    /// An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for
+    /// OpenSearch. Find more information on how to use it and the resources that the operator
+    /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[versioned(k8s(
         group = "opensearch.stackable.tech",
@@ -54,14 +54,14 @@ pub mod versioned {
     ))]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterSpec {
-        // no doc string - see ProductImage struct
+        // no doc - docs in ProductImage struct.
         pub image: ProductImage,
 
-        // no doc string - see ClusterOperation struct
+        // no doc - docs in ClusterOperation struct.
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        /// OpenSearch nodes
+        // no doc - docs in Role struct.
         pub nodes:
             Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
     }
@@ -130,6 +130,10 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Duration,
 
+        /// Roles of the OpenSearch node.
+        ///
+        /// Consult the [node roles
+        /// documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/usage-guide/node-roles) for details.
         pub node_roles: NodeRoles,
 
         #[fragment_attrs(serde(default))]
