@@ -23,7 +23,7 @@ spec:
           description: Auto-generated derived type for OpenSearchClusterSpec via `CustomResource`
           properties:
             spec:
-              description: A OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
+              description: An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch. Find more information on how to use it and the resources that the operator generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
               properties:
                 clusterOperation:
                   default:
@@ -89,7 +89,7 @@ spec:
                       type: string
                   type: object
                 nodes:
-                  description: OpenSearch nodes
+                  description: This struct represents a role - e.g. HDFS datanodes or Trino workers. It has a key-value-map containing all the roleGroups that are part of this role. Additionally, there is a `config`, which is configurable at the role *and* roleGroup level. Everything at roleGroup level is merged on top of what is configured on role level. There is also a second form of config, which can only be configured at role level, the `roleConfig`. You can learn more about this in the [Roles and role group concept documentation](https://docs.stackable.tech/home/nightly/concepts/roles-and-role-groups).
                   properties:
                     cliOverrides:
                       additionalProperties:
@@ -138,6 +138,10 @@ spec:
                           nullable: true
                           type: string
                         nodeRoles:
+                          description: |-
+                            Roles of the OpenSearch node.
+
+                            Consult the [node roles documentation](https://docs.stackable.tech/home/nightly/opensearch/usage-guide/node-roles) for details.
                           items:
                             enum:
                               - cluster_manager
@@ -334,6 +338,10 @@ spec:
                                 nullable: true
                                 type: string
                               nodeRoles:
+                                description: |-
+                                  Roles of the OpenSearch node.
+
+                                  Consult the [node roles documentation](https://docs.stackable.tech/home/nightly/opensearch/usage-guide/node-roles) for details.
                                 items:
                                   enum:
                                     - cluster_manager
