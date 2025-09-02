@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use stackable_operator::{
     config::{
         fragment::{self, FromFragment},
-        merge::Merge,
+        merge::{Merge, merge},
     },
-    k8s_openapi::api::core::v1::PodTemplateSpec,
+    k8s_openapi::{DeepMerge, api::core::v1::PodTemplateSpec},
     role_utils::{CommonConfiguration, Role, RoleGroup},
     schemars::JsonSchema,
 };
@@ -143,8 +143,8 @@ fn merged_pod_overrides(
     role_pod_overrides: PodTemplateSpec,
     role_group_pod_overrides: PodTemplateSpec,
 ) -> PodTemplateSpec {
-    let mut merged_pod_overrides = role_group_pod_overrides;
-    merged_pod_overrides.merge(&role_pod_overrides);
+    let mut merged_pod_overrides = role_pod_overrides;
+    merged_pod_overrides.merge_from(role_group_pod_overrides);
     merged_pod_overrides
 }
 
@@ -152,9 +152,7 @@ fn merged_product_specific_common_config<T>(role_config: T, role_group_config: T
 where
     T: Merge,
 {
-    let mut merged_config = role_group_config;
-    merged_config.merge(&role_config);
-    merged_config
+    merge(role_group_config, &role_config)
 }
 
 pub struct ResourceNames {
@@ -199,5 +197,182 @@ impl ResourceNames {
         );
 
         format!("{}", self.cluster_name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use rstest::*;
+    use schemars::JsonSchema;
+    use serde::Serialize;
+    use stackable_operator::{
+        config::{fragment::Fragment, merge::Merge},
+        k8s_openapi::api::core::v1::PodTemplateSpec,
+        kube::api::ObjectMeta,
+        role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+    };
+
+    use super::ResourceNames;
+    use crate::framework::{ClusterName, ProductName, role_utils::with_validated_config};
+
+    #[derive(Debug, Fragment, PartialEq)]
+    #[fragment_attrs(derive(Clone, Debug, Default, Merge, PartialEq))]
+    struct Config {
+        property: String,
+    }
+
+    impl Config {
+        fn new(value: &str) -> Self {
+            Self {
+                property: value.to_owned(),
+            }
+        }
+    }
+
+    impl ConfigFragment {
+        fn new(value: Option<&str>) -> Self {
+            Self {
+                property: value.map(str::to_owned),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, Default, JsonSchema, Merge, PartialEq, Serialize)]
+    struct ProductCommonConfig {
+        property: Option<String>,
+    }
+
+    fn new_common_config<T>(
+        config: T,
+        override_value: Option<&str>,
+    ) -> CommonConfiguration<T, ProductCommonConfig> {
+        let mut config_file_overrides = HashMap::new();
+        let mut env_overrides = HashMap::new();
+        let mut cli_overrides = BTreeMap::new();
+
+        if let Some(value) = override_value {
+            config_file_overrides.insert("property".to_owned(), value.to_owned());
+            env_overrides.insert("PROPERTY".to_owned(), value.to_owned());
+            cli_overrides.insert("--property".to_owned(), value.to_owned());
+        }
+
+        CommonConfiguration {
+            config,
+            config_overrides: [("config.file".to_owned(), config_file_overrides)].into(),
+            env_overrides,
+            cli_overrides,
+            pod_overrides: PodTemplateSpec {
+                metadata: Some(ObjectMeta {
+                    name: override_value.map(str::to_owned),
+                    ..ObjectMeta::default()
+                }),
+                ..PodTemplateSpec::default()
+            },
+            product_specific_common_config: ProductCommonConfig {
+                property: override_value.map(str::to_owned),
+            },
+        }
+    }
+
+    #[rstest]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        Some("role"),
+        Some("default")
+    )]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        Some("role"),
+        None
+    )]
+    #[case(
+        "role-group",
+        Some("role-group"),
+        Some("role-group"),
+        None,
+        Some("default")
+    )]
+    #[case("role-group", Some("role-group"), Some("role-group"), None, None)]
+    #[case("role", Some("role"), None, Some("role"), Some("default"))]
+    #[case("role", Some("role"), None, Some("role"), None)]
+    #[case("default", None, None, None, Some("default"))]
+    fn test_with_validated_config_and_result_ok(
+        #[case] expected_config_value: &str,
+        #[case] expected_override_value: Option<&str>,
+        #[case] role_group_value: Option<&str>,
+        #[case] role_value: Option<&str>,
+        #[case] default_value: Option<&str>,
+    ) {
+        let role_group = RoleGroup {
+            config: new_common_config(ConfigFragment::new(role_group_value), role_group_value),
+            replicas: Some(3),
+        };
+        let role = Role::<_, GenericRoleConfig, _> {
+            config: new_common_config(ConfigFragment::new(role_value), role_value),
+            ..Role::default()
+        };
+        let default_config = ConfigFragment::new(default_value);
+
+        let result = with_validated_config(&role_group, &role, &default_config);
+
+        assert_eq!(
+            Some(RoleGroup {
+                config: new_common_config(
+                    Config::new(expected_config_value),
+                    expected_override_value
+                ),
+                replicas: Some(3)
+            }),
+            result.ok()
+        )
+    }
+
+    #[test]
+    fn test_with_validated_config_and_result_err() {
+        let role_group = RoleGroup {
+            config: new_common_config(ConfigFragment::new(None), None),
+            replicas: None,
+        };
+        let role = Role::<_, GenericRoleConfig, _> {
+            config: new_common_config(ConfigFragment::new(None), None),
+            ..Role::default()
+        };
+        let default_config = ConfigFragment::new(None);
+
+        let result: Result<RoleGroup<Config, _>, _> =
+            with_validated_config(&role_group, &role, &default_config);
+
+        assert!(result.is_err())
+    }
+
+    #[test]
+    fn test_resource_names() {
+        let resource_names = ResourceNames {
+            cluster_name: ClusterName::from_str_unsafe("my-cluster"),
+            product_name: ProductName::from_str_unsafe("my-product"),
+        };
+
+        assert_eq!(
+            "my-cluster-serviceaccount".to_owned(),
+            resource_names.service_account_name()
+        );
+        assert_eq!(
+            "my-cluster-rolebinding".to_owned(),
+            resource_names.role_binding_name()
+        );
+        assert_eq!(
+            "my-product-clusterrole".to_owned(),
+            resource_names.cluster_role_name()
+        );
+        assert_eq!(
+            "my-cluster".to_owned(),
+            resource_names.discovery_service_name()
+        );
     }
 }

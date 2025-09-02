@@ -43,3 +43,150 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         status: PhantomData,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use stackable_operator::{
+        commons::affinity::StackableAffinity, k8s_openapi::api::core::v1::PodTemplateSpec,
+        kube::Resource, role_utils::GenericRoleConfig,
+    };
+
+    use super::build;
+    use crate::{
+        controller::{
+            ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
+            ValidatedOpenSearchConfig,
+        },
+        crd::{NodeRoles, v1alpha1},
+        framework::{
+            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
+            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+        },
+    };
+
+    #[test]
+    fn test_build() {
+        let resources = build(&context_names(), validated_cluster());
+
+        assert_eq!(
+            vec![
+                "my-opensearch-nodes-cluster-manager",
+                "my-opensearch-nodes-coordinating",
+                "my-opensearch-nodes-data",
+            ],
+            extract_resource_names(&resources.stateful_sets)
+        );
+        assert_eq!(
+            vec![
+                "my-opensearch",
+                "my-opensearch-nodes-cluster-manager-headless",
+                "my-opensearch-nodes-coordinating-headless",
+                "my-opensearch-nodes-data-headless"
+            ],
+            extract_resource_names(&resources.services)
+        );
+        assert_eq!(
+            vec![
+                "my-opensearch-nodes-cluster-manager",
+                "my-opensearch-nodes-coordinating",
+                "my-opensearch-nodes-data"
+            ],
+            extract_resource_names(&resources.listeners)
+        );
+        assert_eq!(
+            vec![
+                "my-opensearch-nodes-cluster-manager",
+                "my-opensearch-nodes-coordinating",
+                "my-opensearch-nodes-data"
+            ],
+            extract_resource_names(&resources.config_maps)
+        );
+        assert_eq!(
+            vec!["my-opensearch-serviceaccount"],
+            extract_resource_names(&resources.service_accounts)
+        );
+        assert_eq!(
+            vec!["my-opensearch-rolebinding"],
+            extract_resource_names(&resources.role_bindings)
+        );
+        assert_eq!(
+            vec!["my-opensearch-nodes"],
+            extract_resource_names(&resources.pod_disruption_budgets)
+        );
+    }
+
+    fn extract_resource_names(resources: &[impl Resource]) -> Vec<&str> {
+        let mut resource_names: Vec<&str> = resources
+            .iter()
+            .filter_map(|resource| resource.meta().name.as_ref())
+            .map(|x| x.as_str())
+            .collect();
+        resource_names.sort();
+        resource_names
+    }
+
+    fn context_names() -> ContextNames {
+        ContextNames {
+            product_name: ProductName::from_str_unsafe("opensearch"),
+            operator_name: OperatorName::from_str_unsafe("opensearch.stackable.tech"),
+            controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
+        }
+    }
+
+    fn validated_cluster() -> ValidatedCluster {
+        ValidatedCluster::new(
+            serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
+                .expect("should be a valid ProductImage structure"),
+            ProductVersion::from_str_unsafe("3.1.0"),
+            ClusterName::from_str_unsafe("my-opensearch"),
+            "default".to_owned(),
+            "e6ac237d-a6d4-43a1-8135-f36506110912".to_owned(),
+            GenericRoleConfig::default(),
+            [
+                (
+                    RoleGroupName::from_str_unsafe("coordinating"),
+                    role_group_config(5, &[v1alpha1::NodeRole::CoordinatingOnly]),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("cluster-manager"),
+                    role_group_config(3, &[v1alpha1::NodeRole::ClusterManager]),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("data"),
+                    role_group_config(
+                        8,
+                        &[
+                            v1alpha1::NodeRole::Ingest,
+                            v1alpha1::NodeRole::Data,
+                            v1alpha1::NodeRole::RemoteClusterClient,
+                        ],
+                    ),
+                ),
+            ]
+            .into(),
+        )
+    }
+
+    fn role_group_config(
+        replicas: u16,
+        node_roles: &[v1alpha1::NodeRole],
+    ) -> OpenSearchRoleGroupConfig {
+        OpenSearchRoleGroupConfig {
+            replicas,
+            config: ValidatedOpenSearchConfig {
+                affinity: StackableAffinity::default(),
+                node_roles: NodeRoles(node_roles.to_vec()),
+                resources: OpenSearchNodeResources::default(),
+                termination_grace_period_seconds: 120,
+                listener_class: "external-stable".to_owned(),
+            },
+            config_overrides: HashMap::default(),
+            env_overrides: EnvVarSet::default(),
+            cli_overrides: BTreeMap::default(),
+            pod_overrides: PodTemplateSpec::default(),
+            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+        }
+    }
+}

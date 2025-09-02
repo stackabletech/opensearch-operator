@@ -238,11 +238,7 @@ impl NodeConfig {
 
 #[cfg(test)]
 mod tests {
-
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::collections::BTreeMap;
 
     use stackable_operator::{
         commons::{
@@ -250,7 +246,6 @@ mod tests {
             resources::Resources,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
-        kube::api::ObjectMeta,
         role_utils::GenericRoleConfig,
     };
 
@@ -258,8 +253,102 @@ mod tests {
     use crate::{
         controller::ValidatedOpenSearchConfig,
         crd::NodeRoles,
-        framework::{ClusterName, ProductVersion, role_utils::GenericProductSpecificCommonConfig},
+        framework::{
+            ClusterName, ProductVersion, RoleGroupName,
+            role_utils::GenericProductSpecificCommonConfig,
+        },
     };
+
+    pub fn node_config(
+        replicas: u16,
+        config_settings: &[(&str, &str)],
+        env_vars: &[(&str, &str)],
+    ) -> NodeConfig {
+        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
+            .expect("should be a valid ProductImage");
+
+        let role_group_config = OpenSearchRoleGroupConfig {
+            replicas,
+            config: ValidatedOpenSearchConfig {
+                affinity: StackableAffinity::default(),
+                node_roles: NodeRoles(vec![
+                    v1alpha1::NodeRole::ClusterManager,
+                    v1alpha1::NodeRole::Data,
+                    v1alpha1::NodeRole::Ingest,
+                    v1alpha1::NodeRole::RemoteClusterClient,
+                ]),
+                resources: Resources::default(),
+                termination_grace_period_seconds: 30,
+                listener_class: "cluster-internal".to_string(),
+            },
+            config_overrides: [(
+                CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
+                config_settings
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            )]
+            .into(),
+            env_overrides: EnvVarSet::new().with_values(
+                env_vars
+                    .iter()
+                    .map(|(k, v)| (EnvVarName::from_str_unsafe(k), *v)),
+            ),
+            cli_overrides: BTreeMap::default(),
+            pod_overrides: PodTemplateSpec::default(),
+            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+        };
+
+        let cluster = ValidatedCluster::new(
+            image.clone(),
+            ProductVersion::from_str_unsafe(image.product_version()),
+            ClusterName::from_str_unsafe("my-opensearch-cluster"),
+            "default".to_owned(),
+            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            GenericRoleConfig::default(),
+            [(
+                RoleGroupName::from_str_unsafe("default"),
+                role_group_config.clone(),
+            )]
+            .into(),
+        );
+
+        NodeConfig::new(
+            cluster,
+            role_group_config,
+            "my-opensearch-cluster-manager".to_owned(),
+        )
+    }
+
+    #[test]
+    pub fn test_static_opensearch_config_file() {
+        let node_config = node_config(2, &[("test", "value")], &[]);
+
+        assert_eq!(
+            concat!(
+                "cluster.name: \"my-opensearch-cluster\"\n",
+                "discovery.type: \"zen\"\n",
+                "network.host: \"0.0.0.0\"\n",
+                "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
+                "test: \"value\""
+            )
+            .to_owned(),
+            node_config.static_opensearch_config_file()
+        );
+    }
+
+    #[test]
+    pub fn test_tls_on_http_port_enabled() {
+        let node_config_tls_undefined = node_config(2, &[], &[]);
+        let node_config_tls_enabled =
+            node_config(2, &[("plugins.security.ssl.http.enabled", "true")], &[]);
+        let node_config_tls_disabled =
+            node_config(2, &[("plugins.security.ssl.http.enabled", "false")], &[]);
+
+        assert!(!node_config_tls_undefined.tls_on_http_port_enabled());
+        assert!(node_config_tls_enabled.tls_on_http_port_enabled());
+        assert!(!node_config_tls_disabled.tls_on_http_port_enabled());
+    }
 
     #[test]
     pub fn test_value_as_bool() {
@@ -300,52 +389,14 @@ mod tests {
 
     #[test]
     pub fn test_environment_variables() {
-        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.0.0"}"#)
-            .expect("should be a valid ProductImage");
-        let cluster = ValidatedCluster {
-            metadata: ObjectMeta::default(),
-            image: image.clone(),
-            product_version: ProductVersion::from_str(image.product_version())
-                .expect("should be a valid ProductVersion"),
-            name: ClusterName::from_str("my-opensearch-cluster")
-                .expect("should be a valid ClusterName"),
-            namespace: "default".to_owned(),
-            uid: "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
-            role_config: GenericRoleConfig::default(),
-            role_group_configs: BTreeMap::new(),
-        };
-
-        let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: 1,
-            config: ValidatedOpenSearchConfig {
-                affinity: StackableAffinity::default(),
-                node_roles: NodeRoles::default(),
-                resources: Resources::default(),
-                termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
-            },
-            config_overrides: HashMap::default(),
-            env_overrides: EnvVarSet::new()
-                .with_value(EnvVarName::from_str_unsafe("TEST"), "value"),
-            cli_overrides: BTreeMap::default(),
-            pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
-        };
-
-        let node_config = NodeConfig::new(
-            cluster,
-            role_group_config,
-            "my-opensearch-cluster-manager".to_owned(),
-        );
-
-        let env_vars = node_config.environment_variables();
+        let node_config = node_config(2, &[], &[("TEST", "value")]);
 
         assert_eq!(
             EnvVarSet::new()
                 .with_value(EnvVarName::from_str_unsafe("TEST"), "value",)
                 .with_value(
                     EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
-                    "",
+                    "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1",
                 )
                 .with_value(
                     EnvVarName::from_str_unsafe("discovery.seed_hosts"),
@@ -355,8 +406,41 @@ mod tests {
                     EnvVarName::from_str_unsafe("node.name"),
                     FieldPathEnvVar::Name
                 )
-                .with_value(EnvVarName::from_str_unsafe("node.roles"), "",),
-            env_vars
+                .with_value(
+                    EnvVarName::from_str_unsafe("node.roles"),
+                    "cluster_manager,data,ingest,remote_cluster_client"
+                ),
+            node_config.environment_variables()
+        );
+    }
+
+    #[test]
+    pub fn test_discovery_type() {
+        let node_config_single_node = node_config(1, &[], &[]);
+        let node_config_multiple_nodes = node_config(2, &[], &[]);
+
+        assert_eq!(
+            "single-node".to_owned(),
+            node_config_single_node.discovery_type()
+        );
+        assert_eq!(
+            "zen".to_owned(),
+            node_config_multiple_nodes.discovery_type()
+        );
+    }
+
+    #[test]
+    pub fn test_initial_cluster_manager_nodes() {
+        let node_config_single_node = node_config(1, &[], &[]);
+        let node_config_multiple_nodes = node_config(3, &[], &[]);
+
+        assert_eq!(
+            "".to_owned(),
+            node_config_single_node.initial_cluster_manager_nodes()
+        );
+        assert_eq!(
+            "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned(),
+            node_config_multiple_nodes.initial_cluster_manager_nodes()
         );
     }
 }

@@ -11,7 +11,8 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display(
-        "invalid environment variable name: a valid environment variable name must consist only of printable ASCII characters other than '='"
+        "invalid environment variable name: a valid environment variable name must not be empty \
+        and must consist only of printable ASCII characters other than '='"
     ))]
     ParseEnvVarName { env_var_name: String },
 }
@@ -37,9 +38,7 @@ impl FromStr for EnvVarName {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // The length of the environment variable names seems not to be restricted.
 
-        if s.find(|c: char| !c.is_ascii_graphic() || c == '=')
-            .is_none()
-        {
+        if !s.is_empty() && s.chars().all(|c| matches!(c, ' '..='<' | '>'..='~')) {
             Ok(Self(s.to_owned()))
         } else {
             Err(Error::ParseEnvVarName {
@@ -124,5 +123,160 @@ impl EnvVarSet {
 impl From<EnvVarSet> for Vec<EnvVar> {
     fn from(value: EnvVarSet) -> Self {
         value.0.values().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use stackable_operator::{
+        builder::pod::container::FieldPathEnvVar,
+        k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+    };
+
+    use super::{EnvVarName, EnvVarSet};
+
+    #[test]
+    fn test_envvarname_fromstr() {
+        // actually accepted by Kubernetes
+        assert!(EnvVarName::from_str(" !\"#$%&'()*+,-./0123456789:;<>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~").is_ok());
+
+        // empty string
+        assert!(EnvVarName::from_str("").is_err());
+        // non-printable ASCII characters
+        assert!(EnvVarName::from_str("\n").is_err());
+        assert!(EnvVarName::from_str("€").is_err());
+        // equals sign
+        assert!(EnvVarName::from_str("=").is_err());
+    }
+
+    #[test]
+    fn test_envvarname_format() {
+        assert_eq!(
+            "TEST".to_owned(),
+            format!("{}", EnvVarName::from_str_unsafe("TEST"))
+        );
+    }
+
+    #[test]
+    fn test_envvarset_merge() {
+        let env_var_set1 = EnvVarSet::new().with_values([
+            (
+                EnvVarName::from_str_unsafe("ENV1"),
+                "value1 from env_var_set1",
+            ),
+            (
+                EnvVarName::from_str_unsafe("ENV2"),
+                "value2 from env_var_set1",
+            ),
+            (
+                EnvVarName::from_str_unsafe("ENV3"),
+                "value3 from env_var_set1",
+            ),
+        ]);
+        let env_var_set2 = EnvVarSet::new()
+            .with_value(
+                EnvVarName::from_str_unsafe("ENV2"),
+                "value2 from env_var_set2",
+            )
+            .with_field_path(EnvVarName::from_str_unsafe("ENV3"), FieldPathEnvVar::Name)
+            .with_value(
+                EnvVarName::from_str_unsafe("ENV4"),
+                "value4 from env_var_set2",
+            );
+
+        let merged_env_var_set = env_var_set1.merge(env_var_set2);
+
+        assert_eq!(
+            vec![
+                EnvVar {
+                    name: "ENV1".to_owned(),
+                    value: Some("value1 from env_var_set1".to_owned()),
+                    value_from: None
+                },
+                EnvVar {
+                    name: "ENV2".to_owned(),
+                    value: Some("value2 from env_var_set2".to_owned()),
+                    value_from: None
+                },
+                EnvVar {
+                    name: "ENV3".to_owned(),
+                    value: None,
+                    value_from: Some(EnvVarSource {
+                        field_ref: Some(ObjectFieldSelector {
+                            field_path: "metadata.name".to_owned(),
+                            ..ObjectFieldSelector::default()
+                        }),
+                        ..EnvVarSource::default()
+                    }),
+                },
+                EnvVar {
+                    name: "ENV4".to_owned(),
+                    value: Some("value4 from env_var_set2".to_owned()),
+                    value_from: None
+                }
+            ],
+            Vec::from(merged_env_var_set)
+        );
+    }
+
+    #[test]
+    fn test_envvarset_with_values() {
+        let env_var_set = EnvVarSet::new().with_values([
+            (EnvVarName::from_str_unsafe("ENV1"), "value1"),
+            (EnvVarName::from_str_unsafe("ENV2"), "value2"),
+        ]);
+
+        assert_eq!(
+            vec![
+                EnvVar {
+                    name: "ENV1".to_owned(),
+                    value: Some("value1".to_owned()),
+                    value_from: None
+                },
+                EnvVar {
+                    name: "ENV2".to_owned(),
+                    value: Some("value2".to_owned()),
+                    value_from: None
+                }
+            ],
+            Vec::from(env_var_set)
+        );
+    }
+
+    #[test]
+    fn test_envvarset_with_value() {
+        let env_var_set = EnvVarSet::new().with_value(EnvVarName::from_str_unsafe("ENV"), "value");
+
+        assert_eq!(
+            Some(&EnvVar {
+                name: "ENV".to_owned(),
+                value: Some("value".to_owned()),
+                value_from: None
+            }),
+            env_var_set.get(EnvVarName::from_str_unsafe("ENV"))
+        );
+    }
+
+    #[test]
+    fn test_envvarset_with_field_path() {
+        let env_var_set = EnvVarSet::new()
+            .with_field_path(EnvVarName::from_str_unsafe("ENV"), FieldPathEnvVar::Name);
+
+        assert_eq!(
+            Some(&EnvVar {
+                name: "ENV".to_owned(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    field_ref: Some(ObjectFieldSelector {
+                        field_path: "metadata.name".to_owned(),
+                        ..ObjectFieldSelector::default()
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            }),
+            env_var_set.get(EnvVarName::from_str_unsafe("ENV"))
+        );
     }
 }

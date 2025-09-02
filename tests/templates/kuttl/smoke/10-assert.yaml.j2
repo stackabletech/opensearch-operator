@@ -131,6 +131,10 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-cluster-manager
         name: config
+      - name: security-config
+        secret:
+          defaultMode: 420
+          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
@@ -146,10 +150,6 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
-      - name: security-config
-        secret:
-          defaultMode: 420
-          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -318,6 +318,10 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-data
         name: config
+      - name: security-config
+        secret:
+          defaultMode: 420
+          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
@@ -333,10 +337,6 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
-      - name: security-config
-        secret:
-          defaultMode: 420
-          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
