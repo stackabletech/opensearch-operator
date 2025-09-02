@@ -16,6 +16,7 @@ use crate::{
     crd::v1alpha1::{self, OpenSearchConfig, OpenSearchConfigFragment},
     framework::{
         ClusterName,
+        builder::pod::container::{EnvVarName, EnvVarSet},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
     },
 };
@@ -40,6 +41,11 @@ pub enum Error {
 
     #[snafu(display("failed to set role-group name"))]
     ParseRoleGroupName { source: crate::framework::Error },
+
+    #[snafu(display("failed to parse environment variable"))]
+    ParseEnvironmentVariable {
+        source: crate::framework::builder::pod::container::Error,
+    },
 
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
@@ -125,12 +131,21 @@ fn validate_role_group_config(
         listener_class: merged_role_group.config.config.listener_class,
     };
 
+    let mut env_overrides = EnvVarSet::new();
+
+    for (env_var_name, env_var_value) in merged_role_group.config.env_overrides {
+        env_overrides = env_overrides.with_value(
+            EnvVarName::from_str(&env_var_name).context(ParseEnvironmentVariableSnafu)?,
+            env_var_value,
+        );
+    }
+
     Ok(RoleGroupConfig {
         // Kubernetes defaults to 1 if not set
         replicas: merged_role_group.replicas.unwrap_or(1),
         config: validated_config,
         config_overrides: merged_role_group.config.config_overrides,
-        env_overrides: merged_role_group.config.env_overrides,
+        env_overrides,
         cli_overrides: merged_role_group.config.cli_overrides,
         pod_overrides: merged_role_group.config.pod_overrides,
         product_specific_common_config: merged_role_group.config.product_specific_common_config,

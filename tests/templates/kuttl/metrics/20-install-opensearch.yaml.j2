@@ -38,7 +38,6 @@ spec:
         plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
         plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
         plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
-        plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     podOverrides:
       spec:
         containers:
@@ -50,8 +49,6 @@ spec:
               - name: tls
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
                 readOnly: true
-        securityContext:
-          fsGroup: 1000
         volumes:
           - name: security-config
             secret:

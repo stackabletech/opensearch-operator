@@ -60,16 +60,16 @@ spec:
                       annotations:
                         secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data2-headless
     envOverrides:
-      # TODO Make these the defaults in the image
+      # Only required for the official image
+      # The official image (built with https://github.com/opensearch-project/opensearch-build)
+      # installs a demo configuration if not disabled explicitly.
       DISABLE_INSTALL_DEMO_CONFIG: "true"
       OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
     configOverrides:
-      # TODO Add the required options to the operator
       opensearch.yml:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
         # vm.max_map_count would have to be increased to 262144 on the node.
         node.store.allow_mmap: "false"
-        # TODO Check that this is safe despite the warning in the documentation
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
         plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
@@ -79,7 +79,6 @@ spec:
         plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
         plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
         plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
-        plugins.security.authcz.admin_dn: "CN=generated certificate for pod"
     podOverrides:
       spec:
         containers:
@@ -89,11 +88,8 @@ spec:
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
                 readOnly: true
               - name: tls
-                # The Java policy allows reading from ${OPENSEARCH_HOME}/config.
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
                 readOnly: true
-        securityContext:
-          fsGroup: 1000
         volumes:
           - name: security-config
             secret:

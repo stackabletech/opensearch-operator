@@ -22,7 +22,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         RoleGroupName,
-        builder::meta::ownerreference_from_resource,
+        builder::{meta::ownerreference_from_resource, pod::container::EnvVarName},
         kvp::label::{recommended_labels, role_group_selector, role_selector},
         listener::listener_pvc,
         role_group_utils::ResourceNames,
@@ -235,7 +235,8 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
-        // TODO Check the maximum length at compile-time
+        // It is not possible to check the infallibility of the following statement at
+        // compile-time. Instead, it is tested in `tests::test_build_node_role_label`.
         Label::try_from((
             format!("stackable.tech/opensearch-role.{node_role}"),
             "true".to_string(),
@@ -276,13 +277,13 @@ impl<'a> RoleGroupBuilder<'a> {
 
         // Use `OPENSEARCH_HOME` from envOverrides or default to `DEFAULT_OPENSEARCH_HOME`.
         let opensearch_home = env_vars
-            .get_env_var("OPENSEARCH_HOME")
+            .get(EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned());
         // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `{OPENSEARCH_HOME}/config`,
         // i.e. depend on `OPENSEARCH_HOME`.
         let opensearch_path_conf = env_vars
-            .get_env_var("OPENSEARCH_PATH_CONF")
+            .get(EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"));
 
@@ -482,7 +483,17 @@ impl<'a> RoleGroupBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
+    use strum::IntoEnumIterator;
+
     use super::RoleGroupBuilder;
+    use crate::crd::v1alpha1;
+
+    #[test]
+    fn test_build_node_role_label() {
+        for node_role in v1alpha1::NodeRole::iter() {
+            RoleGroupBuilder::build_node_role_label(&node_role);
+        }
+    }
 
     #[test]
     pub fn test_prometheus_labels() {

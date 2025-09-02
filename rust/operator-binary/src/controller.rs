@@ -185,7 +185,6 @@ impl IsLabelValue for ValidatedCluster {
     }
 }
 
-// TODO Remove boilerplate (like derive_more)
 impl Resource for ValidatedCluster {
     type DynamicType =
         <v1alpha1::OpenSearchCluster as stackable_operator::kube::Resource>::DynamicType;
