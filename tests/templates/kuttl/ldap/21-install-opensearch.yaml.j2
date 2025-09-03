@@ -27,6 +27,11 @@ spec:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
         # vm.max_map_count would have to be increased to 262144 on the node.
         node.store.allow_mmap: "false"
+        # Disable the disk allocation decider in this test; Otherwise the test depends on the disk
+        # usage of the node and if the relative watermark set in
+        # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
+        # not be created even if enough disk space would be available.
+        cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
         plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
