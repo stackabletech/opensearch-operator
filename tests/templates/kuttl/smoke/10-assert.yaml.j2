@@ -399,6 +399,7 @@ metadata:
 data:
   opensearch.yml: |-
     cluster.name: "opensearch"
+    cluster.routing.allocation.disk.threshold_enabled: "false"
     discovery.type: "zen"
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
@@ -433,6 +434,7 @@ metadata:
 data:
   opensearch.yml: |-
     cluster.name: "opensearch"
+    cluster.routing.allocation.disk.threshold_enabled: "false"
     discovery.type: "zen"
     network.host: "0.0.0.0"
     node.store.allow_mmap: "false"
