@@ -250,7 +250,7 @@ impl v1alpha1::OpenSearchConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-pub struct NodeRoles(Vec<v1alpha1::NodeRole>);
+pub struct NodeRoles(pub Vec<v1alpha1::NodeRole>);
 
 impl NodeRoles {
     pub fn contains(&self, node_role: &v1alpha1::NodeRole) -> bool {
