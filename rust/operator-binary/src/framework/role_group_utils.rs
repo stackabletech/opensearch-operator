@@ -79,24 +79,36 @@ impl ResourceNames {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use super::{ClusterName, RoleGroupName, RoleName};
     use crate::framework::role_group_utils::ResourceNames;
 
     #[test]
-    fn test_stateful_set_name() {
+    fn test_resource_names() {
         let resource_names = ResourceNames {
-            cluster_name: ClusterName::from_str("test-cluster")
-                .expect("should be a valid cluster name"),
-            role_name: RoleName::from_str("data-nodes").expect("should be a valid role name"),
-            role_group_name: RoleGroupName::from_str("ssd-storage")
-                .expect("should be a valid role group name"),
+            cluster_name: ClusterName::from_str_unsafe("test-cluster"),
+            role_name: RoleName::from_str_unsafe("data-nodes"),
+            role_group_name: RoleGroupName::from_str_unsafe("ssd-storage"),
         };
 
         assert_eq!(
             "test-cluster-data-nodes-ssd-storage",
+            resource_names.qualified_role_group_name()
+        );
+        assert_eq!(
+            "test-cluster-data-nodes-ssd-storage",
+            resource_names.role_group_config_map()
+        );
+        assert_eq!(
+            "test-cluster-data-nodes-ssd-storage",
             resource_names.stateful_set_name()
+        );
+        assert_eq!(
+            "test-cluster-data-nodes-ssd-storage-headless",
+            resource_names.headless_service_name()
+        );
+        assert_eq!(
+            "test-cluster-data-nodes-ssd-storage",
+            resource_names.listener_service_name()
         );
     }
 }

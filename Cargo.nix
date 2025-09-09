@@ -2475,6 +2475,21 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "std" ];
       };
+      "futures-timer" = rec {
+        crateName = "futures-timer";
+        version = "3.0.3";
+        edition = "2018";
+        sha256 = "094vw8k37djpbwv74bwf2qb7n6v6ghif4myss6smd6hgyajb127j";
+        libName = "futures_timer";
+        authors = [
+          "Alex Crichton <alex@alexcrichton.com>"
+        ];
+        features = {
+          "gloo-timers" = [ "dep:gloo-timers" ];
+          "send_wrapper" = [ "dep:send_wrapper" ];
+          "wasm-bindgen" = [ "gloo-timers" "send_wrapper" ];
+        };
+      };
       "futures-util" = rec {
         crateName = "futures-util";
         version = "0.3.31";
@@ -6405,6 +6420,25 @@ rec {
         };
         resolvedDefaultFeatures = [ "simd" "std" ];
       };
+      "proc-macro-crate" = rec {
+        crateName = "proc-macro-crate";
+        version = "3.3.0";
+        edition = "2021";
+        sha256 = "0d9xlymplfi9yv3f5g4bp0d6qh70apnihvqcjllampx4f5lmikpd";
+        libName = "proc_macro_crate";
+        authors = [
+          "Bastian Köcher <git@kchr.de>"
+        ];
+        dependencies = [
+          {
+            name = "toml_edit";
+            packageId = "toml_edit";
+            usesDefaultFeatures = false;
+            features = [ "parse" ];
+          }
+        ];
+
+      };
       "proc-macro2" = rec {
         crateName = "proc-macro2";
         version = "1.0.95";
@@ -6931,6 +6965,20 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" "unicode" "unicode-age" "unicode-bool" "unicode-case" "unicode-gencat" "unicode-perl" "unicode-script" "unicode-segment" ];
       };
+      "relative-path" = rec {
+        crateName = "relative-path";
+        version = "1.9.3";
+        edition = "2021";
+        sha256 = "1limlh8fzwi21g0473fqzd6fln9iqkwvzp3816bxi31pkilz6fds";
+        libName = "relative_path";
+        authors = [
+          "John-John Tedro <udoprog@tedro.se>"
+        ];
+        features = {
+          "serde" = [ "dep:serde" ];
+        };
+        resolvedDefaultFeatures = [ "default" ];
+      };
       "reqwest" = rec {
         crateName = "reqwest";
         version = "0.12.22";
@@ -7224,6 +7272,99 @@ rec {
         };
         resolvedDefaultFeatures = [ "alloc" "default" "dev_urandom_fallback" ];
       };
+      "rstest" = rec {
+        crateName = "rstest";
+        version = "0.26.1";
+        edition = "2021";
+        sha256 = "0jcxhg9mxlr2p9an14algbcq6ax7r0sk1w1kbals5aiv0qy1k8zm";
+        authors = [
+          "Michele d'Amico <michele.damico@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "futures-timer";
+            packageId = "futures-timer";
+            optional = true;
+          }
+          {
+            name = "futures-util";
+            packageId = "futures-util";
+            optional = true;
+          }
+          {
+            name = "rstest_macros";
+            packageId = "rstest_macros";
+            usesDefaultFeatures = false;
+          }
+        ];
+        features = {
+          "async-timeout" = [ "dep:futures-timer" "dep:futures-util" "rstest_macros/async-timeout" ];
+          "crate-name" = [ "rstest_macros/crate-name" ];
+          "default" = [ "async-timeout" "crate-name" ];
+        };
+        resolvedDefaultFeatures = [ "async-timeout" "crate-name" "default" ];
+      };
+      "rstest_macros" = rec {
+        crateName = "rstest_macros";
+        version = "0.26.1";
+        edition = "2021";
+        sha256 = "185v185wn2x3llp3nn1i7h44vi5ffnnsj8b1a32m2ygzy08m714w";
+        procMacro = true;
+        authors = [
+          "Michele d'Amico <michele.damico@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "cfg-if";
+            packageId = "cfg-if";
+          }
+          {
+            name = "glob";
+            packageId = "glob";
+          }
+          {
+            name = "proc-macro-crate";
+            packageId = "proc-macro-crate";
+            optional = true;
+          }
+          {
+            name = "proc-macro2";
+            packageId = "proc-macro2";
+          }
+          {
+            name = "quote";
+            packageId = "quote";
+          }
+          {
+            name = "regex";
+            packageId = "regex";
+          }
+          {
+            name = "relative-path";
+            packageId = "relative-path";
+          }
+          {
+            name = "syn";
+            packageId = "syn 2.0.104";
+            features = [ "full" "parsing" "extra-traits" "visit" "visit-mut" ];
+          }
+          {
+            name = "unicode-ident";
+            packageId = "unicode-ident";
+          }
+        ];
+        buildDependencies = [
+          {
+            name = "rustc_version";
+            packageId = "rustc_version";
+          }
+        ];
+        features = {
+          "crate-name" = [ "dep:proc-macro-crate" ];
+          "default" = [ "async-timeout" "crate-name" ];
+        };
+        resolvedDefaultFeatures = [ "async-timeout" "crate-name" ];
+      };
       "rustc-demangle" = rec {
         crateName = "rustc-demangle";
         version = "0.1.25";
@@ -7237,6 +7378,19 @@ rec {
           "core" = [ "dep:core" ];
           "rustc-dep-of-std" = [ "core" ];
         };
+      };
+      "rustc_version" = rec {
+        crateName = "rustc_version";
+        version = "0.4.1";
+        edition = "2018";
+        sha256 = "14lvdsmr5si5qbqzrajgb6vfn69k0sfygrvfvr2mps26xwi3mjyg";
+        dependencies = [
+          {
+            name = "semver";
+            packageId = "semver";
+          }
+        ];
+
       };
       "rustls" = rec {
         crateName = "rustls";
@@ -8406,6 +8560,12 @@ rec {
             name = "built";
             packageId = "built";
             features = [ "chrono" "git2" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "rstest";
+            packageId = "rstest";
           }
         ];
 
@@ -9617,6 +9777,46 @@ rec {
           "tracing" = [ "dep:tracing" ];
         };
         resolvedDefaultFeatures = [ "codec" "default" "io" "slab" "time" ];
+      };
+      "toml_datetime" = rec {
+        crateName = "toml_datetime";
+        version = "0.6.11";
+        edition = "2021";
+        sha256 = "077ix2hb1dcya49hmi1avalwbixmrs75zgzb3b2i7g2gizwdmk92";
+        features = {
+          "serde" = [ "dep:serde" ];
+        };
+      };
+      "toml_edit" = rec {
+        crateName = "toml_edit";
+        version = "0.22.27";
+        edition = "2021";
+        sha256 = "16l15xm40404asih8vyjvnka9g0xs9i4hfb6ry3ph9g419k8rzj1";
+        dependencies = [
+          {
+            name = "indexmap";
+            packageId = "indexmap 2.10.0";
+            features = [ "std" ];
+          }
+          {
+            name = "toml_datetime";
+            packageId = "toml_datetime";
+          }
+          {
+            name = "winnow";
+            packageId = "winnow";
+            optional = true;
+          }
+        ];
+        features = {
+          "default" = [ "parse" "display" ];
+          "display" = [ "dep:toml_write" ];
+          "parse" = [ "dep:winnow" ];
+          "perf" = [ "dep:kstring" ];
+          "serde" = [ "dep:serde" "toml_datetime/serde" "dep:serde_spanned" ];
+          "unstable-debug" = [ "winnow?/debug" ];
+        };
+        resolvedDefaultFeatures = [ "parse" ];
       };
       "tonic" = rec {
         crateName = "tonic";
@@ -12324,6 +12524,28 @@ rec {
           "Microsoft"
         ];
 
+      };
+      "winnow" = rec {
+        crateName = "winnow";
+        version = "0.7.13";
+        edition = "2021";
+        sha256 = "1krrjc1wj2vx0r57m9nwnlc1zrhga3fq41d8w9hysvvqb5mj7811";
+        dependencies = [
+          {
+            name = "memchr";
+            packageId = "memchr";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+        ];
+        features = {
+          "debug" = [ "std" "dep:anstream" "dep:anstyle" "dep:is_terminal_polyfill" "dep:terminal_size" ];
+          "default" = [ "std" ];
+          "simd" = [ "dep:memchr" ];
+          "std" = [ "alloc" "memchr?/std" ];
+          "unstable-doc" = [ "alloc" "std" "simd" "unstable-recover" ];
+        };
+        resolvedDefaultFeatures = [ "alloc" "default" "std" ];
       };
       "wit-bindgen-rt" = rec {
         crateName = "wit-bindgen-rt";

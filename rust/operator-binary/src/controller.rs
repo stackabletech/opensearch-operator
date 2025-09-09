@@ -54,13 +54,17 @@ impl Context {
     pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
         Context {
             client,
-            names: ContextNames {
-                product_name: ProductName::from_str("opensearch")
-                    .expect("should be a valid product name"),
-                operator_name,
-                controller_name: ControllerName::from_str("opensearchcluster")
-                    .expect("should be a valid controller name"),
-            },
+            names: Self::context_names(operator_name),
+        }
+    }
+
+    fn context_names(operator_name: OperatorName) -> ContextNames {
+        ContextNames {
+            product_name: ProductName::from_str("opensearch")
+                .expect("should be a valid product name"),
+            operator_name,
+            controller_name: ControllerName::from_str("opensearchcluster")
+                .expect("should be a valid controller name"),
         }
     }
 
@@ -106,11 +110,14 @@ impl ReconcilerError for Error {
 type OpenSearchRoleGroupConfig =
     RoleGroupConfig<GenericProductSpecificCommonConfig, ValidatedOpenSearchConfig>;
 
+type OpenSearchNodeResources =
+    stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
     pub node_roles: NodeRoles,
-    pub resources: stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>,
+    pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
     pub listener_class: String,
 }
@@ -132,6 +139,32 @@ pub struct ValidatedCluster {
 }
 
 impl ValidatedCluster {
+    pub fn new(
+        image: ProductImage,
+        product_version: ProductVersion,
+        name: ClusterName,
+        namespace: String,
+        uid: String,
+        role_config: GenericRoleConfig,
+        role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+    ) -> Self {
+        ValidatedCluster {
+            metadata: ObjectMeta {
+                name: Some(name.to_object_name()),
+                namespace: Some(namespace.clone()),
+                uid: Some(uid.clone()),
+                ..ObjectMeta::default()
+            },
+            image,
+            product_version,
+            name,
+            namespace,
+            uid,
+            role_config,
+            role_group_configs,
+        }
+    }
+
     pub fn role_name() -> RoleName {
         RoleName::from_str("nodes").expect("should be a valid role name")
     }
@@ -177,7 +210,6 @@ impl HasUid for ValidatedCluster {
     }
 }
 
-// ?
 impl IsLabelValue for ValidatedCluster {
     fn to_label_value(&self) -> String {
         // opinionated!
@@ -282,4 +314,149 @@ struct KubernetesResources<T> {
     role_bindings: Vec<RoleBinding>,
     pod_disruption_budgets: Vec<PodDisruptionBudget>,
     status: PhantomData<T>,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use stackable_operator::{
+        commons::affinity::StackableAffinity, k8s_openapi::api::core::v1::PodTemplateSpec,
+        role_utils::GenericRoleConfig,
+    };
+
+    use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster};
+    use crate::{
+        controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
+        crd::{NodeRoles, v1alpha1},
+        framework::{
+            ClusterName, OperatorName, ProductVersion, RoleGroupName,
+            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+        },
+    };
+
+    #[test]
+    fn test_context_names() {
+        // Test that the function does not panic
+        Context::context_names(OperatorName::from_str_unsafe("my-operator"));
+    }
+
+    #[test]
+    fn test_validated_cluster_role_name() {
+        // Test that the function does not panic
+        ValidatedCluster::role_name();
+    }
+
+    #[test]
+    fn test_validated_cluster_is_single_node() {
+        let validated_cluster = validated_cluster();
+
+        assert!(!validated_cluster.is_single_node());
+    }
+
+    #[test]
+    fn test_validated_cluster_node_count() {
+        let validated_cluster = validated_cluster();
+
+        assert_eq!(18, validated_cluster.node_count());
+    }
+
+    #[test]
+    fn test_validated_cluster_role_group_configs_filtered_by_node_role() {
+        let validated_cluster = validated_cluster();
+
+        assert_eq!(
+            BTreeMap::from([
+                (
+                    RoleGroupName::from_str_unsafe("data1"),
+                    role_group_config(
+                        4,
+                        &[
+                            v1alpha1::NodeRole::Ingest,
+                            v1alpha1::NodeRole::Data,
+                            v1alpha1::NodeRole::RemoteClusterClient,
+                        ],
+                    ),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("data2"),
+                    role_group_config(
+                        6,
+                        &[
+                            v1alpha1::NodeRole::Ingest,
+                            v1alpha1::NodeRole::Data,
+                            v1alpha1::NodeRole::RemoteClusterClient,
+                        ],
+                    ),
+                ),
+            ]),
+            validated_cluster.role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::Data)
+        );
+    }
+
+    fn validated_cluster() -> ValidatedCluster {
+        ValidatedCluster::new(
+            serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
+                .expect("should be a valid ProductImage structure"),
+            ProductVersion::from_str_unsafe("3.1.0"),
+            ClusterName::from_str_unsafe("my-opensearch"),
+            "default".to_owned(),
+            "e6ac237d-a6d4-43a1-8135-f36506110912".to_owned(),
+            GenericRoleConfig::default(),
+            [
+                (
+                    RoleGroupName::from_str_unsafe("coordinating"),
+                    role_group_config(5, &[v1alpha1::NodeRole::CoordinatingOnly]),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("cluster-manager"),
+                    role_group_config(3, &[v1alpha1::NodeRole::ClusterManager]),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("data1"),
+                    role_group_config(
+                        4,
+                        &[
+                            v1alpha1::NodeRole::Ingest,
+                            v1alpha1::NodeRole::Data,
+                            v1alpha1::NodeRole::RemoteClusterClient,
+                        ],
+                    ),
+                ),
+                (
+                    RoleGroupName::from_str_unsafe("data2"),
+                    role_group_config(
+                        6,
+                        &[
+                            v1alpha1::NodeRole::Ingest,
+                            v1alpha1::NodeRole::Data,
+                            v1alpha1::NodeRole::RemoteClusterClient,
+                        ],
+                    ),
+                ),
+            ]
+            .into(),
+        )
+    }
+
+    fn role_group_config(
+        replicas: u16,
+        node_roles: &[v1alpha1::NodeRole],
+    ) -> OpenSearchRoleGroupConfig {
+        OpenSearchRoleGroupConfig {
+            replicas,
+            config: ValidatedOpenSearchConfig {
+                affinity: StackableAffinity::default(),
+                node_roles: NodeRoles(node_roles.to_vec()),
+                resources: OpenSearchNodeResources::default(),
+                termination_grace_period_seconds: 120,
+                listener_class: "external-stable".to_owned(),
+            },
+            config_overrides: HashMap::default(),
+            env_overrides: EnvVarSet::default(),
+            cli_overrides: BTreeMap::default(),
+            pod_overrides: PodTemplateSpec::default(),
+            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+        }
+    }
 }

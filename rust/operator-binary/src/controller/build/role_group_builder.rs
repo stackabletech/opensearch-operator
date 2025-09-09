@@ -483,27 +483,504 @@ impl<'a> RoleGroupBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use serde_json::json;
+    use stackable_operator::{
+        commons::{
+            affinity::StackableAffinity, product_image_selection::ProductImage,
+            resources::Resources,
+        },
+        k8s_openapi::api::core::v1::PodTemplateSpec,
+        role_utils::GenericRoleConfig,
+    };
     use strum::IntoEnumIterator;
 
     use super::RoleGroupBuilder;
-    use crate::crd::v1alpha1;
+    use crate::{
+        controller::{
+            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedOpenSearchConfig,
+        },
+        crd::{NodeRoles, v1alpha1},
+        framework::{
+            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
+            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+        },
+    };
+
+    fn context_names() -> ContextNames {
+        ContextNames {
+            product_name: ProductName::from_str_unsafe("opensearch"),
+            operator_name: OperatorName::from_str_unsafe("opensearch.stackable.tech"),
+            controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
+        }
+    }
+
+    fn validated_cluster() -> ValidatedCluster {
+        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
+            .expect("should be a valid ProductImage");
+
+        let role_group_config = OpenSearchRoleGroupConfig {
+            replicas: 1,
+            config: ValidatedOpenSearchConfig {
+                affinity: StackableAffinity::default(),
+                node_roles: NodeRoles(vec![
+                    v1alpha1::NodeRole::ClusterManager,
+                    v1alpha1::NodeRole::Data,
+                    v1alpha1::NodeRole::Ingest,
+                    v1alpha1::NodeRole::RemoteClusterClient,
+                ]),
+                resources: Resources::default(),
+                termination_grace_period_seconds: 30,
+                listener_class: "cluster-internal".to_string(),
+            },
+            config_overrides: HashMap::default(),
+            env_overrides: EnvVarSet::default(),
+            cli_overrides: BTreeMap::default(),
+            pod_overrides: PodTemplateSpec::default(),
+            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+        };
+
+        ValidatedCluster::new(
+            image.clone(),
+            ProductVersion::from_str_unsafe(image.product_version()),
+            ClusterName::from_str_unsafe("my-opensearch-cluster"),
+            "default".to_owned(),
+            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            GenericRoleConfig::default(),
+            [(
+                RoleGroupName::from_str_unsafe("default"),
+                role_group_config.clone(),
+            )]
+            .into(),
+        )
+    }
+
+    fn role_group_builder<'a>(context_names: &'a ContextNames) -> RoleGroupBuilder<'a> {
+        let cluster = validated_cluster();
+
+        let (role_group_name, role_group_config) = cluster
+            .role_group_configs
+            .first_key_value()
+            .expect("should be set");
+
+        let role_group_name = role_group_name.to_owned();
+        let role_group_config = role_group_config.to_owned();
+
+        RoleGroupBuilder::new(
+            "my-opensearch-cluster-serviceaccount".to_owned(),
+            cluster,
+            role_group_name,
+            role_group_config,
+            context_names,
+            "my-opensearch-cluster".to_owned(),
+        )
+    }
+
+    #[test]
+    fn test_build_config_map() {
+        let context_names = context_names();
+        let role_group_builder = role_group_builder(&context_names);
+
+        let config_map = serde_json::to_value(role_group_builder.build_config_map())
+            .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/role-group": "default",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "stackable.tech/vendor": "Stackable"
+                    },
+                    "name": "my-opensearch-cluster-nodes-default",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+                        }
+                    ]
+                },
+                "data": {
+                    "opensearch.yml": concat!(
+                        "cluster.name: \"my-opensearch-cluster\"\n",
+                        "discovery.type: \"single-node\"\n",
+                        "network.host: \"0.0.0.0\"\n",
+                        "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]"
+                    )
+                }
+            }),
+            config_map
+        );
+    }
+
+    #[test]
+    fn test_build_stateful_set() {
+        let context_names = context_names();
+        let role_group_builder = role_group_builder(&context_names);
+
+        let stateful_set = serde_json::to_value(role_group_builder.build_stateful_set())
+            .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "apps/v1",
+                "kind": "StatefulSet",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/role-group": "default",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "stackable.tech/vendor": "Stackable"
+                    },
+                    "name": "my-opensearch-cluster-nodes-default",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+                        }
+                    ]
+                },
+                "spec": {
+                    "podManagementPolicy": "Parallel",
+                    "replicas": 1,
+                    "selector": {
+                        "matchLabels": {
+                            "app.kubernetes.io/component": "nodes",
+                            "app.kubernetes.io/instance": "my-opensearch-cluster",
+                            "app.kubernetes.io/name": "opensearch",
+                            "app.kubernetes.io/role-group": "default"
+                        }
+                    },
+                    "serviceName": "my-opensearch-cluster-nodes-default-headless",
+                    "template": {
+                        "metadata": {
+                            "labels": {
+                                "app.kubernetes.io/component": "nodes",
+                                "app.kubernetes.io/instance": "my-opensearch-cluster",
+                                "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                                "app.kubernetes.io/name": "opensearch",
+                                "app.kubernetes.io/role-group": "default",
+                                "app.kubernetes.io/version": "3.1.0",
+                                "stackable.tech/opensearch-role.cluster_manager": "true",
+                                "stackable.tech/opensearch-role.data": "true",
+                                "stackable.tech/opensearch-role.ingest": "true",
+                                "stackable.tech/opensearch-role.remote_cluster_client": "true",
+                                "stackable.tech/vendor": "Stackable"
+                            }
+                        },
+                        "spec": {
+                            "affinity": {},
+                            "containers": [
+                                {
+                                    "args": [],
+                                    "command": [
+                                        "/stackable/opensearch/opensearch-docker-entrypoint.sh"
+                                    ],
+                                    "env": [
+                                        {
+                                            "name": "cluster.initial_cluster_manager_nodes",
+                                            "value": ""
+                                        },
+                                        {
+                                            "name": "discovery.seed_hosts",
+                                            "value": "my-opensearch-cluster"
+                                        },
+                                        {
+                                            "name": "node.name",
+                                            "valueFrom": {
+                                                "fieldRef": {
+                                                    "fieldPath": "metadata.name"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "name": "node.roles",
+                                            "value": "cluster_manager,data,ingest,remote_cluster_client"
+                                        }
+                                    ],
+                                    "image": "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev",
+                                    "imagePullPolicy": "Always",
+                                    "name": "opensearch",
+                                    "ports": [
+                                        {
+                                            "containerPort": 9200,
+                                            "name": "http"
+                                        },
+                                        {
+                                            "containerPort": 9300,
+                                            "name": "transport"
+                                        }
+                                    ],
+                                    "readinessProbe": {
+                                        "failureThreshold": 3,
+                                        "periodSeconds": 5,
+                                        "tcpSocket": {
+                                            "port": "http"
+                                        },
+                                        "timeoutSeconds": 3
+                                    },
+                                    "resources": {},
+                                    "startupProbe": {
+                                        "failureThreshold": 30,
+                                        "initialDelaySeconds": 5,
+                                        "periodSeconds": 10,
+                                        "tcpSocket": {
+                                            "port": "http"
+                                        },
+                                        "timeoutSeconds": 3
+                                    },
+                                    "volumeMounts": [
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch.yml",
+                                            "name": "config",
+                                            "readOnly": true,
+                                            "subPath": "opensearch.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/data",
+                                            "name": "data"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/listener",
+                                            "name": "listener"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "securityContext": {
+                                "fsGroup": 1000
+                            },
+                            "serviceAccountName": "my-opensearch-cluster-serviceaccount",
+                            "terminationGracePeriodSeconds": 30,
+                            "volumes": [
+                                {
+                                    "configMap": {
+                                        "name": "my-opensearch-cluster-nodes-default"
+                                    },
+                                    "name": "config"
+                                }
+                            ]
+                        }
+                    },
+                    "volumeClaimTemplates": [
+                        {
+                            "apiVersion": "v1",
+                            "kind": "PersistentVolumeClaim",
+                            "metadata": {
+                                "name": "data"
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {}
+                                }
+                            }
+                        },
+                        {
+                            "apiVersion": "v1",
+                            "kind": "PersistentVolumeClaim",
+                            "metadata": {
+                                "annotations": {
+                                    "listeners.stackable.tech/listener-name": "my-opensearch-cluster-nodes-default"
+                                },
+                                "labels": {
+                                    "app.kubernetes.io/component": "nodes",
+                                    "app.kubernetes.io/instance": "my-opensearch-cluster",
+                                    "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                                    "app.kubernetes.io/name": "opensearch",
+                                    "app.kubernetes.io/role-group": "default",
+                                    "app.kubernetes.io/version": "3.1.0",
+                                    "stackable.tech/vendor": "Stackable"
+                                },
+                                "name": "listener"
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteMany"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "listeners.stackable.tech"
+                            }
+                        }
+                    ]
+                }
+            }),
+            stateful_set
+        );
+    }
+
+    #[test]
+    fn test_build_cluster_manager_labels() {
+        let cluster_manager_labels =
+            RoleGroupBuilder::cluster_manager_labels(&validated_cluster(), &context_names());
+
+        assert_eq!(
+            BTreeMap::from(
+                [
+                    ("app.kubernetes.io/component", "nodes"),
+                    ("app.kubernetes.io/instance", "my-opensearch-cluster"),
+                    ("app.kubernetes.io/name", "opensearch"),
+                    ("stackable.tech/opensearch-role.cluster_manager", "true")
+                ]
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            ),
+            cluster_manager_labels.into()
+        );
+    }
+
+    #[test]
+    fn test_build_headless_service() {
+        let context_names = context_names();
+        let role_group_builder = role_group_builder(&context_names);
+
+        let headless_service = serde_json::to_value(role_group_builder.build_headless_service())
+            .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {
+                    "annotations": {
+                        "prometheus.io/path": "/_prometheus/metrics",
+                        "prometheus.io/port": "9200",
+                        "prometheus.io/scheme": "http",
+                        "prometheus.io/scrape": "true"
+                    },
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/role-group": "default",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "prometheus.io/scrape": "true",
+                        "stackable.tech/vendor": "Stackable"
+                    },
+                    "name": "my-opensearch-cluster-nodes-default-headless",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+                        }
+                    ]
+                },
+                "spec": {
+                    "clusterIP": "None",
+                    "ports": [
+                        {
+                            "name": "http",
+                            "port": 9200
+                        },
+                        {
+                            "name": "transport",
+                            "port": 9300
+                        }
+                    ],
+                    "publishNotReadyAddresses": true,
+                    "selector": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/role-group": "default"
+                    },
+                    "type": "ClusterIP"
+                }
+            }),
+            headless_service
+        );
+    }
+
+    #[test]
+    fn test_build_listener() {
+        let context_names = context_names();
+        let role_group_builder = role_group_builder(&context_names);
+
+        let listener = serde_json::to_value(role_group_builder.build_listener())
+            .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "listeners.stackable.tech/v1alpha1",
+                "kind": "Listener",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/role-group": "default",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "stackable.tech/vendor": "Stackable"
+                    },
+                    "name": "my-opensearch-cluster-nodes-default",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+                        }
+                    ]
+                },
+                "spec": {
+                    "className": "cluster-internal",
+                    "extraPodSelectorLabels": {},
+                    "ports": [
+                        {
+                            "name": "http",
+                            "port": 9200,
+                            "protocol": "TCP"
+                        }
+                    ],
+                    "publishNotReadyAddresses": null
+                }
+            }),
+            listener
+        );
+    }
 
     #[test]
     fn test_build_node_role_label() {
+        // Test that the function does not panic on all possible inputs
         for node_role in v1alpha1::NodeRole::iter() {
             RoleGroupBuilder::build_node_role_label(&node_role);
         }
     }
 
     #[test]
-    pub fn test_prometheus_labels() {
-        // Test that the function does not panic
-        RoleGroupBuilder::prometheus_labels();
-    }
-
-    #[test]
-    pub fn test_prometheus_annotations() {
-        // Test that the function does not panic on all possible execution paths
+    fn test_prometheus_annotations() {
+        // Test that the function does not panic on all possible inputs
         RoleGroupBuilder::prometheus_annotations(false);
         RoleGroupBuilder::prometheus_annotations(true);
     }
