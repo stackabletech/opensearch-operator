@@ -8,9 +8,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, KubernetesResources, Prepared};
-use crate::framework::{
-    HasNamespace, HasObjectName, HasUid, cluster_resources::cluster_resources_new,
-};
+use crate::framework::{ClusterName, NamespaceName, Uid, cluster_resources::cluster_resources_new};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -37,14 +35,18 @@ impl<'a> Applier<'a> {
     pub fn new(
         client: &'a Client,
         names: &ContextNames,
-        cluster: &(impl HasObjectName + HasNamespace + HasUid),
+        cluster_name: &ClusterName,
+        cluster_namespace: &NamespaceName,
+        cluster_uid: &Uid,
         apply_strategy: ClusterResourceApplyStrategy,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
             &names.product_name,
             &names.operator_name,
             &names.controller_name,
-            cluster,
+            cluster_name,
+            cluster_namespace,
+            cluster_uid,
             apply_strategy,
         );
 

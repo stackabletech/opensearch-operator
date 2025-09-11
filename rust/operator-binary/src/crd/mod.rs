@@ -26,7 +26,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter};
 
 use crate::framework::{
-    ClusterName, IsLabelValue, ProductName, RoleName,
+    ClusterName, NameIsValidLabelValue, ProductName, RoleName,
     role_utils::GenericProductSpecificCommonConfig,
 };
 

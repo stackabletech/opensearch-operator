@@ -15,7 +15,7 @@ use super::{
 use crate::{
     crd::v1alpha1::{self, OpenSearchConfig, OpenSearchConfigFragment},
     framework::{
-        ClusterName,
+        ClusterName, NamespaceName, Uid,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
     },
@@ -36,16 +36,22 @@ pub enum Error {
     #[snafu(display("failed to set cluster name"))]
     ParseClusterName { source: crate::framework::Error },
 
-    #[snafu(display("failed to set product version"))]
-    ParseProductVersion { source: crate::framework::Error },
+    #[snafu(display("failed to set cluster namespace"))]
+    ParseClusterNamespace { source: crate::framework::Error },
 
-    #[snafu(display("failed to set role-group name"))]
-    ParseRoleGroupName { source: crate::framework::Error },
+    #[snafu(display("failed to set UID"))]
+    ParseClusterUid { source: crate::framework::Error },
 
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
         source: crate::framework::builder::pod::container::Error,
     },
+
+    #[snafu(display("failed to set product version"))]
+    ParseProductVersion { source: crate::framework::Error },
+
+    #[snafu(display("failed to set role-group name"))]
+    ParseRoleGroupName { source: crate::framework::Error },
 
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
@@ -69,9 +75,11 @@ pub fn validate(
     let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
     let cluster_name = ClusterName::from_str(&raw_cluster_name).context(ParseClusterNameSnafu)?;
 
-    let namespace = cluster.namespace().context(GetClusterNamespaceSnafu)?;
+    let raw_namespace = cluster.namespace().context(GetClusterNamespaceSnafu)?;
+    let namespace = NamespaceName::from_str(&raw_namespace).context(ParseClusterNamespaceSnafu)?;
 
-    let uid = cluster.uid().context(GetClusterUidSnafu)?;
+    let raw_uid = cluster.uid().context(GetClusterUidSnafu)?;
+    let uid = Uid::from_str(&raw_uid).context(ParseClusterUidSnafu)?;
 
     let product_version = ProductVersion::from_str(cluster.spec.image.product_version())
         .context(ParseProductVersionSnafu)?;
@@ -169,6 +177,7 @@ mod tests {
         role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
         time::Duration,
     };
+    use uuid::uuid;
 
     use super::{ErrorDiscriminants, validate};
     use crate::{
@@ -178,7 +187,8 @@ mod tests {
             v1alpha1::{self, OpenSearchClusterSpec, OpenSearchConfigFragment, StorageConfig},
         },
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         },
@@ -194,8 +204,8 @@ mod tests {
                     .expect("should be a valid ProductImage structure"),
                 ProductVersion::from_str_unsafe("3.1.0"),
                 ClusterName::from_str_unsafe("my-opensearch"),
-                "default".to_owned(),
-                "e6ac237d-a6d4-43a1-8135-f36506110912".to_owned(),
+                NamespaceName::from_str_unsafe("default"),
+                uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
                 GenericRoleConfig::default(),
                 [(
                     RoleGroupName::from_str_unsafe("default"),
@@ -365,10 +375,26 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_err_parse_cluster_namespace() {
+        test_validate_err(
+            |cluster| cluster.metadata.namespace = Some("invalid cluster namespace".to_owned()),
+            ErrorDiscriminants::ParseClusterNamespace,
+        );
+    }
+
+    #[test]
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
             |cluster| cluster.metadata.uid = None,
             ErrorDiscriminants::GetClusterUid,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_parse_cluster_uid() {
+        test_validate_err(
+            |cluster| cluster.metadata.uid = Some("invalid cluster UID".to_owned()),
+            ErrorDiscriminants::ParseClusterUid,
         );
     }
 

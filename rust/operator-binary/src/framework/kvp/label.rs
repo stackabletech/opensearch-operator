@@ -4,15 +4,13 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    ControllerName, HasObjectName, IsLabelValue, OperatorName, ProductName, ProductVersion,
+    ControllerName, HasName, NameIsValidLabelValue, OperatorName, ProductName, ProductVersion,
     RoleGroupName, RoleName,
 };
 
-pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
-
 /// Infallible variant of `Labels::recommended`
 pub fn recommended_labels(
-    owner: &(impl Resource + HasObjectName + IsLabelValue),
+    owner: &(impl Resource + HasName + NameIsValidLabelValue),
     product_name: &ProductName,
     product_version: &ProductVersion,
     operator_name: &OperatorName,
@@ -35,7 +33,7 @@ pub fn recommended_labels(
 
 /// Infallible variant of `Labels::role_selector`
 pub fn role_selector(
-    owner: &(impl Resource + IsLabelValue),
+    owner: &(impl Resource + HasName + NameIsValidLabelValue),
     product_name: &ProductName,
     role_name: &RoleName,
 ) -> Labels {
@@ -49,7 +47,7 @@ pub fn role_selector(
 
 /// Infallible variant of `Labels::role_group_selector`
 pub fn role_group_selector(
-    owner: &(impl Resource + IsLabelValue),
+    owner: &(impl Resource + HasName + NameIsValidLabelValue),
     product_name: &ProductName,
     role_name: &RoleName,
     role_group_name: &RoleGroupName,
@@ -72,7 +70,7 @@ mod tests {
     };
 
     use crate::framework::{
-        ControllerName, HasObjectName, IsLabelValue, OperatorName, ProductName, ProductVersion,
+        ControllerName, HasName, NameIsValidLabelValue, OperatorName, ProductName, ProductVersion,
         RoleGroupName, RoleName,
         kvp::label::{recommended_labels, role_group_selector, role_selector},
     };
@@ -121,8 +119,8 @@ mod tests {
         }
     }
 
-    impl HasObjectName for Cluster {
-        fn to_object_name(&self) -> String {
+    impl HasName for Cluster {
+        fn to_name(&self) -> String {
             self.object_meta
                 .name
                 .clone()
@@ -130,7 +128,7 @@ mod tests {
         }
     }
 
-    impl IsLabelValue for Cluster {
+    impl NameIsValidLabelValue for Cluster {
         fn to_label_value(&self) -> String {
             self.object_meta
                 .name

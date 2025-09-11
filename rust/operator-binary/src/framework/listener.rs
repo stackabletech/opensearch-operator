@@ -4,16 +4,26 @@ use stackable_operator::{
     kvp::Labels,
 };
 
+use super::PersistentVolumeClaimName;
+
+// TODO Listener name vs. class?
+// String is bad!
+
+/// Infallible variant of `ListenerOperatorVolumeSourceBuilder::build_pvc`
 pub fn listener_pvc(
-    listener_group_name: String,
+    listener_name: String,
     labels: &Labels,
-    pvc_name: String,
+    pvc_name: &PersistentVolumeClaimName,
 ) -> PersistentVolumeClaim {
     ListenerOperatorVolumeSourceBuilder::new(
-        &ListenerReference::ListenerName(listener_group_name),
+        &ListenerReference::ListenerName(listener_name),
         labels,
     )
     .expect("should return Ok independent of the given parameters")
     .build_pvc(pvc_name.to_string())
-    .expect("should be a valid annotation")
+    .expect(
+        "should return a PersistentVolumeClaim, because the only check is that \
+        listener_group_name is a valid annotation value and there are no restrictions on single \
+        annotation values",
+    )
 }

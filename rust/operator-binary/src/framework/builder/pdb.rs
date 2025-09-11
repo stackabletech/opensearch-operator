@@ -5,11 +5,11 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    ControllerName, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName, RoleName,
+    ControllerName, HasName, HasUid, NameIsValidLabelValue, OperatorName, ProductName, RoleName,
 };
 
 pub fn pod_disruption_budget_builder_with_role(
-    owner: &(impl Resource<DynamicType = ()> + HasObjectName + HasUid + IsLabelValue),
+    owner: &(impl Resource<DynamicType = ()> + HasName + NameIsValidLabelValue + HasUid),
     product_name: &ProductName,
     role_name: &RoleName,
     operator_name: &OperatorName,
@@ -44,8 +44,8 @@ mod tests {
     };
 
     use crate::framework::{
-        ControllerName, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName, RoleName,
-        builder::pdb::pod_disruption_budget_builder_with_role,
+        ControllerName, HasName, HasUid, NameIsValidLabelValue, OperatorName, ProductName,
+        RoleName, Uid, builder::pdb::pod_disruption_budget_builder_with_role,
     };
 
     struct Cluster {
@@ -93,8 +93,8 @@ mod tests {
         }
     }
 
-    impl HasObjectName for Cluster {
-        fn to_object_name(&self) -> String {
+    impl HasName for Cluster {
+        fn to_name(&self) -> String {
             self.object_meta
                 .name
                 .clone()
@@ -103,15 +103,18 @@ mod tests {
     }
 
     impl HasUid for Cluster {
-        fn to_uid(&self) -> String {
-            self.object_meta
-                .uid
-                .clone()
-                .expect("should be set in Cluster::new")
+        fn to_uid(&self) -> Uid {
+            Uid::from_str_unsafe(
+                &self
+                    .object_meta
+                    .uid
+                    .clone()
+                    .expect("should be set in Cluster::new"),
+            )
         }
     }
 
-    impl IsLabelValue for Cluster {
+    impl NameIsValidLabelValue for Cluster {
         fn to_label_value(&self) -> String {
             self.object_meta
                 .name

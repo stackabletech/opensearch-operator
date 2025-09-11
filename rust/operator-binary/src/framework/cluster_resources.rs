@@ -3,16 +3,17 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ObjectReference,
 };
 
-use super::{
-    ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName,
-};
-use crate::framework::kvp::label::MAX_LABEL_VALUE_LENGTH;
+use super::{ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, Uid};
+use crate::framework::{MAX_LABEL_VALUE_LENGTH, NameIsValidLabelValue};
 
+/// Infallible variant of `ClusterResources::new`
 pub fn cluster_resources_new(
     product_name: &ProductName,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
-    cluster: &(impl HasObjectName + HasNamespace + HasUid),
+    cluster_name: &ClusterName,
+    cluster_namespace: &NamespaceName,
+    cluster_uid: &Uid,
     apply_strategy: ClusterResourceApplyStrategy,
 ) -> ClusterResources {
     // ClusterResources::new creates a label value from the given app name by appending
@@ -28,9 +29,9 @@ pub fn cluster_resources_new(
         &operator_name.to_label_value(),
         &controller_name.to_label_value(),
         &ObjectReference {
-            name: Some(cluster.to_object_name()),
-            namespace: Some(cluster.to_namespace()),
-            uid: Some(cluster.to_uid()),
+            name: Some(cluster_name.to_string()),
+            namespace: Some(cluster_namespace.to_string()),
+            uid: Some(cluster_uid.to_string()),
             ..Default::default()
         },
         apply_strategy,
