@@ -21,7 +21,7 @@ use super::role_group_builder::{
 use crate::{
     controller::{ContextNames, ValidatedCluster},
     framework::{
-        IsLabelValue,
+        NameIsValidLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
@@ -83,13 +83,13 @@ impl<'a> RoleBuilder<'a> {
             role_ref: RoleRef {
                 api_group: ClusterRole::GROUP.to_owned(),
                 kind: ClusterRole::KIND.to_owned(),
-                name: self.resource_names.cluster_role_name(),
+                name: self.resource_names.cluster_role_name().to_string(),
             },
             subjects: Some(vec![Subject {
                 api_group: Some(ServiceAccount::GROUP.to_owned()),
                 kind: ServiceAccount::KIND.to_owned(),
-                name: self.resource_names.service_account_name(),
-                namespace: Some(self.cluster.namespace.clone()),
+                name: self.resource_names.service_account_name().to_string(),
+                namespace: Some(self.cluster.namespace.to_string()),
             }]),
         }
     }
@@ -208,6 +208,7 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::RoleBuilder;
     use crate::{
@@ -216,8 +217,9 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -258,8 +260,8 @@ mod tests {
             image.clone(),
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
-            "default".to_owned(),
-            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),

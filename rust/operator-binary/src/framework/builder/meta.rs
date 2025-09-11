@@ -3,19 +3,21 @@ use stackable_operator::{
     k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference, kube::Resource,
 };
 
-use crate::framework::{HasObjectName, HasUid};
+use crate::framework::{HasName, HasUid};
 
 /// Infallible variant of `stackable_operator::builder::meta::ObjectMetaBuilder::ownerreference_from_resource`
 pub fn ownerreference_from_resource(
-    resource: &(impl Resource<DynamicType = ()> + HasObjectName + HasUid),
+    resource: &(impl Resource<DynamicType = ()> + HasName + HasUid),
     block_owner_deletion: Option<bool>,
     controller: Option<bool>,
 ) -> OwnerReference {
     OwnerReferenceBuilder::new()
         // Set api_version, kind, name and additionally the UID if it exists.
         .initialize_from_resource(resource)
+        // Ensure that the name is set.
+        .name(resource.to_name())
         // Ensure that the UID is set.
-        .uid(resource.to_uid())
+        .uid(resource.to_uid().to_string())
         .block_owner_deletion_opt(block_owner_deletion)
         .controller_opt(controller)
         .build()
@@ -34,7 +36,7 @@ mod tests {
         kube::Resource,
     };
 
-    use crate::framework::{HasObjectName, HasUid, builder::meta::ownerreference_from_resource};
+    use crate::framework::{HasName, HasUid, Uid, builder::meta::ownerreference_from_resource};
 
     struct Cluster {
         object_meta: ObjectMeta,
@@ -81,8 +83,8 @@ mod tests {
         }
     }
 
-    impl HasObjectName for Cluster {
-        fn to_object_name(&self) -> String {
+    impl HasName for Cluster {
+        fn to_name(&self) -> String {
             self.object_meta
                 .name
                 .clone()
@@ -91,11 +93,14 @@ mod tests {
     }
 
     impl HasUid for Cluster {
-        fn to_uid(&self) -> String {
-            self.object_meta
-                .uid
-                .clone()
-                .expect("should be set in Cluster::new")
+        fn to_uid(&self) -> Uid {
+            Uid::from_str_unsafe(
+                &self
+                    .object_meta
+                    .uid
+                    .clone()
+                    .expect("should be set in Cluster::new"),
+            )
         }
     }
 

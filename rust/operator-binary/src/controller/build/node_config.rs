@@ -8,6 +8,7 @@ use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{
+        ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
     },
@@ -43,7 +44,7 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.node
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
-    discovery_service_name: String,
+    discovery_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -52,7 +53,7 @@ impl NodeConfig {
     pub fn new(
         cluster: ValidatedCluster,
         role_group_config: OpenSearchRoleGroupConfig,
-        discovery_service_name: String,
+        discovery_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
@@ -248,13 +249,14 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::*;
     use crate::{
         controller::ValidatedOpenSearchConfig,
         crd::NodeRoles,
         framework::{
-            ClusterName, ProductVersion, RoleGroupName,
+            ClusterName, NamespaceName, ProductVersion, RoleGroupName,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -303,8 +305,8 @@ mod tests {
             image.clone(),
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
-            "default".to_owned(),
-            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
@@ -316,7 +318,7 @@ mod tests {
         NodeConfig::new(
             cluster,
             role_group_config,
-            "my-opensearch-cluster-manager".to_owned(),
+            ServiceName::from_str_unsafe("my-opensearch-cluster-manager"),
         )
     }
 

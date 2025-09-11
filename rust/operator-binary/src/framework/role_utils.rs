@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
 use stackable_operator::{
@@ -11,8 +14,11 @@ use stackable_operator::{
     schemars::JsonSchema,
 };
 
-use super::{ProductName, builder::pod::container::EnvVarSet};
-use crate::framework::{ClusterName, MAX_OBJECT_NAME_LENGTH, kvp::label::MAX_LABEL_VALUE_LENGTH};
+use super::{
+    ProductName, RoleBindingName, ServiceAccountName, ServiceName,
+    builder::pod::container::EnvVarSet,
+};
+use crate::framework::{ClusterName, ClusterRoleName};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericProductSpecificCommonConfig {}
@@ -161,42 +167,53 @@ pub struct ResourceNames {
 }
 
 impl ResourceNames {
-    pub fn service_account_name(&self) -> String {
+    pub fn service_account_name(&self) -> ServiceAccountName {
         const SUFFIX: &str = "-serviceaccount";
 
         // Compile-time check
         const _: () = assert!(
-            ClusterName::MAX_LENGTH + SUFFIX.len() <= MAX_OBJECT_NAME_LENGTH,
-            "The ServiceAccount name `<cluster_name>-serviceaccount` must not exceed 253 characters."
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceAccountName::MAX_LENGTH,
+            "The string `<cluster_name>-serviceaccount` must not exceed the limit of ServiceAccount names."
         );
 
-        format!("{}{SUFFIX}", self.cluster_name)
+        ServiceAccountName::from_str(&format!("{}{SUFFIX}", self.cluster_name))
+            .expect("should be a valid ServiceAccount name")
     }
 
-    pub fn role_binding_name(&self) -> String {
+    pub fn role_binding_name(&self) -> RoleBindingName {
         const SUFFIX: &str = "-rolebinding";
 
-        // No compile-time check, because RoleBinding names do not seem to be restricted.
-
-        format!("{}{SUFFIX}", self.cluster_name)
-    }
-
-    pub fn cluster_role_name(&self) -> String {
-        const SUFFIX: &str = "-clusterrole";
-
-        // No compile-time check, because ClusterRole names do not seem to be restricted.
-
-        format!("{}{SUFFIX}", self.product_name)
-    }
-
-    pub fn discovery_service_name(&self) -> String {
         // Compile-time check
         const _: () = assert!(
-            ClusterName::MAX_LENGTH <= MAX_LABEL_VALUE_LENGTH,
-            "The Service name `<cluster_name>` must not exceed 63 characters."
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= RoleBindingName::MAX_LENGTH,
+            "The string `<cluster_name>-rolebinding` must not exceed the limit of RoleBinding names."
         );
 
-        format!("{}", self.cluster_name)
+        RoleBindingName::from_str(&format!("{}{SUFFIX}", self.cluster_name))
+            .expect("should be a valid RoleBinding name")
+    }
+
+    pub fn cluster_role_name(&self) -> ClusterRoleName {
+        const SUFFIX: &str = "-clusterrole";
+
+        // Compile-time check
+        const _: () = assert!(
+            ProductName::MAX_LENGTH + SUFFIX.len() <= ClusterRoleName::MAX_LENGTH,
+            "The string `<cluster_name>-clusterrole` must not exceed the limit of cluster role names."
+        );
+
+        ClusterRoleName::from_str(&format!("{}{SUFFIX}", self.product_name))
+            .expect("should be a valid cluster role name")
+    }
+
+    pub fn discovery_service_name(&self) -> ServiceName {
+        // Compile-time check
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH <= ServiceName::MAX_LENGTH,
+            "The string `<cluster_name>` must not exceed the limit of Service names."
+        );
+
+        ServiceName::from_str(self.cluster_name.as_ref()).expect("should be a valid Service name")
     }
 }
 
@@ -215,7 +232,10 @@ mod tests {
     };
 
     use super::ResourceNames;
-    use crate::framework::{ClusterName, ProductName, role_utils::with_validated_config};
+    use crate::framework::{
+        ClusterName, ClusterRoleName, ProductName, RoleBindingName, ServiceAccountName,
+        ServiceName, role_utils::with_validated_config,
+    };
 
     #[derive(Debug, Fragment, PartialEq)]
     #[fragment_attrs(derive(Clone, Debug, Default, Merge, PartialEq))]
@@ -359,19 +379,19 @@ mod tests {
         };
 
         assert_eq!(
-            "my-cluster-serviceaccount".to_owned(),
+            ServiceAccountName::from_str_unsafe("my-cluster-serviceaccount"),
             resource_names.service_account_name()
         );
         assert_eq!(
-            "my-cluster-rolebinding".to_owned(),
+            RoleBindingName::from_str_unsafe("my-cluster-rolebinding"),
             resource_names.role_binding_name()
         );
         assert_eq!(
-            "my-product-clusterrole".to_owned(),
+            ClusterRoleName::from_str_unsafe("my-product-clusterrole"),
             resource_names.cluster_role_name()
         );
         assert_eq!(
-            "my-cluster".to_owned(),
+            ServiceName::from_str_unsafe("my-cluster"),
             resource_names.discovery_service_name()
         );
     }

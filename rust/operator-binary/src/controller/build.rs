@@ -52,6 +52,7 @@ mod tests {
         commons::affinity::StackableAffinity, k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::Resource, role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::build;
     use crate::{
@@ -61,8 +62,9 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -141,8 +143,8 @@ mod tests {
                 .expect("should be a valid ProductImage structure"),
             ProductVersion::from_str_unsafe("3.1.0"),
             ClusterName::from_str_unsafe("my-opensearch"),
-            "default".to_owned(),
-            "e6ac237d-a6d4-43a1-8135-f36506110912".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
             GenericRoleConfig::default(),
             [
                 (

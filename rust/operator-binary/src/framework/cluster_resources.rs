@@ -3,24 +3,26 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ObjectReference,
 };
 
-use super::{
-    ControllerName, HasNamespace, HasObjectName, HasUid, IsLabelValue, OperatorName, ProductName,
-};
-use crate::framework::kvp::label::MAX_LABEL_VALUE_LENGTH;
+use super::{ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, Uid};
+use crate::framework::{MAX_LABEL_VALUE_LENGTH, NameIsValidLabelValue};
 
+/// Infallible variant of `stackable_operator::cluster_resources::ClusterResources::new`
 pub fn cluster_resources_new(
     product_name: &ProductName,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
-    cluster: &(impl HasObjectName + HasNamespace + HasUid),
+    cluster_name: &ClusterName,
+    cluster_namespace: &NamespaceName,
+    cluster_uid: &Uid,
     apply_strategy: ClusterResourceApplyStrategy,
 ) -> ClusterResources {
+    // Compile-time check
     // ClusterResources::new creates a label value from the given app name by appending
-    // `-operator`. For the resulting label value to be valid, it must not exceed 63 characters.
-    // Check at compile time that ProductName::MAX_LENGTH is defined accordingly.
+    // `-operator`. For the resulting label value to be valid, it must not exceed
+    // `MAX_LABEL_VALUE_LENGTH`.
     const _: () = assert!(
         ProductName::MAX_LENGTH + "-operator".len() <= MAX_LABEL_VALUE_LENGTH,
-        "The label value `<product_name>-operator` must not exceed 63 characters."
+        "The string `<cluster_name>-operator` must not exceed the limit of Label names."
     );
 
     ClusterResources::new(
@@ -28,9 +30,9 @@ pub fn cluster_resources_new(
         &operator_name.to_label_value(),
         &controller_name.to_label_value(),
         &ObjectReference {
-            name: Some(cluster.to_object_name()),
-            namespace: Some(cluster.to_namespace()),
-            uid: Some(cluster.to_uid()),
+            name: Some(cluster_name.to_string()),
+            namespace: Some(cluster_namespace.to_string()),
+            uid: Some(cluster_uid.to_string()),
             ..Default::default()
         },
         apply_strategy,
