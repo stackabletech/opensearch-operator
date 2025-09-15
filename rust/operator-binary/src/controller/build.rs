@@ -8,6 +8,13 @@ pub mod node_config;
 pub mod role_builder;
 pub mod role_group_builder;
 
+/// Builds Kubernetes resource specifications from the given validated cluster
+///
+/// This function cannot fail because all failing conditions were already checked in the validation
+/// step.
+/// A Kubernetes client is not required because references to other Kubernetes resources must
+/// already be dereferenced in a prior step and the result would be validated and added to the
+/// validated cluster.
 pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResources<Prepared> {
     let mut config_maps = vec![];
     let mut stateful_sets = vec![];

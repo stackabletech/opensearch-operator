@@ -67,7 +67,13 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-// no client needed
+/// Validates the `v1alpha1::OpenSearchCluster` and returns a `ValidateCluster`
+///
+/// The validated values should be wrapped in fail-safe types so that illegal states are
+/// unrepresentable in the following steps.
+///
+/// A Kubernetes client is not required because references to other Kubernetes resources must
+/// already be dereferenced in a prior step.
 pub fn validate(
     context_names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,

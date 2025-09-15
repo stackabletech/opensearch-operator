@@ -3,6 +3,7 @@ use std::str::FromStr;
 use super::{ClusterName, ConfigMapName, ListenerName, RoleGroupName, RoleName, StatefulSetName};
 use crate::framework::ServiceName;
 
+/// Type-safe names for role-group resources
 pub struct ResourceNames {
     pub cluster_name: ClusterName,
     pub role_name: RoleName,

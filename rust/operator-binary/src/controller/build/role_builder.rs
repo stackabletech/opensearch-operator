@@ -177,11 +177,11 @@ impl<'a> RoleBuilder<'a> {
         .unwrap();
 
         let managed_by = Label::managed_by(
-            &self.context_names.operator_name.to_string(),
-            &self.context_names.controller_name.to_string(),
+            self.context_names.operator_name.as_ref(),
+            self.context_names.controller_name.as_ref(),
         )
         .unwrap();
-        let version = Label::version(&self.cluster.product_version.to_string()).unwrap();
+        let version = Label::version(self.cluster.product_version.as_ref()).unwrap();
 
         labels.insert(managed_by);
         labels.insert(version);

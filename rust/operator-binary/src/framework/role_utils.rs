@@ -20,6 +20,8 @@ use super::{
 };
 use crate::framework::{ClusterName, ClusterRoleName};
 
+/// Variant of `stackable_operator::role_utils::GenericProductSpecificCommonConfig` that implements
+/// `Merge`
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericProductSpecificCommonConfig {}
 
@@ -27,7 +29,12 @@ impl Merge for GenericProductSpecificCommonConfig {
     fn merge(&mut self, _defaults: &Self) {}
 }
 
-// much better to work with than RoleGroup
+/// Variant of `stackable_operator::role_utils::RoleGroup` that is easier to work with
+///
+/// Differences are:
+/// * `replicas` is non-optional.
+/// * `config` is flattened.
+/// * The `HashMap` in `env_overrides` is replaced with an `EnvVarSet`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RoleGroupConfig<ProductSpecificCommonConfig, T> {
     pub replicas: u16,
@@ -51,7 +58,9 @@ impl<ProductSpecificCommonConfig, T> RoleGroupConfig<ProductSpecificCommonConfig
     }
 }
 
-// RoleGroup::validate_config with fixed types
+/// Variant of `stackable_operator::role_utils::RoleGroup::validate_config` with fixed types
+///
+/// The `role` parameter takes the `ProductSpecificCommonConfig` into account.
 pub fn validate_config<C, ProductSpecificCommonConfig, T, U>(
     role_group: &RoleGroup<T, ProductSpecificCommonConfig>,
     role: &Role<T, U, ProductSpecificCommonConfig>,
@@ -70,7 +79,7 @@ where
     fragment::validate(rolegroup_config)
 }
 
-// also useful for operators which use the product config
+/// Merges and validates the `RoleGroup` with the given `role` and `default_config`
 pub fn with_validated_config<C, ProductSpecificCommonConfig, T, U>(
     role_group: &RoleGroup<T, ProductSpecificCommonConfig>,
     role: &Role<T, U, ProductSpecificCommonConfig>,
@@ -161,6 +170,7 @@ where
     merge(role_group_config, &role_config)
 }
 
+/// Type-safe names for role resources
 pub struct ResourceNames {
     pub cluster_name: ClusterName,
     pub product_name: ProductName,
