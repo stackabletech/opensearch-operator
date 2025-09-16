@@ -47,6 +47,11 @@ pub enum Error {
         source: stackable_operator::kvp::LabelValueError,
     },
 
+    #[snafu(display("not a valid label name as defined in RFC 1035"))]
+    InvalidRfc1035LabelName {
+        source: stackable_operator::validation::Errors,
+    },
+
     #[snafu(display("not a valid DNS subdomain name as defined in RFC 1123"))]
     InvalidRfc1123DnsSubdomainName {
         source: stackable_operator::validation::Errors,
@@ -71,6 +76,11 @@ pub const MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH: usize = 253;
 ///
 /// Duplicates the private constant [`stackable-operator::validation::RFC_1123_LABEL_MAX_LENGTH`]
 pub const MAX_RFC_1123_LABEL_NAME_LENGTH: usize = 63;
+
+/// Maximum length of label names as defined in RFC 1035.
+///
+/// Duplicates the private constant [`stackable-operator::validation::RFC_1035_LABEL_MAX_LENGTH`]
+pub const MAX_RFC_1035_LABEL_NAME_LENGTH: usize = 63;
 
 /// Maximum length of label values
 ///
@@ -174,6 +184,9 @@ macro_rules! attributed_string_type {
     (@from_str $name:ident, $s:expr, is_rfc_1123_label_name) => {
         stackable_operator::validation::is_rfc_1123_label($s).context(InvalidRfc1123LabelNameSnafu)?;
     };
+    (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
+        stackable_operator::validation::is_rfc_1035_label($s).context(InvalidRfc1035LabelNameSnafu)?;
+    };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         LabelValue::from_str($s).context(InvalidLabelValueSnafu)?;
     };
@@ -189,6 +202,8 @@ macro_rules! attributed_string_type {
     (@trait_impl $name:ident, is_rfc_1123_dns_subdomain_name) => {
     };
     (@trait_impl $name:ident, is_rfc_1123_label_name) => {
+    };
+    (@trait_impl $name:ident, is_rfc_1035_label_name) => {
     };
     (@trait_impl $name:ident, is_uid) => {
         impl From<Uuid> for $name {
@@ -298,8 +313,8 @@ attributed_string_type! {
     ServiceName,
     "The name of a Service",
     "opensearch-nodes-default-headless",
-    (max_length = min(MAX_RFC_1123_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
-    is_rfc_1123_label_name,
+    (max_length = min(MAX_RFC_1035_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
+    is_rfc_1035_label_name,
     is_valid_label_value
 }
 attributed_string_type! {
@@ -398,10 +413,11 @@ mod tests {
 
     use super::{
         ClusterName, ClusterRoleName, ConfigMapName, ControllerName, EmptyStringSnafu, Error,
-        ErrorDiscriminants, InvalidLabelValueSnafu, InvalidRfc1123DnsSubdomainNameSnafu,
-        InvalidRfc1123LabelNameSnafu, InvalidUidSnafu, LabelValue, LengthExceededSnafu,
-        NamespaceName, OperatorName, PersistentVolumeClaimName, ProductVersion, RoleBindingName,
-        RoleGroupName, RoleName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
+        ErrorDiscriminants, InvalidLabelValueSnafu, InvalidRfc1035LabelNameSnafu,
+        InvalidRfc1123DnsSubdomainNameSnafu, InvalidRfc1123LabelNameSnafu, InvalidUidSnafu,
+        LabelValue, LengthExceededSnafu, NamespaceName, OperatorName, PersistentVolumeClaimName,
+        ProductVersion, RoleBindingName, RoleGroupName, RoleName, ServiceAccountName, ServiceName,
+        StatefulSetName, Uid, VolumeName,
     };
     use crate::framework::{NameIsValidLabelValue, ProductName};
 
@@ -479,6 +495,24 @@ mod tests {
     }
 
     attributed_string_type! {
+        IsRfc1035LabelNameTest,
+        "is_rfc_1035_label_name test",
+        "a-b",
+        is_rfc_1035_label_name
+    }
+
+    #[test]
+    fn test_attributed_string_type_is_rfc_1035_label_name() {
+        type T = IsRfc1035LabelNameTest;
+
+        T::test_example();
+        assert_eq!(
+            Err(ErrorDiscriminants::InvalidRfc1035LabelName),
+            T::from_str("A").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
         IsRfc1123DnsSubdomainNameTest,
         "is_rfc_1123_dns_subdomain_name test",
         "a-b.c",
@@ -499,7 +533,7 @@ mod tests {
     attributed_string_type! {
         IsRfc1123LabelNameTest,
         "is_rfc_1123_label_name test",
-        "a-b",
+        "1-a",
         is_rfc_1123_label_name
     }
 
