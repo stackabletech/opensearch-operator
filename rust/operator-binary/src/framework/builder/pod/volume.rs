@@ -41,7 +41,7 @@ pub fn listener_operator_volume_source_builder_build_pvc(
         .build_pvc(pvc_name.to_string())
         .expect(
             "should return a PersistentVolumeClaim, because the only check is that \
-        listener_reference is a valid annotation value and there are no restrictions on single \
-        annotation values",
+            listener_reference is a valid annotation value and there are no restrictions on single \
+            annotation values",
         )
 }
