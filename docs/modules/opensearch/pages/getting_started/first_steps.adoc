@@ -80,4 +80,4 @@ Now you can create your own indexes, populate them with data and search for it.
 
 == What's next
 
-Check the xref:usage-guide/index.adoc[] to find out more about configuring your OpenSearch instance or have a look at the OpenSearch documentation to https://docs.opensearch.org/docs/latest/getting-started/[ingest, search or visualize your data with OpenSearch Dashboards].
+Check the xref:usage-guide/index.adoc[] to find out more about configuring your OpenSearch instance or have a look at the OpenSearch documentation to https://docs.opensearch.org/docs/latest/getting-started/[ingest, search or visualize your data with OpenSearch Dashboards{external-link-icon}^].

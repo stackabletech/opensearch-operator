@@ -31,7 +31,7 @@ In a production cluster, you probably want to assign different roles to the node
 This can be achieved by creating multiple role groups and configuring their node roles.
 The node roles configured at the role group level override the ones from the role level.
 
-For instance, if you want to deploy https://docs.opensearch.org/docs/latest/tuning-your-cluster/[the sample cluster from the OpenSearch documentation] that has one dedicated cluster manager node, one dedicated coordinating node and two data nodes, you could configure the role groups as follows:
+For instance, if you want to deploy https://docs.opensearch.org/docs/latest/tuning-your-cluster/[the sample cluster from the OpenSearch documentation{external-link-icon}^] that has one dedicated cluster manager node, one dedicated coordinating node and two data nodes, you could configure the role groups as follows:
 
 [source,yaml]
 ----
@@ -65,4 +65,4 @@ The following roles are currently supported by the operator:
 * `search`
 * `warm`
 
-We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation] for an explanation of the roles.
+We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation{external-link-icon}^] for an explanation of the roles.

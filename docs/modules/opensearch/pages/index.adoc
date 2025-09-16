@@ -9,11 +9,11 @@
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
-* {github}[GitHub {external-link-icon}^]
-* {feature-tracker}[Feature Tracker {external-link-icon}^]
-* {crd}[CRD documentation {external-link-icon}^]
+* {github}[GitHub{external-link-icon}^]
+* {feature-tracker}[Feature Tracker{external-link-icon}^]
+* {crd}[CRD documentation{external-link-icon}^]
 
-The Stackable operator for {opensearch}[OpenSearch] deploys and manages OpenSearch clusters on Kubernetes.
+The Stackable operator for {opensearch}[OpenSearch{external-link-icon}^] deploys and manages OpenSearch clusters on Kubernetes.
 OpenSearch is a powerful search and analytics engine built on Apache Lucene.
 This operator helps you manage your OpenSearch instances on Kubernetes efficiently.
 
@@ -25,7 +25,7 @@ It guides you through installing the operator, connecting to your OpenSearch ins
 == Operator model
 
 The operator manages the _OpenSearchCluster_ resource.
-It creates a number of different Kubernetes resources based on this {crs}[custom resource].
+It creates a number of different Kubernetes resources based on this {crs}[custom resource{external-link-icon}^].
 
 === Custom resources
 
@@ -58,6 +58,6 @@ include::partial$supported-versions.adoc[]
 
 == Useful links
 
-* The {github}[opensearch-operator {external-link-icon}^] GitHub repository
-* The operator feature overview in the {feature-tracker}[feature tracker {external-link-icon}^]
-* The {crd-opensearchcluster}[OpenSearchCluster {external-link-icon}^] CRD documentation
+* The {github}[opensearch-operator{external-link-icon}^] GitHub repository
+* The operator feature overview in the {feature-tracker}[feature tracker{external-link-icon}^]
+* The {crd-opensearchcluster}[OpenSearchCluster{external-link-icon}^] CRD documentation
