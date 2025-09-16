@@ -19,8 +19,8 @@ use stackable_operator::{
     kube::CustomResource,
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
+    shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
-    time::Duration,
     versioned::versioned,
 };
 use strum::{Display, EnumIter};
@@ -32,25 +32,29 @@ use crate::framework::{
 
 const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
 
-#[versioned(version(name = "v1alpha1"))]
+#[versioned(
+    version(name = "v1alpha1"),
+    crates(
+        k8s_openapi = "stackable_operator::k8s_openapi",
+        kube_client = "stackable_operator::kube::client",
+        kube_core = "stackable_operator::kube::core",
+        schemars = "stackable_operator::schemars",
+        versioned = "stackable_operator::versioned"
+    )
+)]
 pub mod versioned {
 
     /// An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for
     /// OpenSearch. Find more information on how to use it and the resources that the operator
     /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
-    #[versioned(k8s(
+    #[versioned(crd(
         group = "opensearch.stackable.tech",
         kind = "OpenSearchCluster",
         plural = "opensearchclusters",
         shortname = "opensearch",
         status = "v1alpha1::OpenSearchClusterStatus",
-        namespaced,
-        crates(
-            kube_core = "stackable_operator::kube::core",
-            k8s_openapi = "stackable_operator::k8s_openapi",
-            schemars = "stackable_operator::schemars"
-        )
+        namespaced
     ))]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterSpec {

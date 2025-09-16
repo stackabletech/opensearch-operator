@@ -4,7 +4,7 @@ use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     kube::{Resource, ResourceExt},
     role_utils::RoleGroup,
-    time::Duration,
+    shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -47,6 +47,11 @@ pub enum Error {
         source: crate::framework::builder::pod::container::Error,
     },
 
+    #[snafu(display("failed to resolve product image"))]
+    ResolveProductImage {
+        source: stackable_operator::commons::product_image_selection::Error,
+    },
+
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
@@ -61,6 +66,8 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
+
 // no client needed
 pub fn validate(
     context_names: &ContextNames,
@@ -73,7 +80,13 @@ pub fn validate(
 
     let uid = cluster.uid().context(GetClusterUidSnafu)?;
 
-    let product_version = ProductVersion::from_str(cluster.spec.image.product_version())
+    let product_image = cluster
+        .spec
+        .image
+        .resolve(DEFAULT_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .context(ResolveProductImageSnafu)?;
+
+    let product_version = ProductVersion::from_str(&product_image.product_version)
         .context(ParseProductVersionSnafu)?;
 
     let mut role_group_configs = BTreeMap::new();
@@ -88,7 +101,7 @@ pub fn validate(
     }
 
     Ok(ValidatedCluster::new(
-        cluster.spec.image.clone(),
+        product_image,
         product_version,
         cluster_name,
         namespace,
@@ -153,10 +166,13 @@ fn validate_role_group_config(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use stackable_operator::{
         commons::{
             affinity::StackableAffinity,
             cluster_operation::ClusterOperation,
+            product_image_selection::ResolvedProductImage,
             resources::{CpuLimits, MemoryLimits, PvcConfig, Resources},
         },
         k8s_openapi::{
@@ -166,8 +182,9 @@ mod tests {
             apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
         },
         kube::api::ObjectMeta,
+        kvp::LabelValue,
         role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
-        time::Duration,
+        shared::time::Duration,
     };
 
     use super::{ErrorDiscriminants, validate};
@@ -190,8 +207,14 @@ mod tests {
 
         assert_eq!(
             Some(ValidatedCluster::new(
-                serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
-                    .expect("should be a valid ProductImage structure"),
+                ResolvedProductImage {
+                    product_version: "3.1.0".to_owned(),
+                    app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                        .expect("should be a valid label value"),
+                    image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                    image_pull_policy: "Always".to_owned(),
+                    pull_secrets: None,
+                },
                 ProductVersion::from_str_unsafe("3.1.0"),
                 ClusterName::from_str_unsafe("my-opensearch"),
                 "default".to_owned(),

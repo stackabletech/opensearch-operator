@@ -13,7 +13,6 @@ pub fn listener_pvc(
         &ListenerReference::ListenerName(listener_group_name),
         labels,
     )
-    .expect("should return Ok independent of the given parameters")
     .build_pvc(pvc_name.to_string())
     .expect("should be a valid annotation")
 }

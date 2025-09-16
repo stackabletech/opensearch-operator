@@ -1,13 +1,13 @@
 use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
-use crd::{OpenSearchCluster, v1alpha1};
+use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
 use framework::OperatorName;
 use futures::StreamExt;
 use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{
     YamlSchema as _,
-    cli::{Command, ProductOperatorRun},
+    cli::{Command, CommonOptions, ProductOperatorRun},
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
@@ -71,18 +71,23 @@ async fn main() -> Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            OpenSearchCluster::merged_crd(OpenSearchCluster::V1Alpha1)
+            OpenSearchCluster::merged_crd(OpenSearchClusterVersion::V1Alpha1)
                 .context(MergeCrdSnafu)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())
                 .context(SerializeCrdSnafu)?;
         }
         Command::Run(ProductOperatorRun {
+            common:
+                CommonOptions {
+                    telemetry,
+                    cluster_info,
+                },
+            disable_crd_maintenance: _,
+            operator_environment: _,
             product_config: _,
             watch_namespace,
-            telemetry_arguments,
-            cluster_info_opts,
         }) => {
-            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments)
+            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry)
                 .init()
                 .context(InitTracingSnafu)?;
 
@@ -101,7 +106,7 @@ async fn main() -> Result<()> {
 
             let client = stackable_operator::client::initialize_operator(
                 Some(format!("{operator_name}")),
-                &cluster_info_opts,
+                &cluster_info,
             )
             .await
             .context(CreateClientSnafu)?;
