@@ -21,8 +21,11 @@ impl ResourceNames {
 
     /// Creates a qualified role group name consisting of the cluster name, role name and role-group
     /// name.
+    ///
     /// The result is a valid DNS subdomain name as defined in RFC 1123 that can be used e.g. as a name
-    /// for a StatefulSet.
+    /// for a [`StatefulSet`].
+    ///
+    /// [`StatefulSet`]: stackable_operator::k8s_openapi::api::apps::v1::StatefulSet
     fn qualified_role_group_name(&self) -> String {
         format!(
             "{}-{}-{}",

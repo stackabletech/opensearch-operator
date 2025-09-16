@@ -1,7 +1,7 @@
 //! Additions to stackable-operator
 //!
 //! Functions in stackable-operator usually accept generic types like strings and validate the
-//! parameters as late as possible. Therefore, nearly all functions have to return a `Result` and
+//! parameters as late as possible. Therefore, nearly all functions have to return a [`Result`] and
 //! errors are returned along the call chain. That makes error handling complex because every
 //! module re-packages the received error. Also, the validation is repeated if the value is used in
 //! different function calls. Sometimes, validation is not necessary if constant values are used,
@@ -9,16 +9,16 @@
 //!
 //! The OpenSearch operator uses a different approach. The incoming values are validated as early
 //! as possible and wrapped in a fail-safe type. This type is then used along the call chain,
-//! validation is not necessary anymore and functions without side effects do not need to return
-//! a `Result`.
+//! validation is not necessary anymore and functions without side effects do not need to return a
+//! [`Result`].
 //!
 //! However, the OpenSearch operator uses stackable-operator and at the interface, the fail-safe
-//! types must be unwrapped and the `Result` returned by the stackable-operator function must be
-//! handled. This is done by calling `Result::expect` which requires thorough testing.
+//! types must be unwrapped and the [`Result`] returned by the stackable-operator function must be
+//! handled. This is done by calling [`Result::expect`] which requires thorough testing.
 //!
 //! When the development of the OpenSearch operator has progressed and changes in this module
-//! become less frequent, then this module can be incorporated into stackable-operator. The
-//! module structure should already resemble the one of stackable-operator.
+//! become less frequent, then this module can be incorporated into stackable-operator. The module
+//! structure should already resemble the one of stackable-operator.
 
 use std::{fmt::Display, str::FromStr};
 
@@ -63,17 +63,18 @@ pub enum Error {
 
 /// Maximum length of DNS subdomain names as defined in RFC 1123.
 ///
-/// Duplicates the private constant `stackable-operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH`
+/// Duplicates the private constant
+/// [`stackable-operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH`]
 pub const MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH: usize = 253;
 
 /// Maximum length of label names as defined in RFC 1123.
 ///
-/// Duplicates the private constant `stackable-operator::validation::RFC_1123_LABEL_MAX_LENGTH`
+/// Duplicates the private constant [`stackable-operator::validation::RFC_1123_LABEL_MAX_LENGTH`]
 pub const MAX_RFC_1123_LABEL_NAME_LENGTH: usize = 63;
 
 /// Maximum length of label values
 ///
-/// Duplicates the private constant `stackable-operator::kvp::label::value::LABEL_VALUE_MAX_LEN`
+/// Duplicates the private constant [`stackable-operator::kvp::label::value::LABEL_VALUE_MAX_LEN`]
 pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 
 /// Has a non-empty name
@@ -213,7 +214,7 @@ macro_rules! attributed_string_type {
 
 /// Returns the minimum of the given values.
 ///
-/// As opposed to `std::cmp::min`, this function can be used at compile-time.
+/// As opposed to [`std::cmp::min`], this function can be used at compile-time.
 ///
 /// # Examples
 ///

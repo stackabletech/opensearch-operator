@@ -1,4 +1,4 @@
-//! Controller for `v1alpha1::OpenSearchCluster`
+//! Controller for [`v1alpha1::OpenSearchCluster`]
 //!
 //! The cluster specification is validated, Kubernetes resource specifications are created and
 //! applied and the cluster status is updated.
@@ -46,7 +46,7 @@ mod validate;
 
 /// Names in the controller context which are passed to the submodules of the controller
 ///
-/// The names are not directly defined in `Context` because not every submodule requires a
+/// The names are not directly defined in [`Context`] because not every submodule requires a
 /// Kubernetes client and unit testing is easier without an unnecessary client.
 pub struct ContextNames {
     pub product_name: ProductName,
@@ -123,7 +123,7 @@ type OpenSearchRoleGroupConfig =
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
 
-/// The validated `v1alpha1::OpenSearchConfig`.
+/// The validated [`v1alpha1::OpenSearchConfig`]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
@@ -133,14 +133,14 @@ pub struct ValidatedOpenSearchConfig {
     pub listener_class: String,
 }
 
-/// The validated `v1alpha1::OpenSearchCluster`
+/// The validated [`v1alpha1::OpenSearchCluster`]
 ///
 /// Validated means that there should be no reason for Kubernetes to reject resources generated
 /// from these values. This is usually achieved by using fail-safe types. For instance, the cluster
-/// name is wrapped in the type `ClusterName`. This type implements e.g. the function
-/// `ClusterName::to_label_value` which returns a valid label value as string. If this function is
-/// used as intended, i.e. to set a label value, and if it is used as late as possible in the call
-/// chain, then chances are high that the resulting Kubernetes resource is valid.
+/// name is wrapped in the type [`ClusterName`]. This type implements e.g. the function
+/// [`ClusterName::to_label_value`] which returns a valid label value as string. If this function
+/// is used as intended, i.e. to set a label value, and if it is used as late as possible in the
+/// call chain, then chances are high that the resulting Kubernetes resource is valid.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedCluster {
     metadata: ObjectMeta,
@@ -275,7 +275,7 @@ pub fn error_policy(
 /// Reconcile function of the OpenSearchCluster controller
 ///
 /// The reconcile function performs the following steps:
-/// 1. Validate the given cluster specification and return a `ValidatedCluster` if successful.
+/// 1. Validate the given cluster specification and return a [`ValidatedCluster`] if successful.
 /// 2. Build Kubernetes resource specifications from the validated cluster.
 /// 3. Apply the Kubernetes resource specifications
 /// 4. Update the cluster status
@@ -330,8 +330,8 @@ struct Applied;
 
 /// List of all Kubernetes resources produced by this controller
 ///
-/// `T` is a marker that indicates if these resources are only `Prepared` or already `Applied`. The
-/// marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
 /// resources.
 struct KubernetesResources<T> {
     stateful_sets: Vec<StatefulSet>,

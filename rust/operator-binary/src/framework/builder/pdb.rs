@@ -9,7 +9,7 @@ use crate::framework::{
 };
 
 /// Infallible variant of
-/// `stackable_operator::builder::pdb::PodDisruptionBudgetBuilder::new_with_role`
+/// [`stackable_operator::builder::pdb::PodDisruptionBudgetBuilder::new_with_role`]
 pub fn pod_disruption_budget_builder_with_role(
     owner: &(impl Resource<DynamicType = ()> + HasName + NameIsValidLabelValue + HasUid),
     product_name: &ProductName,

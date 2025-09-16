@@ -5,7 +5,7 @@ use stackable_operator::{
 
 use crate::framework::{ListenerClassName, ListenerName, PersistentVolumeClaimName};
 
-/// Infallible variant of `stackable_operator::builder::pod::volume::ListenerReference`
+/// Infallible variant of [`stackable_operator::builder::pod::volume::ListenerReference`]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ListenerReference {
     ListenerClass(ListenerClassName),
@@ -29,7 +29,8 @@ impl From<&ListenerReference> for stackable_operator::builder::pod::volume::List
     }
 }
 
-/// Infallible variant of `stackable_operator::builder::pod::volume::ListenerOperatorVolumeSourceBuilder::build_pvc`
+/// Infallible variant of
+/// [`stackable_operator::builder::pod::volume::ListenerOperatorVolumeSourceBuilder::build_pvc`]
 pub fn listener_operator_volume_source_builder_build_pvc(
     listener_reference: &ListenerReference,
     labels: &Labels,

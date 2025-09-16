@@ -136,7 +136,7 @@ impl NodeConfig {
             == Some(true)
     }
 
-    /// Converts the given JSON value to `bool` if possible
+    /// Converts the given JSON value to [`bool`] if possible
     pub fn value_as_bool(value: &Value) -> Option<bool> {
         value.as_bool().or(
             // OpenSearch parses the strings "true" and "false" as boolean, see
@@ -154,7 +154,7 @@ impl NodeConfig {
     pub fn environment_variables(&self) -> EnvVarSet {
         EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.
-            // The node name is used e.g. for `{INITIAL_CLUSTER_MANAGER_NODES}`.
+            // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
                 EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,
@@ -189,9 +189,9 @@ impl NodeConfig {
             .join("\n")
     }
 
-    /// Configuration for `{DISCOVERY_TYPE}`
+    /// Configuration for `discovery.type`
     ///
-    /// "zen" is the default if `{DISCOVERY_TYPE}` is not set.
+    /// "zen" is the default if `discovery.type` is not set.
     /// It is nevertheless explicitly set here.
     /// see <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/discovery/DiscoveryModule.java#L88-L89>
     ///
@@ -236,7 +236,7 @@ impl NodeConfig {
                 .cluster
                 .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
 
-            // This setting requires node names as set in `{NODE_NAME}`.
+            // This setting requires node names as set in NODE_NAME.
             // The node names are set to the pod names with
             // `valueFrom.fieldRef.fieldPath: metadata.name`, so it is okay to calculate the pod
             // names here and use them as node names.

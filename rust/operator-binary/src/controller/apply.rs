@@ -31,7 +31,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// Applier for the Kubernetes resource specifications produced by this controller
 ///
 /// The implementation is not tied to this controller and could theoretically be moved to
-/// stackable_operator if `KubernetesResources` would contain all possible resource types.
+/// stackable_operator if [`KubernetesResources`] would contain all possible resource types.
 pub struct Applier<'a> {
     client: &'a Client,
     cluster_resources: ClusterResources,

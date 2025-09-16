@@ -69,7 +69,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Validates the `v1alpha1::OpenSearchCluster` and returns a `ValidateCluster`
+/// Validates the [`v1alpha1::OpenSearchCluster`] and returns a [`ValidatedCluster`]
 ///
 /// The validated values should be wrapped in fail-safe types so that illegal states are
 /// unrepresentable in the following steps.

@@ -103,7 +103,8 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Builds the ConfigMap containing the configuration files of the role-group StatefulSet
+    /// Builds the [`ConfigMap`] containing the configuration files of the role-group
+    /// [`StatefulSet`]
     pub fn build_config_map(&self) -> ConfigMap {
         let metadata = self
             .common_metadata(self.resource_names.role_group_config_map())
@@ -122,7 +123,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Builds the role-group StatefulSet
+    /// Builds the role-group [`StatefulSet`]
     pub fn build_stateful_set(&self) -> StatefulSet {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
@@ -177,7 +178,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Builds the PodTemplateSpec for the role-group StatefulSet
+    /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
@@ -245,8 +246,8 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Returns the labels of OpenSearch nodes with the `cluster_manager` role.
     ///
-    /// As described in `RoleBuilder::build_cluster_manager_service`, this function will be
-    /// changed or deleted.
+    /// As described in [`super::role_builder::RoleBuilder::build_cluster_manager_service`], this
+    /// function will be changed or deleted.
     pub fn cluster_manager_labels(
         cluster: &ValidatedCluster,
         context_names: &ContextNames,
@@ -275,7 +276,7 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be a valid label")
     }
 
-    /// Builds the container for the PodTemplateSpec
+    /// Builds the container for the [`PodTemplateSpec`]
     fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
         let product_image = self
             .cluster
@@ -312,7 +313,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .get(EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned());
-        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `{OPENSEARCH_HOME}/config`,
+        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `OPENSEARCH_HOME/config`,
         // i.e. depend on `OPENSEARCH_HOME`.
         let opensearch_path_conf = env_vars
             .get(EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
@@ -367,7 +368,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .build()
     }
 
-    /// Builds the headless Service for the role-group
+    /// Builds the headless [`Service`] for the role-group
     pub fn build_headless_service(&self) -> Service {
         let metadata = self
             .common_metadata(self.resource_names.headless_service_name())
@@ -437,7 +438,7 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be valid annotations")
     }
 
-    /// Builds the Listener for the role-group
+    /// Builds the [`listener::v1alpha1::Listener`] for the role-group
     ///
     /// The Listener exposes only the HTTP port.
     /// The Listener operator will create a Service per role-group.
@@ -495,7 +496,9 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
-    /// Labels to select a Pod in the role-group
+    /// Labels to select a [`Pod`] in the role-group
+    ///
+    /// [`Pod`]: stackable_operator::k8s_openapi::api::core::v1::Pod
     fn pod_selector(&self) -> Labels {
         role_group_selector(
             &self.cluster,

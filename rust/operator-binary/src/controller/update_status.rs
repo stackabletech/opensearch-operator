@@ -34,7 +34,8 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// Updates the status of the `v1alpha1::OpenSearchCluster` according to the given applied resources
+/// Updates the status of the [`v1alpha1::OpenSearchCluster`] according to the given applied
+/// resources
 pub async fn update_status(
     client: &Client,
     names: &ContextNames,

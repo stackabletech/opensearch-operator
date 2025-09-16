@@ -103,7 +103,7 @@ impl<'a> RoleBuilder<'a> {
     /// Builds a Service that references all nodes with the cluster_manager node role
     ///
     /// Initially, this service was meant to be used by
-    /// `NodeConfig::initial_cluster_manager_nodes`, but the function uses now another approach.
+    /// [`super::node_config::NodeConfig::initial_cluster_manager_nodes`], but the function uses now another approach.
     /// Afterwards, it was meant to be used as an entry point to OpenSearch, but it could also make
     /// sense to use coordinating only nodes as entry points and not cluster manager nodes.
     /// Therefore, this service will bei either adapted or removed. There is already an according
@@ -144,7 +144,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
-    /// Builds a PodDisruptionBudget used by all role-groups
+    /// Builds a [`PodDisruptionBudget`] used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
         let pdb_config = &self.cluster.role_config.pod_disruption_budget;
 

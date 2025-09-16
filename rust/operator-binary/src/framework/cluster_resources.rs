@@ -6,7 +6,7 @@ use stackable_operator::{
 use super::{ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, Uid};
 use crate::framework::{MAX_LABEL_VALUE_LENGTH, NameIsValidLabelValue};
 
-/// Infallible variant of `stackable_operator::cluster_resources::ClusterResources::new`
+/// Infallible variant of [`stackable_operator::cluster_resources::ClusterResources::new`]
 pub fn cluster_resources_new(
     product_name: &ProductName,
     operator_name: &OperatorName,
@@ -19,7 +19,7 @@ pub fn cluster_resources_new(
     // Compile-time check
     // ClusterResources::new creates a label value from the given app name by appending
     // `-operator`. For the resulting label value to be valid, it must not exceed
-    // `MAX_LABEL_VALUE_LENGTH`.
+    // MAX_LABEL_VALUE_LENGTH.
     const _: () = assert!(
         ProductName::MAX_LENGTH + "-operator".len() <= MAX_LABEL_VALUE_LENGTH,
         "The string `<cluster_name>-operator` must not exceed the limit of Label names."
