@@ -1,3 +1,5 @@
+//! Builder for role-group resources
+
 use std::str::FromStr;
 
 use stackable_operator::{
@@ -62,6 +64,7 @@ fn listener_volume_name() -> PersistentVolumeClaimName {
         .expect("should be a valid PersistentVolumeClaim name")
 }
 
+/// Builder for role-group resources
 pub struct RoleGroupBuilder<'a> {
     service_account_name: ServiceAccountName,
     cluster: ValidatedCluster,
@@ -100,6 +103,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the ConfigMap containing the configuration files of the role-group StatefulSet
     pub fn build_config_map(&self) -> ConfigMap {
         let metadata = self
             .common_metadata(self.resource_names.role_group_config_map())
@@ -118,6 +122,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the role-group StatefulSet
     pub fn build_stateful_set(&self) -> StatefulSet {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
@@ -172,6 +177,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the PodTemplateSpec for the role-group StatefulSet
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
@@ -237,6 +243,10 @@ impl<'a> RoleGroupBuilder<'a> {
         pod_template
     }
 
+    /// Returns the labels of OpenSearch nodes with the `cluster_manager` role.
+    ///
+    /// As described in `RoleBuilder::build_cluster_manager_service`, this function will be
+    /// changed or deleted.
     pub fn cluster_manager_labels(
         cluster: &ValidatedCluster,
         context_names: &ContextNames,
@@ -254,6 +264,7 @@ impl<'a> RoleGroupBuilder<'a> {
         labels
     }
 
+    /// Builds a label indicating the role of the OpenSearch node
     fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
         // It is not possible to check the infallibility of the following statement at
         // compile-time. Instead, it is tested in `tests::test_build_node_role_label`.
@@ -264,6 +275,7 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be a valid label")
     }
 
+    /// Builds the container for the PodTemplateSpec
     fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
         let product_image = self
             .cluster
@@ -355,7 +367,16 @@ impl<'a> RoleGroupBuilder<'a> {
             .build()
     }
 
+    /// Builds the headless Service for the role-group
     pub fn build_headless_service(&self) -> Service {
+        let metadata = self
+            .common_metadata(self.resource_names.headless_service_name())
+            .with_labels(Self::prometheus_labels())
+            .with_annotations(Self::prometheus_annotations(
+                self.node_config.tls_on_http_port_enabled(),
+            ))
+            .build();
+
         let ports = vec![
             ServicePort {
                 name: Some(HTTP_PORT_NAME.to_owned()),
@@ -369,12 +390,21 @@ impl<'a> RoleGroupBuilder<'a> {
             },
         ];
 
-        self.build_role_group_service(
-            &self.resource_names.headless_service_name(),
-            ports,
-            Self::prometheus_labels(),
-            Self::prometheus_annotations(self.node_config.tls_on_http_port_enabled()),
-        )
+        let service_spec = ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(ports),
+            selector: Some(self.pod_selector().into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        };
+
+        Service {
+            metadata,
+            spec: Some(service_spec),
+            status: None,
+        }
     }
 
     /// Common labels for Prometheus
@@ -407,36 +437,10 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be valid annotations")
     }
 
-    fn build_role_group_service(
-        &self,
-        service_name: &ServiceName,
-        ports: Vec<ServicePort>,
-        extra_labels: Labels,
-        extra_annotations: Annotations,
-    ) -> Service {
-        let metadata = self
-            .common_metadata(service_name)
-            .with_labels(extra_labels)
-            .with_annotations(extra_annotations)
-            .build();
-
-        let service_spec = ServiceSpec {
-            // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
-            ports: Some(ports),
-            selector: Some(self.pod_selector().into()),
-            publish_not_ready_addresses: Some(true),
-            ..ServiceSpec::default()
-        };
-
-        Service {
-            metadata,
-            spec: Some(service_spec),
-            status: None,
-        }
-    }
-
+    /// Builds the Listener for the role-group
+    ///
+    /// The Listener exposes only the HTTP port.
+    /// The Listener operator will create a Service per role-group.
     pub fn build_listener(&self) -> listener::v1alpha1::Listener {
         let metadata = self
             .common_metadata(self.resource_names.listener_name())
@@ -444,25 +448,24 @@ impl<'a> RoleGroupBuilder<'a> {
 
         let listener_class = self.role_group_config.config.listener_class.to_owned();
 
+        let ports = [listener::v1alpha1::ListenerPort {
+            name: HTTP_PORT_NAME.to_string(),
+            port: HTTP_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        }];
+
         listener::v1alpha1::Listener {
             metadata,
             spec: listener::v1alpha1::ListenerSpec {
                 class_name: Some(listener_class),
-                ports: Some(self.listener_ports()),
+                ports: Some(ports.to_vec()),
                 ..listener::v1alpha1::ListenerSpec::default()
             },
             status: None,
         }
     }
 
-    fn listener_ports(&self) -> Vec<listener::v1alpha1::ListenerPort> {
-        vec![listener::v1alpha1::ListenerPort {
-            name: HTTP_PORT_NAME.to_string(),
-            port: HTTP_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        }]
-    }
-
+    /// Common metadata for role-group resources
     fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
         let mut builder = ObjectMetaBuilder::new();
 
@@ -479,6 +482,7 @@ impl<'a> RoleGroupBuilder<'a> {
         builder
     }
 
+    /// Recommended labels for role-group resources
     fn recommended_labels(&self) -> Labels {
         recommended_labels(
             &self.cluster,
@@ -491,6 +495,7 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
+    /// Labels to select a Pod in the role-group
     fn pod_selector(&self) -> Labels {
         role_group_selector(
             &self.cluster,

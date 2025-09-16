@@ -1,3 +1,5 @@
+//! The update status step in the OpenSearchCluster controller
+
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     client::Client,

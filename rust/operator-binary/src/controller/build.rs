@@ -1,3 +1,5 @@
+//! The build step in the OpenSearchCluster controller
+
 use std::marker::PhantomData;
 
 use role_builder::RoleBuilder;

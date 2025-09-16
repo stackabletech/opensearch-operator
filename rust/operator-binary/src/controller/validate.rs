@@ -1,3 +1,5 @@
+//! The validate step in the OpenSearchCluster controller
+
 use std::{collections::BTreeMap, num::TryFromIntError, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};

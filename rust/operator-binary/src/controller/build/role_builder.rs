@@ -1,3 +1,5 @@
+//! Builder for role resources
+
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::{
@@ -31,6 +33,7 @@ use crate::{
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 
+/// Builder for role resources
 pub struct RoleBuilder<'a> {
     cluster: ValidatedCluster,
     context_names: &'a ContextNames,
@@ -49,6 +52,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Creates role-group builders which are initialized with the role-level context
     pub fn role_group_builders(&self) -> Vec<RoleGroupBuilder<'_>> {
         self.cluster
             .role_group_configs
@@ -66,6 +70,7 @@ impl<'a> RoleBuilder<'a> {
             .collect()
     }
 
+    /// Builds a ServiceAccount used by all role-groups
     pub fn build_service_account(&self) -> ServiceAccount {
         let metadata = self.common_metadata(self.resource_names.service_account_name());
 
@@ -75,6 +80,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a RoleBinding used by all role-groups
     pub fn build_role_binding(&self) -> RoleBinding {
         let metadata = self.common_metadata(self.resource_names.role_binding_name());
 
@@ -94,6 +100,14 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a Service that references all nodes with the cluster_manager node role
+    ///
+    /// Initially, this service was meant to be used by
+    /// `NodeConfig::initial_cluster_manager_nodes`, but the function uses now another approach.
+    /// Afterwards, it was meant to be used as an entry point to OpenSearch, but it could also make
+    /// sense to use coordinating only nodes as entry points and not cluster manager nodes.
+    /// Therefore, this service will bei either adapted or removed. There is already an according
+    /// task entry in <https://github.com/stackabletech/opensearch-operator/issues/1>.
     pub fn build_cluster_manager_service(&self) -> Service {
         let ports = vec![
             ServicePort {
@@ -130,6 +144,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a PodDisruptionBudget used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
         let pdb_config = &self.cluster.role_config.pod_disruption_budget;
 
@@ -153,6 +168,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Common metadata for role resources
     fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMeta {
         ObjectMetaBuilder::new()
             .name(resource_name)
@@ -166,7 +182,7 @@ impl<'a> RoleBuilder<'a> {
             .build()
     }
 
-    /// Labels on role resources
+    /// Common labels for role resources
     fn labels(&self) -> Labels {
         // Well-known Kubernetes labels
         let mut labels = Labels::role_selector(

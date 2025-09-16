@@ -1,3 +1,5 @@
+//! Configuration of an OpenSearch node
+
 use std::str::FromStr;
 
 use serde_json::{Value, json};
@@ -14,33 +16,49 @@ use crate::{
     },
 };
 
+/// The main configuration file of OpenSearch
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-/// type: string
+/// The cluster name.
+/// Type: string
 pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
-/// type: (comma-separated) list of strings
+/// The list of hosts that perform discovery when a node is started.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
-/// type: string
+/// By default, OpenSearch forms a multi-node cluster. Set `discovery.type` to `single-node` to
+/// form a single-node cluster.
+/// Type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
-/// type: (comma-separated) list of strings
+/// A list of cluster-manager-eligible nodes used to bootstrap the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
     "cluster.initial_cluster_manager_nodes";
 
-/// type: string
+/// Binds an OpenSearch node to an address.
+/// Type: string
 pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 
-/// type: string
+/// A descriptive name for the node.
+/// Type: string
 pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
-/// type: (comma-separated) list of strings
+/// Defines one or more roles for an OpenSearch node.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
-/// type: (comma-separated) list of strings
+/// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
+/// Whether to enable TLS on the REST layer. If enabled, only HTTPS is allowed.
+/// Type: boolean
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
+    "plugins.security.ssl.http.enabled";
+
+/// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
@@ -62,12 +80,15 @@ impl NodeConfig {
         }
     }
 
-    /// static for the cluster
+    /// Creates the main OpenSearch configuration file in YAML format
     pub fn static_opensearch_config_file(&self) -> String {
         Self::to_yaml(self.static_opensearch_config())
     }
 
-    /// static for the cluster
+    /// Creates the main OpenSearch configuration file as JSON map
+    ///
+    /// The file should only contain cluster-wide configuration options. Node-specific options
+    /// should be defined as environment variables.
     pub fn static_opensearch_config(&self) -> serde_json::Map<String, Value> {
         let mut config = serde_json::Map::new();
 
@@ -107,13 +128,15 @@ impl NodeConfig {
         config
     }
 
+    /// Returns `true` if TLS is enabled on the HTTP port
     pub fn tls_on_http_port_enabled(&self) -> bool {
         self.static_opensearch_config()
-            .get("plugins.security.ssl.http.enabled")
+            .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
             .and_then(Self::value_as_bool)
             == Some(true)
     }
 
+    /// Converts the given JSON value to `bool` if possible
     pub fn value_as_bool(value: &Value) -> Option<bool> {
         value.as_bool().or(
             // OpenSearch parses the strings "true" and "false" as boolean, see
@@ -124,7 +147,10 @@ impl NodeConfig {
         )
     }
 
-    /// different for every node
+    /// Creates environment variables for the OpenSearch configurations
+    ///
+    /// The environment variables should only contain node-specific configuration options.
+    /// Cluster-wide options should be added to the configuration file.
     pub fn environment_variables(&self) -> EnvVarSet {
         EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.

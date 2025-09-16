@@ -1,3 +1,5 @@
+//! The apply step in the OpenSearchCluster controller
+
 use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
