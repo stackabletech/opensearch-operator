@@ -3,7 +3,7 @@
 
 == Storage for data volumes
 
-You can mount volumes where data is stored by specifying https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims] for each individual role group:
+You can mount volumes where data is stored by specifying https://kubernetes.io/docs/concepts/storage/persistent-volumes[PersistentVolumeClaims{external-link-icon}^] for each individual role group:
 
 [source,yaml]
 ----
@@ -27,7 +27,7 @@ On role groups with only the `cluster_manager` node role, you probably want to d
 
 include::home:concepts:stackable_resource_requests.adoc[]
 
-A minimal HA setup consisting of 3 nodes has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements]:
+A minimal HA setup consisting of 3 nodes has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements{external-link-icon}^]:
 
 * `300m` CPU request
 * `1200m` CPU limit

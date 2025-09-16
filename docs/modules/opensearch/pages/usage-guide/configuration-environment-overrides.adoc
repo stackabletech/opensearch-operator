@@ -40,7 +40,7 @@ They are added unchanged to the configuration file.
 Care must be taken to produce a valid configuration.
 
 For a list of configuration options, we refer to the
-https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index/[Configuring OpenSearch] section in the OpenSearch documentation.
+https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index/[Configuring OpenSearch{external-link-icon}^] section in the OpenSearch documentation.
 
 The file `opensearch.yml` is a YAML file, where deep structures are possible.
 On the other hand, `configOverrides` are only flat key-value pairs.
