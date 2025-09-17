@@ -180,11 +180,12 @@ impl ResourceNames {
     pub fn service_account_name(&self) -> ServiceAccountName {
         const SUFFIX: &str = "-serviceaccount";
 
-        // Compile-time check
+        // compile-time checks
         const _: () = assert!(
             ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceAccountName::MAX_LENGTH,
             "The string `<cluster_name>-serviceaccount` must not exceed the limit of ServiceAccount names."
         );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
 
         ServiceAccountName::from_str(&format!("{}{SUFFIX}", self.cluster_name))
             .expect("should be a valid ServiceAccount name")
@@ -193,11 +194,12 @@ impl ResourceNames {
     pub fn role_binding_name(&self) -> RoleBindingName {
         const SUFFIX: &str = "-rolebinding";
 
-        // Compile-time check
+        // compile-time checks
         const _: () = assert!(
             ClusterName::MAX_LENGTH + SUFFIX.len() <= RoleBindingName::MAX_LENGTH,
             "The string `<cluster_name>-rolebinding` must not exceed the limit of RoleBinding names."
         );
+        let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
 
         RoleBindingName::from_str(&format!("{}{SUFFIX}", self.cluster_name))
             .expect("should be a valid RoleBinding name")
@@ -206,22 +208,25 @@ impl ResourceNames {
     pub fn cluster_role_name(&self) -> ClusterRoleName {
         const SUFFIX: &str = "-clusterrole";
 
-        // Compile-time check
+        // compile-time checks
         const _: () = assert!(
             ProductName::MAX_LENGTH + SUFFIX.len() <= ClusterRoleName::MAX_LENGTH,
             "The string `<cluster_name>-clusterrole` must not exceed the limit of cluster role names."
         );
+        let _ = ProductName::IS_RFC_1123_SUBDOMAIN_NAME;
 
         ClusterRoleName::from_str(&format!("{}{SUFFIX}", self.product_name))
             .expect("should be a valid cluster role name")
     }
 
     pub fn discovery_service_name(&self) -> ServiceName {
-        // Compile-time check
+        // compile-time checks
         const _: () = assert!(
             ClusterName::MAX_LENGTH <= ServiceName::MAX_LENGTH,
             "The string `<cluster_name>` must not exceed the limit of Service names."
         );
+        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
+        let _ = ClusterName::IS_VALID_LABEL_VALUE;
 
         ServiceName::from_str(self.cluster_name.as_ref()).expect("should be a valid Service name")
     }

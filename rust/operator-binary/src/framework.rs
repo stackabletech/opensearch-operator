@@ -20,12 +20,8 @@
 //! become less frequent, then this module can be incorporated into stackable-operator. The module
 //! structure should already resemble the one of stackable-operator.
 
-use std::{fmt::Display, str::FromStr};
-
-use snafu::{ResultExt, Snafu, ensure};
-use stackable_operator::kvp::LabelValue;
+use snafu::Snafu;
 use strum::{EnumDiscriminants, IntoStaticStr};
-use uuid::Uuid;
 
 pub mod builder;
 pub mod cluster_resources;
@@ -107,13 +103,16 @@ pub trait NameIsValidLabelValue {
 }
 
 /// Restricted string type with attributes like maximum length.
+///
+/// Fully-qualified types are used to ease the import into other modules.
+#[macro_export(local_inner_macros)]
 macro_rules! attributed_string_type {
     ($name:ident, $description:literal, $example:literal $(, $attribute:tt)*) => {
-        #[doc = concat!($description, ", e.g. \"", $example, "\"")]
+        #[doc = std::concat!($description, ", e.g. \"", $example, "\"")]
         #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
 
-        impl Display for $name {
+        impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.0.fmt(f)
             }
@@ -137,14 +136,17 @@ macro_rules! attributed_string_type {
             }
         }
 
-        impl FromStr for $name {
-            type Err = Error;
+        impl std::str::FromStr for $name {
+            type Err = $crate::framework::Error;
 
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+                // ResultExt::context is used on most but not all usages of this macro
+                #[allow(unused_imports)]
+                use snafu::ResultExt;
 
-                ensure!(
+                snafu::ensure!(
                     !s.is_empty(),
-                    EmptyStringSnafu {}
+                    $crate::framework::EmptyStringSnafu {}
                 );
 
                 $(attributed_string_type!(@from_str $name, s, $attribute);)*
@@ -157,7 +159,7 @@ macro_rules! attributed_string_type {
         impl $name {
             #[allow(dead_code)]
             pub fn from_str_unsafe(s: &str) -> Self {
-                FromStr::from_str(s).expect("should be a valid {name}")
+                std::str::FromStr::from_str(s).expect("should be a valid {name}")
             }
 
             // A dead_code warning is emitted if there is no unit test that calls this function.
@@ -170,28 +172,28 @@ macro_rules! attributed_string_type {
     };
     (@from_str $name:ident, $s:expr, (max_length = $max_length:expr)) => {
         let length = $s.len() as usize;
-        ensure!(
+        snafu::ensure!(
             length <= $name::MAX_LENGTH,
-            LengthExceededSnafu {
+            $crate::framework::LengthExceededSnafu {
                 length,
                 max_length: $name::MAX_LENGTH,
             }
         );
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_dns_subdomain_name) => {
-        stackable_operator::validation::is_rfc_1123_subdomain($s).context(InvalidRfc1123DnsSubdomainNameSnafu)?;
+        stackable_operator::validation::is_rfc_1123_subdomain($s).context($crate::framework::InvalidRfc1123DnsSubdomainNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_label_name) => {
-        stackable_operator::validation::is_rfc_1123_label($s).context(InvalidRfc1123LabelNameSnafu)?;
+        stackable_operator::validation::is_rfc_1123_label($s).context($crate::framework::InvalidRfc1123LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
-        stackable_operator::validation::is_rfc_1035_label($s).context(InvalidRfc1035LabelNameSnafu)?;
+        stackable_operator::validation::is_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
-        LabelValue::from_str($s).context(InvalidLabelValueSnafu)?;
+        stackable_operator::kvp::LabelValue::from_str($s).context($crate::framework::InvalidLabelValueSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_uid) => {
-        Uuid::try_parse($s).context(InvalidUidSnafu)?;
+        uuid::Uuid::try_parse($s).context($crate::framework::InvalidUidSnafu)?;
     };
     (@trait_impl $name:ident, (max_length = $max_length:expr)) => {
         impl $name {
@@ -199,27 +201,43 @@ macro_rules! attributed_string_type {
             pub const MAX_LENGTH: usize = $max_length;
         }
     };
+    (@trait_impl $name:ident, is_rfc_1035_label_name) => {
+        impl $name {
+            pub const IS_RFC_1035_LABEL_NAME: bool = true;
+            pub const IS_RFC_1123_LABEL_NAME: bool = true;
+            pub const IS_RFC_1123_SUBDOMAIN_NAME: bool = true;
+        }
+    };
     (@trait_impl $name:ident, is_rfc_1123_dns_subdomain_name) => {
+        impl $name {
+            pub const IS_RFC_1123_SUBDOMAIN_NAME: bool = true;
+        }
     };
     (@trait_impl $name:ident, is_rfc_1123_label_name) => {
-    };
-    (@trait_impl $name:ident, is_rfc_1035_label_name) => {
+        impl $name {
+            pub const IS_RFC_1123_LABEL_NAME: bool = true;
+            pub const IS_RFC_1123_SUBDOMAIN_NAME: bool = true;
+        }
     };
     (@trait_impl $name:ident, is_uid) => {
-        impl From<Uuid> for $name {
-            fn from(value: Uuid) -> Self {
+        impl From<uuid::Uuid> for $name {
+            fn from(value: uuid::Uuid) -> Self {
                 Self(value.to_string())
             }
         }
 
-        impl From<&Uuid> for $name {
-            fn from(value: &Uuid) -> Self {
+        impl From<&uuid::Uuid> for $name {
+            fn from(value: &uuid::Uuid) -> Self {
                 Self(value.to_string())
             }
         }
     };
     (@trait_impl $name:ident, is_valid_label_value) => {
-        impl NameIsValidLabelValue for $name {
+        impl $name {
+            pub const IS_VALID_LABEL_VALUE: bool = true;
+        }
+
+        impl $crate::framework::NameIsValidLabelValue for $name {
             fn to_label_value(&self) -> String {
                 self.0.clone()
             }
@@ -321,7 +339,12 @@ attributed_string_type! {
     StatefulSetName,
     "The name of a StatefulSet",
     "opensearch-nodes-default",
-    (max_length = min(MAX_RFC_1123_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = min(
+        // see https://github.com/kubernetes/kubernetes/issues/64023
+        MAX_RFC_1123_LABEL_NAME_LENGTH
+            - 1 /* dash */
+            - 10 /* digits for the controller-revision-hash label */,
+        MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -351,6 +374,7 @@ attributed_string_type! {
     // A suffix is added to produce a label value. An according compile-time check ensures that
     // max_length cannot be set higher.
     (max_length = min(54, MAX_LABEL_VALUE_LENGTH)),
+    is_rfc_1123_dns_subdomain_name,
     is_valid_label_value
 }
 attributed_string_type! {
@@ -364,9 +388,10 @@ attributed_string_type! {
     ClusterName,
     "The name of a cluster/stacklet",
     "my-opensearch-cluster",
-    // Suffixes are added to produce a resource names. According compile-time check ensures that
+    // Suffixes are added to produce resource names. According compile-time checks ensure that
     // max_length cannot be set higher.
     (max_length = min(24, MAX_LABEL_VALUE_LENGTH)),
+    is_rfc_1035_label_name,
     is_valid_label_value
 }
 attributed_string_type! {
@@ -391,6 +416,7 @@ attributed_string_type! {
     // are valid, max_length is restricted. Compile-time checks ensure that max_length cannot be
     // set higher if not other names like the RoleName are set lower accordingly.
     (max_length = min(16, MAX_LABEL_VALUE_LENGTH)),
+    is_rfc_1123_label_name,
     is_valid_label_value
 }
 attributed_string_type! {
@@ -401,23 +427,20 @@ attributed_string_type! {
     // valid, max_length is restricted. Compile-time checks ensure that max_length cannot be set
     // higher if not other names like the RoleGroupName are set lower accordingly.
     (max_length = min(10, MAX_LABEL_VALUE_LENGTH)),
+    is_rfc_1123_label_name,
     is_valid_label_value
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Display, str::FromStr};
+    use std::str::FromStr;
 
-    use snafu::{ResultExt, ensure};
-    use uuid::{Uuid, uuid};
+    use uuid::uuid;
 
     use super::{
-        ClusterName, ClusterRoleName, ConfigMapName, ControllerName, EmptyStringSnafu, Error,
-        ErrorDiscriminants, InvalidLabelValueSnafu, InvalidRfc1035LabelNameSnafu,
-        InvalidRfc1123DnsSubdomainNameSnafu, InvalidRfc1123LabelNameSnafu, InvalidUidSnafu,
-        LabelValue, LengthExceededSnafu, NamespaceName, OperatorName, PersistentVolumeClaimName,
-        ProductVersion, RoleBindingName, RoleGroupName, RoleName, ServiceAccountName, ServiceName,
-        StatefulSetName, Uid, VolumeName,
+        ClusterName, ClusterRoleName, ConfigMapName, ControllerName, ErrorDiscriminants,
+        NamespaceName, OperatorName, PersistentVolumeClaimName, ProductVersion, RoleBindingName,
+        RoleGroupName, RoleName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
     };
     use crate::framework::{NameIsValidLabelValue, ProductName};
 
@@ -505,6 +528,10 @@ mod tests {
     fn test_attributed_string_type_is_rfc_1035_label_name() {
         type T = IsRfc1035LabelNameTest;
 
+        let _ = T::IS_RFC_1035_LABEL_NAME;
+        let _ = T::IS_RFC_1123_LABEL_NAME;
+        let _ = T::IS_RFC_1123_SUBDOMAIN_NAME;
+
         T::test_example();
         assert_eq!(
             Err(ErrorDiscriminants::InvalidRfc1035LabelName),
@@ -522,6 +549,8 @@ mod tests {
     #[test]
     fn test_attributed_string_type_is_rfc_1123_dns_subdomain_name() {
         type T = IsRfc1123DnsSubdomainNameTest;
+
+        let _ = T::IS_RFC_1123_SUBDOMAIN_NAME;
 
         T::test_example();
         assert_eq!(
@@ -541,6 +570,9 @@ mod tests {
     fn test_attributed_string_type_is_rfc_1123_label_name() {
         type T = IsRfc1123LabelNameTest;
 
+        let _ = T::IS_RFC_1123_LABEL_NAME;
+        let _ = T::IS_RFC_1123_SUBDOMAIN_NAME;
+
         T::test_example();
         assert_eq!(
             Err(ErrorDiscriminants::InvalidRfc1123LabelName),
@@ -558,6 +590,8 @@ mod tests {
     #[test]
     fn test_attributed_string_type_is_valid_label_value() {
         type T = IsValidLabelValueTest;
+
+        let _ = T::IS_VALID_LABEL_VALUE;
 
         T::test_example();
         assert_eq!(

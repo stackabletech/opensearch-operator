@@ -16,7 +16,7 @@ pub fn cluster_resources_new(
     cluster_uid: &Uid,
     apply_strategy: ClusterResourceApplyStrategy,
 ) -> ClusterResources {
-    // Compile-time check
+    // compile-time check
     // ClusterResources::new creates a label value from the given app name by appending
     // `-operator`. For the resulting label value to be valid, it must not exceed
     // MAX_LABEL_VALUE_LENGTH.
