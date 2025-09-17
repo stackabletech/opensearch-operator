@@ -1,3 +1,5 @@
+//! The apply step in the OpenSearchCluster controller
+
 use std::marker::PhantomData;
 
 use snafu::{ResultExt, Snafu};
@@ -8,9 +10,7 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, KubernetesResources, Prepared};
-use crate::framework::{
-    HasNamespace, HasObjectName, HasUid, cluster_resources::cluster_resources_new,
-};
+use crate::framework::{ClusterName, NamespaceName, Uid, cluster_resources::cluster_resources_new};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -28,6 +28,10 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// Applier for the Kubernetes resource specifications produced by this controller
+///
+/// The implementation is not tied to this controller and could theoretically be moved to
+/// stackable_operator if [`KubernetesResources`] would contain all possible resource types.
 pub struct Applier<'a> {
     client: &'a Client,
     cluster_resources: ClusterResources,
@@ -37,14 +41,18 @@ impl<'a> Applier<'a> {
     pub fn new(
         client: &'a Client,
         names: &ContextNames,
-        cluster: &(impl HasObjectName + HasNamespace + HasUid),
+        cluster_name: &ClusterName,
+        cluster_namespace: &NamespaceName,
+        cluster_uid: &Uid,
         apply_strategy: ClusterResourceApplyStrategy,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
             &names.product_name,
             &names.operator_name,
             &names.controller_name,
-            cluster,
+            cluster_name,
+            cluster_namespace,
+            cluster_uid,
             apply_strategy,
         );
 
@@ -54,6 +62,7 @@ impl<'a> Applier<'a> {
         }
     }
 
+    /// Applies the given Kubernetes resources and marks them as applied
     pub async fn apply(
         mut self,
         resources: KubernetesResources<Prepared>,

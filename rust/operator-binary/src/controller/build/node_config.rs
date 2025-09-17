@@ -1,3 +1,5 @@
+//! Configuration of an OpenSearch node
+
 use std::str::FromStr;
 
 use serde_json::{Value, json};
@@ -8,42 +10,59 @@ use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{
+        ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
     },
 };
 
+/// The main configuration file of OpenSearch
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-/// type: string
+/// The cluster name.
+/// Type: string
 pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
-/// type: (comma-separated) list of strings
+/// The list of hosts that perform discovery when a node is started.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
-/// type: string
+/// By default, OpenSearch forms a multi-node cluster. Set `discovery.type` to `single-node` to
+/// form a single-node cluster.
+/// Type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
-/// type: (comma-separated) list of strings
+/// A list of cluster-manager-eligible nodes used to bootstrap the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
     "cluster.initial_cluster_manager_nodes";
 
-/// type: string
+/// Binds an OpenSearch node to an address.
+/// Type: string
 pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 
-/// type: string
+/// A descriptive name for the node.
+/// Type: string
 pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
-/// type: (comma-separated) list of strings
+/// Defines one or more roles for an OpenSearch node.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
-/// type: (comma-separated) list of strings
+/// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
+/// Whether to enable TLS on the REST layer. If enabled, only HTTPS is allowed.
+/// Type: boolean
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
+    "plugins.security.ssl.http.enabled";
+
+/// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
-    discovery_service_name: String,
+    discovery_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -52,7 +71,7 @@ impl NodeConfig {
     pub fn new(
         cluster: ValidatedCluster,
         role_group_config: OpenSearchRoleGroupConfig,
-        discovery_service_name: String,
+        discovery_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
@@ -61,12 +80,15 @@ impl NodeConfig {
         }
     }
 
-    /// static for the cluster
+    /// Creates the main OpenSearch configuration file in YAML format
     pub fn static_opensearch_config_file(&self) -> String {
         Self::to_yaml(self.static_opensearch_config())
     }
 
-    /// static for the cluster
+    /// Creates the main OpenSearch configuration file as JSON map
+    ///
+    /// The file should only contain cluster-wide configuration options. Node-specific options
+    /// should be defined as environment variables.
     pub fn static_opensearch_config(&self) -> serde_json::Map<String, Value> {
         let mut config = serde_json::Map::new();
 
@@ -106,13 +128,15 @@ impl NodeConfig {
         config
     }
 
+    /// Returns `true` if TLS is enabled on the HTTP port
     pub fn tls_on_http_port_enabled(&self) -> bool {
         self.static_opensearch_config()
-            .get("plugins.security.ssl.http.enabled")
+            .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
             .and_then(Self::value_as_bool)
             == Some(true)
     }
 
+    /// Converts the given JSON value to [`bool`] if possible
     pub fn value_as_bool(value: &Value) -> Option<bool> {
         value.as_bool().or(
             // OpenSearch parses the strings "true" and "false" as boolean, see
@@ -123,11 +147,14 @@ impl NodeConfig {
         )
     }
 
-    /// different for every node
+    /// Creates environment variables for the OpenSearch configurations
+    ///
+    /// The environment variables should only contain node-specific configuration options.
+    /// Cluster-wide options should be added to the configuration file.
     pub fn environment_variables(&self) -> EnvVarSet {
         EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.
-            // The node name is used e.g. for `{INITIAL_CLUSTER_MANAGER_NODES}`.
+            // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
                 EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,
@@ -162,9 +189,9 @@ impl NodeConfig {
             .join("\n")
     }
 
-    /// Configuration for `{DISCOVERY_TYPE}`
+    /// Configuration for `discovery.type`
     ///
-    /// "zen" is the default if `{DISCOVERY_TYPE}` is not set.
+    /// "zen" is the default if `discovery.type` is not set.
     /// It is nevertheless explicitly set here.
     /// see <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/discovery/DiscoveryModule.java#L88-L89>
     ///
@@ -209,7 +236,7 @@ impl NodeConfig {
                 .cluster
                 .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
 
-            // This setting requires node names as set in `{NODE_NAME}`.
+            // This setting requires node names as set in NODE_NAME.
             // The node names are set to the pod names with
             // `valueFrom.fieldRef.fieldPath: metadata.name`, so it is okay to calculate the pod
             // names here and use them as node names.
@@ -248,13 +275,14 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::*;
     use crate::{
         controller::ValidatedOpenSearchConfig,
         crd::NodeRoles,
         framework::{
-            ClusterName, ProductVersion, RoleGroupName,
+            ClusterName, NamespaceName, ProductVersion, RoleGroupName,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -303,8 +331,8 @@ mod tests {
             image.clone(),
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
-            "default".to_owned(),
-            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
@@ -316,7 +344,7 @@ mod tests {
         NodeConfig::new(
             cluster,
             role_group_config,
-            "my-opensearch-cluster-manager".to_owned(),
+            ServiceName::from_str_unsafe("my-opensearch-cluster-manager"),
         )
     }
 
