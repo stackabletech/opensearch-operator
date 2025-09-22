@@ -1,8 +1,23 @@
-use stackable_operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH;
+use std::str::FromStr;
 
-use super::{ClusterName, RoleGroupName, RoleName};
-use crate::framework::{HasObjectName, kvp::label::MAX_LABEL_VALUE_LENGTH};
+use super::{
+    ClusterName, ConfigMapName, ListenerName, RoleGroupName, RoleName, StatefulSetName, min,
+};
+use crate::{attributed_string_type, framework::ServiceName};
+use stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH;
 
+attributed_string_type! {
+    QualifiedRoleGroupName,
+    "A qualified role group name consisting of the cluster name, role name and role-group name. It is a valid label name as defined in RFC 1035 that can be used e.g. as a name for a Service or a StatefulSet.",
+    "opensearch-nodes-default",
+    // Suffixes are added to produce resource names. According compile-time checks ensure that
+    // max_length cannot be set higher.
+    (max_length = min(52, RFC_1035_LABEL_MAX_LENGTH)),
+    is_rfc_1035_label_name,
+    is_valid_label_value
+}
+
+/// Type-safe names for role-group resources
 pub struct ResourceNames {
     pub cluster_name: ClusterName,
     pub role_name: RoleName,
@@ -10,82 +25,104 @@ pub struct ResourceNames {
 }
 
 impl ResourceNames {
-    // used at compile-time
-    #[allow(dead_code)]
-    const MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH: usize = ClusterName::MAX_LENGTH
-            + 1 // dash
-            + RoleName::MAX_LENGTH
-            + 1 // dash
-            + RoleGroupName::MAX_LENGTH;
+    /// Creates a qualified role group name in the format
+    /// `<cluster_name>-<role_name>-<role_group_name>`
+    fn qualified_role_group_name(&self) -> QualifiedRoleGroupName {
+        // compile-time checks
+        const _: () = assert!(
+            ClusterName::MAX_LENGTH
+                + 1 // dash
+                + RoleName::MAX_LENGTH
+                + 1 // dash
+                + RoleGroupName::MAX_LENGTH
+                <= QualifiedRoleGroupName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>-<role_group_name>` must not exceed the limit \
+            of RFC 1035 label names."
+        );
+        // qualified_role_group_name is only an RFC 1035 label name if it starts with an
+        // alphabetic character, therefore cluster_name must also be an RFC 1035 label name.
+        // role_name and role_group_name and the middle of the qualified_role_group_name can
+        // be RFC 1123 label names because digits are allowed there.
+        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
+        let _ = RoleName::IS_RFC_1123_LABEL_NAME;
+        let _ = RoleGroupName::IS_RFC_1123_LABEL_NAME;
 
-    /// Creates a qualified role group name consisting of the cluster name, role name and role-group
-    /// name.
-    /// The result is a valid DNS subdomain name as defined in RFC 1123 that can be used e.g. as a name
-    /// for a StatefulSet.
-    fn qualified_role_group_name(&self) -> String {
-        format!(
+        QualifiedRoleGroupName::from_str(&format!(
             "{}-{}-{}",
-            self.cluster_name.to_object_name(),
-            self.role_name.to_object_name(),
-            self.role_group_name.to_object_name()
-        )
+            self.cluster_name, self.role_name, self.role_group_name,
+        ))
+        .expect("should be a valid QualifiedRoleGroupName")
     }
 
-    pub fn role_group_config_map(&self) -> String {
-        // Compile-time check
+    pub fn role_group_config_map(&self) -> ConfigMapName {
+        // compile-time check
         const _: () = assert!(
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= RFC_1123_SUBDOMAIN_MAX_LENGTH,
-            "The ConfigMap name `<cluster_name>-<role_name>-<role_group_name>` must not exceed 253 characters."
+            QualifiedRoleGroupName::MAX_LENGTH <= ConfigMapName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>-<role_group_name>` must not exceed the limit of \
+            ConfigMap names."
         );
+        let _ = QualifiedRoleGroupName::IS_RFC_1123_SUBDOMAIN_NAME;
 
-        self.qualified_role_group_name()
+        ConfigMapName::from_str(self.qualified_role_group_name().as_ref())
+            .expect("should be a valid ConfigMap name")
     }
 
-    pub fn stateful_set_name(&self) -> String {
-        // Compile-time check
+    pub fn stateful_set_name(&self) -> StatefulSetName {
+        // compile-time checks
         const _: () = assert!(
-            // see https://github.com/kubernetes/kubernetes/issues/64023
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH
-            + 1 // dash
-            + 10 // digits for the controller-revision-hash label
-            <= MAX_LABEL_VALUE_LENGTH,
-            "The maximum lengths of the cluster name, role name and role group name must be defined so that the combination of these names (including separators and the sequential pod number or hash) is also a valid object name with a maximum of 63 characters (see RFC 1123)"
+            QualifiedRoleGroupName::MAX_LENGTH <= StatefulSetName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>-<role_group_name>` must not exceed the \
+            limit of StatefulSet names."
         );
+        let _ = QualifiedRoleGroupName::IS_RFC_1123_LABEL_NAME;
+        let _ = QualifiedRoleGroupName::IS_VALID_LABEL_VALUE;
 
-        self.qualified_role_group_name()
+        StatefulSetName::from_str(self.qualified_role_group_name().as_ref())
+            .expect("should be a valid StatefulSet name")
     }
 
-    pub fn headless_service_name(&self) -> String {
+    pub fn headless_service_name(&self) -> ServiceName {
         const SUFFIX: &str = "-headless";
 
-        // Compile-time check
+        // compile-time checks
         const _: () = assert!(
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH + SUFFIX.len()
-                <= MAX_LABEL_VALUE_LENGTH,
-            "The Service name `<cluster_name>-<role_name>-<role_group_name>-headless` must not exceed 63 characters."
+            QualifiedRoleGroupName::MAX_LENGTH + SUFFIX.len() <= ServiceName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>-<role_group_name>-headless` must not exceed the \
+            limit of Service names."
         );
+        let _ = QualifiedRoleGroupName::IS_RFC_1035_LABEL_NAME;
+        let _ = QualifiedRoleGroupName::IS_VALID_LABEL_VALUE;
 
-        format!("{}{SUFFIX}", self.qualified_role_group_name())
+        ServiceName::from_str(&format!("{}{SUFFIX}", self.qualified_role_group_name()))
+            .expect("should be a valid Service name")
     }
 
-    pub fn listener_service_name(&self) -> String {
-        // Compile-time check
+    pub fn listener_name(&self) -> ListenerName {
+        // compile-time checks
         const _: () = assert!(
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= RFC_1123_SUBDOMAIN_MAX_LENGTH,
-            "The listener name `<cluster_name>-<role_name>-<role_group_name>` must not exceed 253 characters."
+            QualifiedRoleGroupName::MAX_LENGTH <= ListenerName::MAX_LENGTH,
+            "The string `<cluster_name>-<role_name>-<role_group_name>` must not exceed the limit of \
+            Listener names."
         );
+        let _ = QualifiedRoleGroupName::IS_RFC_1123_SUBDOMAIN_NAME;
 
-        self.qualified_role_group_name()
+        ListenerName::from_str(self.qualified_role_group_name().as_ref())
+            .expect("should be a valid Listener name")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{ClusterName, RoleGroupName, RoleName};
-    use crate::framework::role_group_utils::ResourceNames;
+    use crate::framework::{
+        ConfigMapName, ListenerName, ServiceName, StatefulSetName,
+        role_group_utils::{QualifiedRoleGroupName, ResourceNames},
+    };
 
     #[test]
     fn test_resource_names() {
+        QualifiedRoleGroupName::test_example();
+
         let resource_names = ResourceNames {
             cluster_name: ClusterName::from_str_unsafe("test-cluster"),
             role_name: RoleName::from_str_unsafe("data-nodes"),
@@ -93,24 +130,24 @@ mod tests {
         };
 
         assert_eq!(
-            "test-cluster-data-nodes-ssd-storage",
+            QualifiedRoleGroupName::from_str_unsafe("test-cluster-data-nodes-ssd-storage"),
             resource_names.qualified_role_group_name()
         );
         assert_eq!(
-            "test-cluster-data-nodes-ssd-storage",
+            ConfigMapName::from_str_unsafe("test-cluster-data-nodes-ssd-storage"),
             resource_names.role_group_config_map()
         );
         assert_eq!(
-            "test-cluster-data-nodes-ssd-storage",
+            StatefulSetName::from_str_unsafe("test-cluster-data-nodes-ssd-storage"),
             resource_names.stateful_set_name()
         );
         assert_eq!(
-            "test-cluster-data-nodes-ssd-storage-headless",
+            ServiceName::from_str_unsafe("test-cluster-data-nodes-ssd-storage-headless"),
             resource_names.headless_service_name()
         );
         assert_eq!(
-            "test-cluster-data-nodes-ssd-storage",
-            resource_names.listener_service_name()
+            ListenerName::from_str_unsafe("test-cluster-data-nodes-ssd-storage"),
+            resource_names.listener_name()
         );
     }
 }

@@ -1,3 +1,5 @@
+//! The build step in the OpenSearchCluster controller
+
 use std::marker::PhantomData;
 
 use role_builder::RoleBuilder;
@@ -8,6 +10,13 @@ pub mod node_config;
 pub mod role_builder;
 pub mod role_group_builder;
 
+/// Builds Kubernetes resource specifications from the given validated cluster
+///
+/// This function cannot fail because all failing conditions were already checked in the validation
+/// step.
+/// A Kubernetes client is not required because references to other Kubernetes resources must
+/// already be dereferenced in a prior step and the result would be validated and added to the
+/// validated cluster.
 pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResources<Prepared> {
     let mut config_maps = vec![];
     let mut stateful_sets = vec![];
@@ -58,6 +67,7 @@ mod tests {
         kvp::LabelValue,
         role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::build;
     use crate::{
@@ -67,8 +77,9 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -153,8 +164,8 @@ mod tests {
             },
             ProductVersion::from_str_unsafe("3.1.0"),
             ClusterName::from_str_unsafe("my-opensearch"),
-            "default".to_owned(),
-            "e6ac237d-a6d4-43a1-8135-f36506110912".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
             GenericRoleConfig::default(),
             [
                 (

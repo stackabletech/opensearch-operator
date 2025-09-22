@@ -1,3 +1,5 @@
+//! Builder for role resources
+
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
     k8s_openapi::{
@@ -21,7 +23,7 @@ use super::role_group_builder::{
 use crate::{
     controller::{ContextNames, ValidatedCluster},
     framework::{
-        IsLabelValue,
+        NameIsValidLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
@@ -31,6 +33,7 @@ use crate::{
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
 
+/// Builder for role resources
 pub struct RoleBuilder<'a> {
     cluster: ValidatedCluster,
     context_names: &'a ContextNames,
@@ -49,6 +52,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Creates role-group builders which are initialized with the role-level context
     pub fn role_group_builders(&self) -> Vec<RoleGroupBuilder<'_>> {
         self.cluster
             .role_group_configs
@@ -66,6 +70,7 @@ impl<'a> RoleBuilder<'a> {
             .collect()
     }
 
+    /// Builds a ServiceAccount used by all role-groups
     pub fn build_service_account(&self) -> ServiceAccount {
         let metadata = self.common_metadata(self.resource_names.service_account_name());
 
@@ -75,6 +80,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a RoleBinding used by all role-groups
     pub fn build_role_binding(&self) -> RoleBinding {
         let metadata = self.common_metadata(self.resource_names.role_binding_name());
 
@@ -83,17 +89,25 @@ impl<'a> RoleBuilder<'a> {
             role_ref: RoleRef {
                 api_group: ClusterRole::GROUP.to_owned(),
                 kind: ClusterRole::KIND.to_owned(),
-                name: self.resource_names.cluster_role_name(),
+                name: self.resource_names.cluster_role_name().to_string(),
             },
             subjects: Some(vec![Subject {
                 api_group: Some(ServiceAccount::GROUP.to_owned()),
                 kind: ServiceAccount::KIND.to_owned(),
-                name: self.resource_names.service_account_name(),
-                namespace: Some(self.cluster.namespace.clone()),
+                name: self.resource_names.service_account_name().to_string(),
+                namespace: Some(self.cluster.namespace.to_string()),
             }]),
         }
     }
 
+    /// Builds a Service that references all nodes with the cluster_manager node role
+    ///
+    /// Initially, this service was meant to be used by
+    /// [`super::node_config::NodeConfig::initial_cluster_manager_nodes`], but the function uses now another approach.
+    /// Afterwards, it was meant to be used as an entry point to OpenSearch, but it could also make
+    /// sense to use coordinating only nodes as entry points and not cluster manager nodes.
+    /// Therefore, this service will bei either adapted or removed. There is already an according
+    /// task entry in <https://github.com/stackabletech/opensearch-operator/issues/1>.
     pub fn build_cluster_manager_service(&self) -> Service {
         let ports = vec![
             ServicePort {
@@ -130,6 +144,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a [`PodDisruptionBudget`] used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
         let pdb_config = &self.cluster.role_config.pod_disruption_budget;
 
@@ -153,6 +168,7 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Common metadata for role resources
     fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMeta {
         ObjectMetaBuilder::new()
             .name(resource_name)
@@ -166,7 +182,7 @@ impl<'a> RoleBuilder<'a> {
             .build()
     }
 
-    /// Labels on role resources
+    /// Common labels for role resources
     fn labels(&self) -> Labels {
         // Well-known Kubernetes labels
         let mut labels = Labels::role_selector(
@@ -177,11 +193,11 @@ impl<'a> RoleBuilder<'a> {
         .unwrap();
 
         let managed_by = Label::managed_by(
-            &self.context_names.operator_name.to_string(),
-            &self.context_names.controller_name.to_string(),
+            self.context_names.operator_name.as_ref(),
+            self.context_names.controller_name.as_ref(),
         )
         .unwrap();
-        let version = Label::version(&self.cluster.product_version.to_string()).unwrap();
+        let version = Label::version(self.cluster.product_version.as_ref()).unwrap();
 
         labels.insert(managed_by);
         labels.insert(version);
@@ -213,6 +229,7 @@ mod tests {
         kvp::LabelValue,
         role_utils::GenericRoleConfig,
     };
+    use uuid::uuid;
 
     use super::RoleBuilder;
     use crate::{
@@ -221,8 +238,9 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -270,8 +288,8 @@ mod tests {
             },
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
-            "default".to_owned(),
-            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
