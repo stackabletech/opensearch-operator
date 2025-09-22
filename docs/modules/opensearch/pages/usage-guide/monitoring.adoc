@@ -83,11 +83,11 @@ stringData:
       - opendistro_security_anonymous_backendrole
 ----
 <1>  If anonymous authentication is enabled, then all defined HTTP authenticators are non-challenging.
-<2> Enable https://docs.opensearch.org/latest/security/access-control/anonymous-authentication/[anonymous authentication]
+<2> Enable https://docs.opensearch.org/latest/security/access-control/anonymous-authentication/[anonymous authentication{external-link-icon}^]
 <3> Create a role "monitoring" with the required permissions for the Prometheus endpoint
 <4> Map the role "monitoring" to the backend role "opendistro_security_anonymous_backendrole" that is assigned to the anonymous user
 
-If you use the https://prometheus-operator.dev/[Prometheus Operator] to install Prometheus, then you can define a https://prometheus-operator.dev/docs/api-reference/api/#monitoring.coreos.com/v1.ServiceMonitor[ServiceMonitor] to collect the metrics:
+If you use the https://prometheus-operator.dev/[Prometheus Operator{external-link-icon}^] to install Prometheus, then you can define a https://prometheus-operator.dev/docs/api-reference/api/#monitoring.coreos.com/v1.ServiceMonitor[ServiceMonitor{external-link-icon}^] to collect the metrics:
 
 [source,yaml]
 ----
