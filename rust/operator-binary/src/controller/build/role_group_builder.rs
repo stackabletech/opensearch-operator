@@ -1,3 +1,7 @@
+//! Builder for role-group resources
+
+use std::str::FromStr;
+
 use stackable_operator::{
     builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
     crd::listener::{self},
@@ -21,10 +25,15 @@ use crate::{
     controller::{ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster},
     crd::v1alpha1,
     framework::{
-        RoleGroupName,
-        builder::{meta::ownerreference_from_resource, pod::container::EnvVarName},
+        PersistentVolumeClaimName, RoleGroupName, ServiceAccountName, ServiceName, VolumeName,
+        builder::{
+            meta::ownerreference_from_resource,
+            pod::{
+                container::EnvVarName,
+                volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
+            },
+        },
         kvp::label::{recommended_labels, role_group_selector, role_selector},
-        listener::listener_pvc,
         role_group_utils::ResourceNames,
     },
 };
@@ -42,8 +51,22 @@ const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
+fn config_volume_name() -> VolumeName {
+    VolumeName::from_str(CONFIG_VOLUME_NAME).expect("should be a valid Volume name")
+}
+
+fn data_volume_name() -> VolumeName {
+    VolumeName::from_str(DATA_VOLUME_NAME).expect("should be a valid Volume name")
+}
+
+fn listener_volume_name() -> PersistentVolumeClaimName {
+    PersistentVolumeClaimName::from_str(LISTENER_VOLUME_NAME)
+        .expect("should be a valid PersistentVolumeClaim name")
+}
+
+/// Builder for role-group resources
 pub struct RoleGroupBuilder<'a> {
-    service_account_name: String,
+    service_account_name: ServiceAccountName,
     cluster: ValidatedCluster,
     node_config: NodeConfig,
     role_group_name: RoleGroupName,
@@ -54,12 +77,12 @@ pub struct RoleGroupBuilder<'a> {
 
 impl<'a> RoleGroupBuilder<'a> {
     pub fn new(
-        service_account_name: String,
+        service_account_name: ServiceAccountName,
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
         context_names: &'a ContextNames,
-        discovery_service_name: String,
+        discovery_service_name: ServiceName,
     ) -> RoleGroupBuilder<'a> {
         RoleGroupBuilder {
             service_account_name,
@@ -80,6 +103,8 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the [`ConfigMap`] containing the configuration files of the role-group
+    /// [`StatefulSet`]
     pub fn build_config_map(&self) -> ConfigMap {
         let metadata = self
             .common_metadata(self.resource_names.role_group_config_map())
@@ -98,6 +123,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the role-group [`StatefulSet`]
     pub fn build_stateful_set(&self) -> StatefulSet {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
@@ -111,19 +137,19 @@ impl<'a> RoleGroupBuilder<'a> {
             .resources
             .storage
             .data
-            .build_pvc(DATA_VOLUME_NAME, Some(vec!["ReadWriteOnce"]));
+            .build_pvc(data_volume_name().as_ref(), Some(vec!["ReadWriteOnce"]));
 
-        let listener_group_name = self.resource_names.listener_service_name();
+        let listener_group_name = self.resource_names.listener_name();
 
         // Listener endpoints for the all rolegroups will use persistent
         // volumes so that load balancers can hard-code the target
         // addresses. This will be the case even when no class is set (and
         // the value defaults to cluster-internal) as the address should
         // still be consistent.
-        let listener_volume_claim_template = listener_pvc(
-            listener_group_name,
+        let listener_volume_claim_template = listener_operator_volume_source_builder_build_pvc(
+            &ListenerReference::Listener(listener_group_name),
             &self.recommended_labels(),
-            LISTENER_VOLUME_NAME.to_string(),
+            &listener_volume_name(),
         );
 
         let pvcs: Option<Vec<PersistentVolumeClaim>> = Some(vec![
@@ -139,7 +165,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 match_labels: Some(self.pod_selector().into()),
                 ..LabelSelector::default()
             },
-            service_name: Some(self.resource_names.headless_service_name()),
+            service_name: Some(self.resource_names.headless_service_name().to_string()),
             template,
             volume_claim_templates: pvcs,
             ..StatefulSetSpec::default()
@@ -152,6 +178,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
         for node_role in self.role_group_config.config.node_roles.iter() {
@@ -194,16 +221,16 @@ impl<'a> RoleGroupBuilder<'a> {
                     fs_group: Some(1000),
                     ..PodSecurityContext::default()
                 }),
-                service_account_name: Some(self.service_account_name.clone()),
+                service_account_name: Some(self.service_account_name.to_string()),
                 termination_grace_period_seconds: Some(
                     self.role_group_config
                         .config
                         .termination_grace_period_seconds,
                 ),
                 volumes: Some(vec![Volume {
-                    name: CONFIG_VOLUME_NAME.to_owned(),
+                    name: config_volume_name().to_string(),
                     config_map: Some(ConfigMapVolumeSource {
-                        name: self.resource_names.role_group_config_map(),
+                        name: self.resource_names.role_group_config_map().to_string(),
                         ..Default::default()
                     }),
                     ..Volume::default()
@@ -217,6 +244,10 @@ impl<'a> RoleGroupBuilder<'a> {
         pod_template
     }
 
+    /// Returns the labels of OpenSearch nodes with the `cluster_manager` role.
+    ///
+    /// As described in [`super::role_builder::RoleBuilder::build_cluster_manager_service`], this
+    /// function will be changed or deleted.
     pub fn cluster_manager_labels(
         cluster: &ValidatedCluster,
         context_names: &ContextNames,
@@ -234,6 +265,7 @@ impl<'a> RoleGroupBuilder<'a> {
         labels
     }
 
+    /// Builds a label indicating the role of the OpenSearch node
     fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
         // It is not possible to check the infallibility of the following statement at
         // compile-time. Instead, it is tested in `tests::test_build_node_role_label`.
@@ -244,6 +276,7 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be a valid label")
     }
 
+    /// Builds the container for the [`PodTemplateSpec`]
     fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
         let product_image = self
             .cluster
@@ -280,7 +313,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .get(EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned());
-        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `{OPENSEARCH_HOME}/config`,
+        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `OPENSEARCH_HOME/config`,
         // i.e. depend on `OPENSEARCH_HOME`.
         let opensearch_path_conf = env_vars
             .get(EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
@@ -300,14 +333,14 @@ impl<'a> RoleGroupBuilder<'a> {
                     mount_path: format!(
                         "{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"
                     ),
-                    name: CONFIG_VOLUME_NAME.to_owned(),
+                    name: config_volume_name().to_string(),
                     read_only: Some(true),
                     sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
                     ..VolumeMount::default()
                 },
                 VolumeMount {
                     mount_path: format!("{opensearch_home}/data"),
-                    name: DATA_VOLUME_NAME.to_owned(),
+                    name: data_volume_name().to_string(),
                     ..VolumeMount::default()
                 },
                 VolumeMount {
@@ -335,7 +368,16 @@ impl<'a> RoleGroupBuilder<'a> {
             .build()
     }
 
+    /// Builds the headless [`Service`] for the role-group
     pub fn build_headless_service(&self) -> Service {
+        let metadata = self
+            .common_metadata(self.resource_names.headless_service_name())
+            .with_labels(Self::prometheus_labels())
+            .with_annotations(Self::prometheus_annotations(
+                self.node_config.tls_on_http_port_enabled(),
+            ))
+            .build();
+
         let ports = vec![
             ServicePort {
                 name: Some(HTTP_PORT_NAME.to_owned()),
@@ -349,12 +391,21 @@ impl<'a> RoleGroupBuilder<'a> {
             },
         ];
 
-        self.build_role_group_service(
-            self.resource_names.headless_service_name(),
-            ports,
-            Self::prometheus_labels(),
-            Self::prometheus_annotations(self.node_config.tls_on_http_port_enabled()),
-        )
+        let service_spec = ServiceSpec {
+            // Internal communication does not need to be exposed
+            type_: Some("ClusterIP".to_string()),
+            cluster_ip: Some("None".to_string()),
+            ports: Some(ports),
+            selector: Some(self.pod_selector().into()),
+            publish_not_ready_addresses: Some(true),
+            ..ServiceSpec::default()
+        };
+
+        Service {
+            metadata,
+            spec: Some(service_spec),
+            status: None,
+        }
     }
 
     /// Common labels for Prometheus
@@ -387,62 +438,35 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be valid annotations")
     }
 
-    fn build_role_group_service(
-        &self,
-        service_name: impl Into<String>,
-        ports: Vec<ServicePort>,
-        extra_labels: Labels,
-        extra_annotations: Annotations,
-    ) -> Service {
-        let metadata = self
-            .common_metadata(service_name)
-            .with_labels(extra_labels)
-            .with_annotations(extra_annotations)
-            .build();
-
-        let service_spec = ServiceSpec {
-            // Internal communication does not need to be exposed
-            type_: Some("ClusterIP".to_string()),
-            cluster_ip: Some("None".to_string()),
-            ports: Some(ports),
-            selector: Some(self.pod_selector().into()),
-            publish_not_ready_addresses: Some(true),
-            ..ServiceSpec::default()
-        };
-
-        Service {
-            metadata,
-            spec: Some(service_spec),
-            status: None,
-        }
-    }
-
+    /// Builds the [`listener::v1alpha1::Listener`] for the role-group
+    ///
+    /// The Listener exposes only the HTTP port.
+    /// The Listener operator will create a Service per role-group.
     pub fn build_listener(&self) -> listener::v1alpha1::Listener {
         let metadata = self
-            .common_metadata(self.resource_names.listener_service_name())
+            .common_metadata(self.resource_names.listener_name())
             .build();
 
         let listener_class = self.role_group_config.config.listener_class.to_owned();
+
+        let ports = [listener::v1alpha1::ListenerPort {
+            name: HTTP_PORT_NAME.to_string(),
+            port: HTTP_PORT.into(),
+            protocol: Some("TCP".to_string()),
+        }];
 
         listener::v1alpha1::Listener {
             metadata,
             spec: listener::v1alpha1::ListenerSpec {
                 class_name: Some(listener_class),
-                ports: Some(self.listener_ports()),
+                ports: Some(ports.to_vec()),
                 ..listener::v1alpha1::ListenerSpec::default()
             },
             status: None,
         }
     }
 
-    fn listener_ports(&self) -> Vec<listener::v1alpha1::ListenerPort> {
-        vec![listener::v1alpha1::ListenerPort {
-            name: HTTP_PORT_NAME.to_string(),
-            port: HTTP_PORT.into(),
-            protocol: Some("TCP".to_string()),
-        }]
-    }
-
+    /// Common metadata for role-group resources
     fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
         let mut builder = ObjectMetaBuilder::new();
 
@@ -459,6 +483,7 @@ impl<'a> RoleGroupBuilder<'a> {
         builder
     }
 
+    /// Recommended labels for role-group resources
     fn recommended_labels(&self) -> Labels {
         recommended_labels(
             &self.cluster,
@@ -471,6 +496,9 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
+    /// Labels to select a [`Pod`] in the role-group
+    ///
+    /// [`Pod`]: stackable_operator::k8s_openapi::api::core::v1::Pod
     fn pod_selector(&self) -> Labels {
         role_group_selector(
             &self.cluster,
@@ -495,18 +523,28 @@ mod tests {
         role_utils::GenericRoleConfig,
     };
     use strum::IntoEnumIterator;
+    use uuid::uuid;
 
-    use super::RoleGroupBuilder;
+    use super::{RoleGroupBuilder, config_volume_name, data_volume_name, listener_volume_name};
     use crate::{
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
+            RoleGroupName, ServiceAccountName, ServiceName, builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
+
+    #[test]
+    fn test_volume_names() {
+        // Test that the functions do not panic
+        config_volume_name();
+        data_volume_name();
+        listener_volume_name();
+    }
 
     fn context_names() -> ContextNames {
         ContextNames {
@@ -545,8 +583,8 @@ mod tests {
             image.clone(),
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
-            "default".to_owned(),
-            "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
@@ -568,12 +606,12 @@ mod tests {
         let role_group_config = role_group_config.to_owned();
 
         RoleGroupBuilder::new(
-            "my-opensearch-cluster-serviceaccount".to_owned(),
+            ServiceAccountName::from_str_unsafe("my-opensearch-cluster-serviceaccount"),
             cluster,
             role_group_name,
             role_group_config,
             context_names,
-            "my-opensearch-cluster".to_owned(),
+            ServiceName::from_str_unsafe("my-opensearch-cluster"),
         )
     }
 
