@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_product_version() {
+    fn test_validate_err_resolve_product_image() {
         test_validate_err(
             |cluster| {
                 cluster.spec.image =
