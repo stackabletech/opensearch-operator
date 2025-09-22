@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
+use stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH;
+
 use super::{
     ClusterName, ConfigMapName, ListenerName, RoleGroupName, RoleName, StatefulSetName, min,
 };
 use crate::{attributed_string_type, framework::ServiceName};
-use stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH;
 
 attributed_string_type! {
     QualifiedRoleGroupName,
