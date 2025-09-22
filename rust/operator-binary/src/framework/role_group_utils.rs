@@ -1,5 +1,7 @@
+use stackable_operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH;
+
 use super::{ClusterName, RoleGroupName, RoleName};
-use crate::framework::{HasObjectName, MAX_OBJECT_NAME_LENGTH, kvp::label::MAX_LABEL_VALUE_LENGTH};
+use crate::framework::{HasObjectName, kvp::label::MAX_LABEL_VALUE_LENGTH};
 
 pub struct ResourceNames {
     pub cluster_name: ClusterName,
@@ -32,7 +34,7 @@ impl ResourceNames {
     pub fn role_group_config_map(&self) -> String {
         // Compile-time check
         const _: () = assert!(
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= MAX_OBJECT_NAME_LENGTH,
+            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= RFC_1123_SUBDOMAIN_MAX_LENGTH,
             "The ConfigMap name `<cluster_name>-<role_name>-<role_group_name>` must not exceed 253 characters."
         );
 
@@ -69,7 +71,7 @@ impl ResourceNames {
     pub fn listener_service_name(&self) -> String {
         // Compile-time check
         const _: () = assert!(
-            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= MAX_OBJECT_NAME_LENGTH,
+            ResourceNames::MAX_QUALIFIED_ROLE_GROUP_NAME_LENGTH <= RFC_1123_SUBDOMAIN_MAX_LENGTH,
             "The listener name `<cluster_name>-<role_name>-<role_group_name>` must not exceed 253 characters."
         );
 

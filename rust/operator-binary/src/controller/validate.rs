@@ -86,6 +86,8 @@ pub fn validate(
         .resolve(DEFAULT_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
         .context(ResolveProductImageSnafu)?;
 
+    // Cannot fail because `ProductImage::resolve` already validated it and would have thrown a
+    // `ResolveProductImage` error if it were not valid.
     let product_version = ProductVersion::from_str(&product_image.product_version)
         .context(ParseProductVersionSnafu)?;
 
@@ -403,7 +405,7 @@ mod tests {
                     serde_json::from_str(r#"{"productVersion": "invalid product version"}"#)
                         .expect("should be a valid ProductImage structure")
             },
-            ErrorDiscriminants::ParseProductVersion,
+            ErrorDiscriminants::ResolveProductImage,
         );
     }
 

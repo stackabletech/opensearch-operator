@@ -33,12 +33,6 @@ pub enum Error {
     },
 }
 
-/// Maximum length of a DNS subdomain name as defined in RFC 1123.
-/// The object names of most types, e.g. ConfigMap and StatefulSet, must not exceed this limit.
-/// However, there are kinds that allow longer object names, e.g. ClusterRole.
-#[allow(dead_code)]
-pub const MAX_OBJECT_NAME_LENGTH: usize = 253;
-
 /// Has a name that can be used as a DNS subdomain name as defined in RFC 1123.
 /// Most resource types, e.g. a Pod, require such a compliant name.
 pub trait HasObjectName {
@@ -110,7 +104,7 @@ macro_rules! attributed_string_type {
         );
     };
     (@from_str $name:ident, $s:expr, is_object_name) => {
-        stackable_operator::validation::is_rfc_1123_subdomain($s).context(InvalidObjectNameSnafu)?;
+        stackable_operator::validation::is_lowercase_rfc_1123_subdomain($s).context(InvalidObjectNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         LabelValue::from_str($s).context(InvalidLabelValueSnafu)?;

@@ -9,10 +9,11 @@ use stackable_operator::{
     k8s_openapi::{DeepMerge, api::core::v1::PodTemplateSpec},
     role_utils::{CommonConfiguration, Role, RoleGroup},
     schemars::JsonSchema,
+    validation::RFC_1123_SUBDOMAIN_MAX_LENGTH,
 };
 
 use super::{ProductName, builder::pod::container::EnvVarSet};
-use crate::framework::{ClusterName, MAX_OBJECT_NAME_LENGTH, kvp::label::MAX_LABEL_VALUE_LENGTH};
+use crate::framework::{ClusterName, kvp::label::MAX_LABEL_VALUE_LENGTH};
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericProductSpecificCommonConfig {}
@@ -166,7 +167,7 @@ impl ResourceNames {
 
         // Compile-time check
         const _: () = assert!(
-            ClusterName::MAX_LENGTH + SUFFIX.len() <= MAX_OBJECT_NAME_LENGTH,
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= RFC_1123_SUBDOMAIN_MAX_LENGTH,
             "The ServiceAccount name `<cluster_name>-serviceaccount` must not exceed 253 characters."
         );
 
