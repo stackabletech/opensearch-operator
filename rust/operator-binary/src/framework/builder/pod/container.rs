@@ -17,10 +17,14 @@ pub enum Error {
     ParseEnvVarName { env_var_name: String },
 }
 
+/// Validated environment variable name
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EnvVarName(String);
 
 impl EnvVarName {
+    /// Creates an [`EnvVarName`] from the given string and panics if the validation failed
+    ///
+    /// Use this only with constant names that are also tested in unit tests!
     pub fn from_str_unsafe(s: &str) -> Self {
         EnvVarName::from_str(s).expect("should be a valid environment variable name")
     }
@@ -36,7 +40,7 @@ impl FromStr for EnvVarName {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // The length of the environment variable names seems not to be restricted.
+        // The length of environment variable names seems not to be restricted.
 
         if !s.is_empty() && s.chars().all(|c| matches!(c, ' '..='<' | '>'..='~')) {
             Ok(Self(s.to_owned()))
@@ -48,24 +52,35 @@ impl FromStr for EnvVarName {
     }
 }
 
+/// A set of [`EnvVar`]s
+///
+/// The environment variable names in the set are unique.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct EnvVarSet(BTreeMap<EnvVarName, EnvVar>);
 
 impl EnvVarSet {
+    /// Creates an empty [`EnvVarSet`]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Returns a reference to the [`EnvVar`] with the given name
     pub fn get(&self, env_var_name: impl Into<EnvVarName>) -> Option<&EnvVar> {
         self.0.get(&env_var_name.into())
     }
 
+    /// Moves all [`EnvVar`]s from the given set into this one.
+    ///
+    /// [`EnvVar`]s with the same name are overridden.
     pub fn merge(mut self, mut env_var_set: EnvVarSet) -> Self {
         self.0.append(&mut env_var_set.0);
 
         self
     }
 
+    /// Adds the given [`EnvVar`]s to this set
+    ///
+    /// [`EnvVar`]s with the same name are overridden.
     pub fn with_values<I, K, V>(self, env_vars: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -79,6 +94,9 @@ impl EnvVarSet {
             })
     }
 
+    /// Adds an environment variable with the given name and string value to this set
+    ///
+    /// An [`EnvVar`] with the same name is overridden.
     pub fn with_value(mut self, name: impl Into<EnvVarName>, value: impl Into<String>) -> Self {
         let name: EnvVarName = name.into();
 
@@ -94,6 +112,9 @@ impl EnvVarSet {
         self
     }
 
+    /// Adds an environment variable with the given name and field path to this set
+    ///
+    /// An [`EnvVar`] with the same name is overridden.
     pub fn with_field_path(
         mut self,
         name: impl Into<EnvVarName>,
