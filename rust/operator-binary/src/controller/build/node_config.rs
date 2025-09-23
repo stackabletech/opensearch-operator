@@ -269,10 +269,12 @@ mod tests {
 
     use stackable_operator::{
         commons::{
-            affinity::StackableAffinity, product_image_selection::ProductImage,
+            affinity::StackableAffinity,
+            product_image_selection::{ProductImage, ResolvedProductImage},
             resources::Resources,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
+        kvp::LabelValue,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -328,7 +330,14 @@ mod tests {
         };
 
         let cluster = ValidatedCluster::new(
-            image.clone(),
+            ResolvedProductImage {
+                product_version: "3.1.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                    .expect("should be a valid label value"),
+                image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                image_pull_policy: "Always".to_owned(),
+                pull_secrets: None,
+            },
             ProductVersion::from_str_unsafe(image.product_version()),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),

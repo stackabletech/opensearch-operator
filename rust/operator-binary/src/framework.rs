@@ -21,6 +21,9 @@
 //! structure should already resemble the one of stackable-operator.
 
 use snafu::Snafu;
+use stackable_operator::validation::{
+    RFC_1035_LABEL_MAX_LENGTH, RFC_1123_LABEL_MAX_LENGTH, RFC_1123_SUBDOMAIN_MAX_LENGTH,
+};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub mod builder;
@@ -61,22 +64,6 @@ pub enum Error {
     #[snafu(display("not a valid UUID"))]
     InvalidUid { source: uuid::Error },
 }
-
-/// Maximum length of DNS subdomain names as defined in RFC 1123.
-///
-/// Duplicates the private constant
-/// [`stackable-operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH`]
-pub const MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH: usize = 253;
-
-/// Maximum length of label names as defined in RFC 1123.
-///
-/// Duplicates the private constant [`stackable-operator::validation::RFC_1123_LABEL_MAX_LENGTH`]
-pub const MAX_RFC_1123_LABEL_NAME_LENGTH: usize = 63;
-
-/// Maximum length of label names as defined in RFC 1035.
-///
-/// Duplicates the private constant [`stackable-operator::validation::RFC_1035_LABEL_MAX_LENGTH`]
-pub const MAX_RFC_1035_LABEL_NAME_LENGTH: usize = 63;
 
 /// Maximum length of label values
 ///
@@ -181,13 +168,13 @@ macro_rules! attributed_string_type {
         );
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_dns_subdomain_name) => {
-        stackable_operator::validation::is_rfc_1123_subdomain($s).context($crate::framework::InvalidRfc1123DnsSubdomainNameSnafu)?;
+        stackable_operator::validation::is_lowercase_rfc_1123_subdomain($s).context($crate::framework::InvalidRfc1123DnsSubdomainNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_label_name) => {
-        stackable_operator::validation::is_rfc_1123_label($s).context($crate::framework::InvalidRfc1123LabelNameSnafu)?;
+        stackable_operator::validation::is_lowercase_rfc_1123_label($s).context($crate::framework::InvalidRfc1123LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
-        stackable_operator::validation::is_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
+        stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         stackable_operator::kvp::LabelValue::from_str($s).context($crate::framework::InvalidLabelValueSnafu)?;
@@ -266,7 +253,7 @@ attributed_string_type! {
     ConfigMapName,
     "The name of a ConfigMap",
     "opensearch-nodes-default",
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
@@ -277,28 +264,28 @@ attributed_string_type! {
     // subdomain names, on the other hand, their length does not seem to be restricted – at least
     // on Kind. However, 253 characters are sufficient for the Stackable operators, and to avoid
     // problems on other Kubernetes providers, the length is restricted here.
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ListenerName,
     "The name of a Listener",
     "opensearch-nodes-default",
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ListenerClassName,
     "The name of a Listener",
     "external-stable",
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     NamespaceName,
     "The name of a Namespace",
     "stackable-operators",
-    (max_length = min(MAX_RFC_1123_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = min(RFC_1123_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -306,7 +293,7 @@ attributed_string_type! {
     PersistentVolumeClaimName,
     "The name of a PersistentVolumeClaim",
     "config",
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
@@ -317,21 +304,21 @@ attributed_string_type! {
     // subdomain names, on the other hand, their length does not seem to be restricted – at least
     // on Kind. However, 253 characters are sufficient for the Stackable operators, and to avoid
     // problems on other Kubernetes providers, the length is restricted here.
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ServiceAccountName,
     "The name of a ServiceAccount",
     "opensearch-serviceaccount",
-    (max_length = MAX_RFC_1123_DNS_SUBDOMAIN_NAME_LENGTH),
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ServiceName,
     "The name of a Service",
     "opensearch-nodes-default-headless",
-    (max_length = min(MAX_RFC_1035_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = min(RFC_1035_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1035_label_name,
     is_valid_label_value
 }
@@ -341,7 +328,7 @@ attributed_string_type! {
     "opensearch-nodes-default",
     (max_length = min(
         // see https://github.com/kubernetes/kubernetes/issues/64023
-        MAX_RFC_1123_LABEL_NAME_LENGTH
+        RFC_1123_LABEL_MAX_LENGTH
             - 1 /* dash */
             - 10 /* digits for the controller-revision-hash label */,
         MAX_LABEL_VALUE_LENGTH)),
@@ -360,7 +347,7 @@ attributed_string_type! {
     VolumeName,
     "The name of a Volume",
     "opensearch-nodes-default",
-    (max_length = min(MAX_RFC_1123_LABEL_NAME_LENGTH, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = min(RFC_1123_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1123_label_name,
     is_valid_label_value
 }

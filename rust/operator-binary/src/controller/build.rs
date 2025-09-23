@@ -55,11 +55,17 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        str::FromStr,
+    };
 
     use stackable_operator::{
-        commons::affinity::StackableAffinity, k8s_openapi::api::core::v1::PodTemplateSpec,
-        kube::Resource, role_utils::GenericRoleConfig,
+        commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
+        k8s_openapi::api::core::v1::PodTemplateSpec,
+        kube::Resource,
+        kvp::LabelValue,
+        role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
 
@@ -148,8 +154,14 @@ mod tests {
 
     fn validated_cluster() -> ValidatedCluster {
         ValidatedCluster::new(
-            serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
-                .expect("should be a valid ProductImage structure"),
+            ResolvedProductImage {
+                product_version: "3.1.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                    .expect("should be a valid label value"),
+                image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                image_pull_policy: "Always".to_owned(),
+                pull_secrets: None,
+            },
             ProductVersion::from_str_unsafe("3.1.0"),
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),

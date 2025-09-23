@@ -37,7 +37,6 @@ pub fn listener_operator_volume_source_builder_build_pvc(
     pvc_name: &PersistentVolumeClaimName,
 ) -> PersistentVolumeClaim {
     ListenerOperatorVolumeSourceBuilder::new(&listener_reference.into(), labels)
-        .expect("should return Ok independent of the given parameters")
         .build_pvc(pvc_name.to_string())
         .expect(
             "should return a PersistentVolumeClaim, because the only check is that \

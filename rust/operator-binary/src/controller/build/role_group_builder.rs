@@ -278,11 +278,6 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the container for the [`PodTemplateSpec`]
     fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
-        let product_image = self
-            .cluster
-            .image
-            .resolve("opensearch", crate::built_info::PKG_VERSION);
-
         // Probe values taken from the official Helm chart
         let startup_probe = Probe {
             failure_threshold: Some(30),
@@ -322,7 +317,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         ContainerBuilder::new("opensearch")
             .expect("should be a valid container name")
-            .image_from_product_image(&product_image)
+            .image_from_product_image(&self.cluster.image)
             .command(vec![format!(
                 "{opensearch_home}/opensearch-docker-entrypoint.sh"
             )])
@@ -511,15 +506,19 @@ impl<'a> RoleGroupBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        str::FromStr,
+    };
 
     use serde_json::json;
     use stackable_operator::{
         commons::{
-            affinity::StackableAffinity, product_image_selection::ProductImage,
+            affinity::StackableAffinity, product_image_selection::ResolvedProductImage,
             resources::Resources,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
+        kvp::LabelValue,
         role_utils::GenericRoleConfig,
     };
     use strum::IntoEnumIterator;
@@ -555,8 +554,14 @@ mod tests {
     }
 
     fn validated_cluster() -> ValidatedCluster {
-        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
-            .expect("should be a valid ProductImage");
+        let image = ResolvedProductImage {
+            product_version: "3.1.0".to_owned(),
+            app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                .expect("should be a valid label value"),
+            image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+            image_pull_policy: "Always".to_owned(),
+            pull_secrets: None,
+        };
 
         let role_group_config = OpenSearchRoleGroupConfig {
             replicas: 1,
@@ -581,7 +586,7 @@ mod tests {
 
         ValidatedCluster::new(
             image.clone(),
-            ProductVersion::from_str_unsafe(image.product_version()),
+            ProductVersion::from_str_unsafe(&image.product_version),
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),

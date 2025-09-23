@@ -10,7 +10,7 @@ use build::build;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::{affinity::StackableAffinity, product_image_selection::ProductImage},
+    commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
     crd::listener::v1alpha1::Listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -21,7 +21,7 @@ use stackable_operator::{
     kube::{Resource, api::ObjectMeta, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
     role_utils::GenericRoleConfig,
-    time::Duration,
+    shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 use update_status::update_status;
@@ -144,7 +144,7 @@ pub struct ValidatedOpenSearchConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedCluster {
     metadata: ObjectMeta,
-    pub image: ProductImage,
+    pub image: ResolvedProductImage,
     pub product_version: ProductVersion,
     pub name: ClusterName,
     pub namespace: NamespaceName,
@@ -155,7 +155,7 @@ pub struct ValidatedCluster {
 
 impl ValidatedCluster {
     pub fn new(
-        image: ProductImage,
+        image: ResolvedProductImage,
         product_version: ProductVersion,
         name: ClusterName,
         namespace: NamespaceName,
@@ -346,10 +346,15 @@ struct KubernetesResources<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        str::FromStr,
+    };
 
     use stackable_operator::{
-        commons::affinity::StackableAffinity, k8s_openapi::api::core::v1::PodTemplateSpec,
+        commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
+        k8s_openapi::api::core::v1::PodTemplateSpec,
+        kvp::LabelValue,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -425,8 +430,14 @@ mod tests {
 
     fn validated_cluster() -> ValidatedCluster {
         ValidatedCluster::new(
-            serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
-                .expect("should be a valid ProductImage structure"),
+            ResolvedProductImage {
+                product_version: "3.1.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                    .expect("should be a valid label value"),
+                image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                image_pull_policy: "Always".to_owned(),
+                pull_secrets: None,
+            },
             ProductVersion::from_str_unsafe("3.1.0"),
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
