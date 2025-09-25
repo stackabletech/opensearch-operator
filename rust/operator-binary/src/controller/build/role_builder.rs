@@ -227,6 +227,7 @@ mod tests {
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -234,7 +235,8 @@ mod tests {
     use super::RoleBuilder;
     use crate::{
         controller::{
-            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedOpenSearchConfig,
+            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
@@ -260,6 +262,16 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: "cluster-internal".to_string(),
+                logging: ValidatedLogging {
+                    vector_aggregator_config_map_name: None,
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
                     v1alpha1::NodeRole::Data,
@@ -268,7 +280,6 @@ mod tests {
                 ]),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),

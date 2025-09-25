@@ -1,0 +1,463 @@
+# Run tests with `./test-vector.sh`
+#
+# A downside of these test cases is that they compare the whole event and that the message can
+# contain source code positions in vector.yaml, e.g. "function call error for \"parse_timestamp\" at (584:643)". Please adapt the tests if you change VRL code in vector.yaml.
+
+tests:
+  - name: Test opensearch_server log entry without stacktrace
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with stacktrace
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,363Z", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}", 
+            "stacktrace": ["org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]",
+            "Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]",
+            "at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]",
+            "at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]"] }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473451193Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.c.c.JoinHelper",
+                "message": "\
+                  failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}\n\
+                  \n\
+                  org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]\n\
+                  Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]\n\
+                  at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]\n\
+                  at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.363Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with unparsable message
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "JSON not parsable: function call error for \"parse_json\" at (110:133): unable to parse json: EOF while parsing an object at line 2 column 0"
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "",
+                "message": "{\"type\": \"server\", \"timestamp\": \"2025-10-01T12:47:28,582Z\", \"level\": \"INFO\", \"component\": \"o.o.n.Node\", \"cluster.name\": \"opensearch\", \"node.name\": \"opensearch-nodes-cluster-manager-0\", \"message\": \"started\", \"cluster.uuid\": \"Jh1D6YAhTmyzkHI7vM1WWw\", \"node.id\": \"sk-r0P_TTYuPqaamTFbjKg\"\n",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": "2025-10-01T12:47:29.473487331Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry without a JSON object in the message field
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            false
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Parsed event is not a JSON object."
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "",
+                "message": "false\n",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": "2025-10-01T12:47:29.473487331Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with unparsable timestamp
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "unparsable", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Timestamp not parsable, using current time instead: function call error for \"parse_timestamp\" at (584:643): Invalid timestamp \"unparsable\": input contains invalid characters"
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": "2025-10-01T12:47:29.473487331Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry without timestamp
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Timestamp not found, using current time instead."
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": "2025-10-01T12:47:29.473487331Z"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry without logger
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Logger not found."
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry without level
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "file": "opensearch_server.json",
+                "errors": [
+                  "Level not found, using \"INFO\" instead."
+                ],
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with unknown level
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "CRITICAL", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Level \"CRITICAL\" unknown, using \"INFO\" instead."
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry without message
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "errors": [
+                  "Message not found."
+                ],
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test Vector internal logs
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          arch: x86_64
+          debug: false,
+          message: Vector has started.
+          metadata:
+            kind: event
+            level: INFO
+            module_path: vector::internal_events::process
+            target: vector
+          pid: 14
+          pod: opensearch-nodes-cluster-manager-0
+          revision: dc7e792 2025-08-12 13:47:08.632326804
+          source_type: internal_logs
+          timestamp: 2025-10-02T09:46:14.479381097Z
+          version: 0.49.0
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "arch": "x86_64",
+                "cluster": "opensearch",
+                "container": "vector",
+                "debug": "false,",
+                "level": "INFO",
+                "logger": "vector::internal_events::process",
+                "message": "Vector has started.",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "revision": "dc7e792 2025-08-12 13:47:08.632326804",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": "2025-10-02T09:46:14.479381097Z",
+                "version": "0.49.0"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test Vector internal log level filtering - TRACE/DEBUG
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: TRACE
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: DEBUG
+    no_outputs_from:
+      - filtered_logs_vector
+  - name: Test Vector internal log level filtering - INFO
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: INFO
+    outputs:
+      - extract_from: filtered_logs_vector
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!("INFO", .metadata.level)
+  - name: Test Vector internal log level filtering - WARN
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: WARN
+    outputs:
+      - extract_from: filtered_logs_vector
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!("WARN", .metadata.level)
+  - name: Test Vector internal log level filtering - ERROR
+    inputs:
+      - type: log
+        insert_at: filtered_logs_vector
+        log_fields:
+          metadata:
+            level: ERROR
+    outputs:
+      - extract_from: filtered_logs_vector
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!("ERROR", .metadata.level)

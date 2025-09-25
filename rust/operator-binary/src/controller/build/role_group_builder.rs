@@ -1,9 +1,9 @@
 //! Builder for role-group resources
 
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
-    builder::{meta::ObjectMetaBuilder, pod::container::ContainerBuilder},
+    builder::meta::ObjectMetaBuilder,
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -11,16 +11,25 @@ use stackable_operator::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
-                PersistentVolumeClaim, PodSecurityContext, PodSpec, PodTemplateSpec, Probe,
-                Service, ServicePort, ServiceSpec, TCPSocketAction, Volume, VolumeMount,
+                EmptyDirVolumeSource, PersistentVolumeClaim, PodSecurityContext, PodSpec,
+                PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                VolumeMount,
             },
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
     kvp::{Annotations, Label, Labels},
+    memory::MemoryQuantity,
+    product_logging::framework::{
+        create_vector_shutdown_file_command, remove_vector_shutdown_file_command,
+    },
+    utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 
-use super::node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig};
+use super::node_config::{
+    CONFIGURATION_FILE_LOG4J2_PROPERTIES, CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig,
+    STACKABLE_LOG_DIR, VECTOR_CONFIG_FILE,
+};
 use crate::{
     controller::{ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster},
     crd::v1alpha1,
@@ -29,11 +38,12 @@ use crate::{
         builder::{
             meta::ownerreference_from_resource,
             pod::{
-                container::EnvVarName,
+                container::{EnvVarName, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
         },
         kvp::label::{recommended_labels, role_group_selector, role_selector},
+        product_logging::framework::vector_container,
         role_group_utils::ResourceNames,
     },
 };
@@ -44,15 +54,23 @@ pub const TRANSPORT_PORT_NAME: &str = "transport";
 pub const TRANSPORT_PORT: u16 = 9300;
 
 const CONFIG_VOLUME_NAME: &str = "config";
+const LOG_CONFIG_VOLUME_NAME: &str = "log-config";
 const DATA_VOLUME_NAME: &str = "data";
 
 const LISTENER_VOLUME_NAME: &str = "listener";
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
+const LOG_VOLUME_NAME: &str = "log";
+const LOG_VOLUME_DIR: &str = "/stackable/log";
+
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 fn config_volume_name() -> VolumeName {
     VolumeName::from_str(CONFIG_VOLUME_NAME).expect("should be a valid Volume name")
+}
+
+fn log_config_volume_name() -> VolumeName {
+    VolumeName::from_str(LOG_CONFIG_VOLUME_NAME).expect("should be a valid Volume name")
 }
 
 fn data_volume_name() -> VolumeName {
@@ -62,6 +80,10 @@ fn data_volume_name() -> VolumeName {
 fn listener_volume_name() -> PersistentVolumeClaimName {
     PersistentVolumeClaimName::from_str(LISTENER_VOLUME_NAME)
         .expect("should be a valid PersistentVolumeClaim name")
+}
+
+fn log_volume_name() -> VolumeName {
+    VolumeName::from_str(LOG_VOLUME_NAME).expect("should be a valid Volume name")
 }
 
 /// Builder for role-group resources
@@ -110,11 +132,32 @@ impl<'a> RoleGroupBuilder<'a> {
             .common_metadata(self.resource_names.role_group_config_map())
             .build();
 
-        let data = [(
+        let mut data = BTreeMap::new();
+
+        data.insert(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config.static_opensearch_config_file(),
-        )]
-        .into();
+            self.node_config.static_opensearch_config_file_content(),
+        );
+
+        if let Some(log_config_file_content) = self.node_config.automatic_log_config_file_content()
+        {
+            data.insert(
+                CONFIGURATION_FILE_LOG4J2_PROPERTIES.to_owned(),
+                log_config_file_content,
+            );
+        }
+
+        if self
+            .role_group_config
+            .config
+            .logging
+            .is_vector_agent_enabled()
+        {
+            data.insert(
+                VECTOR_CONFIG_FILE.to_owned(),
+                include_str!("vector.yaml").to_owned(),
+            );
+        }
 
         ConfigMap {
             metadata,
@@ -190,7 +233,54 @@ impl<'a> RoleGroupBuilder<'a> {
             .with_labels(node_role_labels)
             .build();
 
-        let container = self.build_container(&self.role_group_config);
+        let opensearch_container = self.build_opensearch_container();
+        let vector_container = if let Some(vector_container_log_config) =
+            &self.role_group_config.config.logging.vector_container
+        {
+            vector_container(
+                &v1alpha1::Container::Vector.to_container_name(),
+                vector_container_log_config,
+                &self.resource_names.cluster_name,
+                &self.resource_names.role_name,
+                &self.resource_names.role_group_name,
+                &self.cluster.image,
+                &log_config_volume_name(),
+                &log_volume_name(),
+            )
+        } else {
+            None
+        };
+
+        let volumes = vec![
+            Volume {
+                name: config_volume_name().to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    name: self.resource_names.role_group_config_map().to_string(),
+                    ..Default::default()
+                }),
+                ..Volume::default()
+            },
+            Volume {
+                name: log_config_volume_name().to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    name: self
+                        .node_config
+                        .custom_log_config_map()
+                        .unwrap_or_else(|| self.resource_names.role_group_config_map())
+                        .to_string(),
+                    ..Default::default()
+                }),
+                ..Volume::default()
+            },
+            Volume {
+                name: log_volume_name().to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(MemoryQuantity::from_mebi(100.0).into()),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            },
+        ];
 
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
@@ -209,7 +299,11 @@ impl<'a> RoleGroupBuilder<'a> {
                         .pod_anti_affinity
                         .clone(),
                 }),
-                containers: vec![container],
+                // TODO Add annotation that the opensearch container is the main one
+                containers: [Some(opensearch_container), vector_container]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
                 node_selector: self
                     .role_group_config
                     .config
@@ -227,14 +321,7 @@ impl<'a> RoleGroupBuilder<'a> {
                         .config
                         .termination_grace_period_seconds,
                 ),
-                volumes: Some(vec![Volume {
-                    name: config_volume_name().to_string(),
-                    config_map: Some(ConfigMapVolumeSource {
-                        name: self.resource_names.role_group_config_map().to_string(),
-                        ..Default::default()
-                    }),
-                    ..Volume::default()
-                }]),
+                volumes: Some(volumes),
                 ..PodSpec::default()
             }),
         };
@@ -277,7 +364,7 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
-    fn build_container(&self, role_group_config: &OpenSearchRoleGroupConfig) -> Container {
+    fn build_opensearch_container(&self) -> Container {
         // Probe values taken from the official Helm chart
         let startup_probe = Probe {
             failure_threshold: Some(30),
@@ -315,35 +402,69 @@ impl<'a> RoleGroupBuilder<'a> {
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"));
 
-        ContainerBuilder::new("opensearch")
-            .expect("should be a valid container name")
+        let volume_mounts = [
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"),
+                name: config_volume_name().to_string(),
+                read_only: Some(true),
+                sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!(
+                    "{opensearch_path_conf}/{CONFIGURATION_FILE_LOG4J2_PROPERTIES}"
+                ),
+                name: log_config_volume_name().to_string(),
+                read_only: Some(true),
+                sub_path: Some(CONFIGURATION_FILE_LOG4J2_PROPERTIES.to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!("{opensearch_home}/data"),
+                name: data_volume_name().to_string(),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: LISTENER_VOLUME_DIR.to_owned(),
+                name: LISTENER_VOLUME_NAME.to_owned(),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: LOG_VOLUME_DIR.to_owned(),
+                name: log_volume_name().to_string(),
+                ..VolumeMount::default()
+            },
+        ];
+
+        new_container_builder(&v1alpha1::Container::OpenSearch.to_container_name())
             .image_from_product_image(&self.cluster.image)
             .command(vec![format!(
                 "{opensearch_home}/opensearch-docker-entrypoint.sh"
             )])
-            .args(role_group_config.cli_overrides_to_vec())
-            .add_env_vars(env_vars.into())
-            .add_volume_mounts([
-                VolumeMount {
-                    mount_path: format!(
-                        "{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"
-                    ),
-                    name: config_volume_name().to_string(),
-                    read_only: Some(true),
-                    sub_path: Some(CONFIGURATION_FILE_OPENSEARCH_YML.to_owned()),
-                    ..VolumeMount::default()
-                },
-                VolumeMount {
-                    mount_path: format!("{opensearch_home}/data"),
-                    name: data_volume_name().to_string(),
-                    ..VolumeMount::default()
-                },
-                VolumeMount {
-                    mount_path: LISTENER_VOLUME_DIR.to_owned(),
-                    name: LISTENER_VOLUME_NAME.to_owned(),
-                    ..VolumeMount::default()
-                },
+            .args(self.role_group_config.cli_overrides_to_vec())
+            .command(vec![
+                "/bin/bash".to_string(),
+                "-x".to_string(),
+                "-euo".to_string(),
+                "pipefail".to_string(),
+                "-c".to_string(),
             ])
+            .args(vec![format!(
+                "{COMMON_BASH_TRAP_FUNCTIONS}\n\
+                {remove_vector_shutdown_file_command}\n\
+                prepare_signal_handlers\n\
+                containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
+                {opensearch_home}/opensearch-docker-entrypoint.sh {extra_args} &\n\
+                wait_for_termination $!\n\
+                {create_vector_shutdown_file_command}",
+                extra_args = self.role_group_config.cli_overrides_to_vec().join(" "),
+                remove_vector_shutdown_file_command =
+                    remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+                create_vector_shutdown_file_command =
+                    create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
+            )])
+            .add_env_vars(env_vars.into())
+            .add_volume_mounts(volume_mounts)
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .add_container_ports(vec![
                 ContainerPort {
@@ -519,20 +640,26 @@ mod tests {
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use strum::IntoEnumIterator;
     use uuid::uuid;
 
-    use super::{RoleGroupBuilder, config_volume_name, data_volume_name, listener_volume_name};
+    use super::{
+        RoleGroupBuilder, config_volume_name, data_volume_name, listener_volume_name,
+        log_config_volume_name,
+    };
     use crate::{
         controller::{
-            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedOpenSearchConfig,
+            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
             ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
             RoleGroupName, ServiceAccountName, ServiceName, builder::pod::container::EnvVarSet,
+            product_logging::framework::VectorContainerLogConfig,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -541,6 +668,7 @@ mod tests {
     fn test_volume_names() {
         // Test that the functions do not panic
         config_volume_name();
+        log_config_volume_name();
         data_volume_name();
         listener_volume_name();
     }
@@ -567,6 +695,19 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: "cluster-internal".to_string(),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                    // Some(VectorContainerLogConfig {
+                    //     log_config: ValidatedContainerLogConfigChoice::Automatic(
+                    //         AutomaticContainerLogConfig::default(),
+                    //     ),
+                    //     vector_aggregator_config_map_name: None,
+                    // }),
+                },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
                     v1alpha1::NodeRole::Data,
@@ -575,7 +716,6 @@ mod tests {
                 ]),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),
@@ -655,6 +795,32 @@ mod tests {
                     ]
                 },
                 "data": {
+                    "log4j2.properties": concat!(
+                        "appenders = FILE, CONSOLE\n\n",
+                        "appender.CONSOLE.type = Console\n",
+                        "appender.CONSOLE.name = CONSOLE\n",
+                        "appender.CONSOLE.target = SYSTEM_ERR\n",
+                        "appender.CONSOLE.layout.type = PatternLayout\n",
+                        "appender.CONSOLE.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n\n",
+                        "appender.CONSOLE.filter.threshold.type = ThresholdFilter\n",
+                        "appender.CONSOLE.filter.threshold.level = INFO\n\n",
+                        "appender.FILE.type = RollingFile\n",
+                        "appender.FILE.name = FILE\n",
+                        "appender.FILE.fileName = /stackable/log/opensearch/opensearch.log4j2.xml\n",
+                        "appender.FILE.filePattern = /stackable/log/opensearch/opensearch.log4j2.xml.%i\n",
+                        "appender.FILE.layout.type = XMLLayout\n",
+                        "appender.FILE.policies.type = Policies\n",
+                        "appender.FILE.policies.size.type = SizeBasedTriggeringPolicy\n",
+                        "appender.FILE.policies.size.size = 5MB\n",
+                        "appender.FILE.strategy.type = DefaultRolloverStrategy\n",
+                        "appender.FILE.strategy.max = 1\n",
+                        "appender.FILE.filter.threshold.type = ThresholdFilter\n",
+                        "appender.FILE.filter.threshold.level = INFO\n\n\n",
+                        "rootLogger.level=INFO\n",
+                        "rootLogger.appenderRefs = CONSOLE, FILE\n",
+                        "rootLogger.appenderRef.CONSOLE.ref = CONSOLE\n",
+                        "rootLogger.appenderRef.FILE.ref = FILE"
+                    ),
                     "opensearch.yml": concat!(
                         "cluster.name: \"my-opensearch-cluster\"\n",
                         "discovery.type: \"single-node\"\n",
@@ -798,6 +964,12 @@ mod tests {
                                             "subPath": "opensearch.yml"
                                         },
                                         {
+                                            "mountPath": "/stackable/opensearch/config/log4j2.properties",
+                                            "name": "log-config",
+                                            "readOnly": true,
+                                            "subPath": "log4j2.properties"
+                                        },
+                                        {
                                             "mountPath": "/stackable/opensearch/data",
                                             "name": "data"
                                         },
@@ -819,6 +991,12 @@ mod tests {
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "config"
+                                },
+                                {
+                                    "configMap": {
+                                        "name": "my-opensearch-cluster-nodes-default"
+                                    },
+                                    "name": "log-config"
                                 }
                             ]
                         }

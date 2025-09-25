@@ -2,10 +2,12 @@ use std::{collections::BTreeMap, fmt::Display, str::FromStr};
 
 use snafu::Snafu;
 use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar,
-    k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+    builder::pod::container::{ContainerBuilder, FieldPathEnvVar},
+    k8s_openapi::api::core::v1::{ConfigMapKeySelector, EnvVar, EnvVarSource, ObjectFieldSelector},
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::framework::{ConfigMapName, ContainerName};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -15,6 +17,11 @@ pub enum Error {
         and must consist only of printable ASCII characters other than '='"
     ))]
     ParseEnvVarName { env_var_name: String },
+}
+
+/// Infallible variant of [`stackable_operator::builder::pod::container::ContainerBuilder::new`]
+pub fn new_container_builder(container_name: &ContainerName) -> ContainerBuilder {
+    ContainerBuilder::new(container_name.as_ref()).expect("should be a valid container name")
 }
 
 /// Validated environment variable name
@@ -131,6 +138,36 @@ impl EnvVarSet {
                     field_ref: Some(ObjectFieldSelector {
                         field_path: field_path.to_string(),
                         ..ObjectFieldSelector::default()
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            },
+        );
+
+        self
+    }
+
+    /// Adds an environment variable with the given name and field path to this set
+    ///
+    /// An [`EnvVar`] with the same name is overridden.
+    pub fn with_config_map_key_ref(
+        mut self,
+        name: impl Into<EnvVarName>,
+        config_map_name: &ConfigMapName,
+        config_map_key: impl Into<String>,
+    ) -> Self {
+        let name: EnvVarName = name.into();
+
+        self.0.insert(
+            name.clone(),
+            EnvVar {
+                name: name.to_string(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    config_map_key_ref: Some(ConfigMapKeySelector {
+                        key: config_map_key.into(),
+                        name: config_map_name.to_string(),
+                        ..ConfigMapKeySelector::default()
                     }),
                     ..EnvVarSource::default()
                 }),

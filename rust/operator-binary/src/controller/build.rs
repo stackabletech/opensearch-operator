@@ -65,6 +65,7 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::Resource,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -73,7 +74,7 @@ mod tests {
     use crate::{
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedOpenSearchConfig,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
@@ -200,10 +201,19 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: "external-stable".to_owned(),
+                logging: ValidatedLogging {
+                    vector_aggregator_config_map_name: None,
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                },
                 node_roles: NodeRoles(node_roles.to_vec()),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
-                listener_class: "external-stable".to_owned(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),
