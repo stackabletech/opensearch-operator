@@ -2,10 +2,12 @@ use std::{collections::BTreeMap, fmt::Display, str::FromStr};
 
 use snafu::Snafu;
 use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar,
+    builder::pod::container::{ContainerBuilder, FieldPathEnvVar},
     k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::framework::ContainerName;
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -15,6 +17,11 @@ pub enum Error {
         and must consist only of printable ASCII characters other than '='"
     ))]
     ParseEnvVarName { env_var_name: String },
+}
+
+/// Infallible variant of [`stackable_operator::builder::pod::container::ContainerBuilder::new`]
+pub fn new_container_builder(container_name: &ContainerName) -> ContainerBuilder {
+    ContainerBuilder::new(container_name.as_ref()).expect("should be a valid container name")
 }
 
 /// Validated environment variable name

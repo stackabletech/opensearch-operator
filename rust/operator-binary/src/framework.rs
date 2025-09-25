@@ -257,6 +257,13 @@ attributed_string_type! {
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
+    ContainerName,
+    "The name of a container in a Pod",
+    "opensearch",
+    (max_length = RFC_1123_LABEL_MAX_LENGTH),
+    is_rfc_1123_label_name
+}
+attributed_string_type! {
     ClusterRoleName,
     "The name of a ClusterRole",
     "opensearch-clusterrole",

@@ -5,6 +5,9 @@ use std::{collections::BTreeMap, num::TryFromIntError, str::FromStr};
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
     kube::{Resource, ResourceExt},
+    product_logging::spec::{
+        ConfigMapLogConfig, ContainerLogConfigChoice, CustomContainerLogConfig, Logging,
+    },
     role_utils::RoleGroup,
     shared::time::Duration,
 };
@@ -12,12 +15,13 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{
     ContextNames, OpenSearchRoleGroupConfig, ProductVersion, RoleGroupName, ValidatedCluster,
-    ValidatedOpenSearchConfig,
+    ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
-    crd::v1alpha1::{self, OpenSearchConfig, OpenSearchConfigFragment},
+    controller::ValidatedContainerLogConfigChoice,
+    crd::v1alpha1::{self},
     framework::{
-        ClusterName, NamespaceName, Uid,
+        ClusterName, ConfigMapName, NamespaceName, Uid,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
     },
@@ -35,6 +39,9 @@ pub enum Error {
     #[snafu(display("failed to get the cluster UID"))]
     GetClusterUid {},
 
+    #[snafu(display("failed to get the container log configuration"))]
+    GetContainerLogConfiguration { container: v1alpha1::Container },
+
     #[snafu(display("failed to set cluster name"))]
     ParseClusterName { source: crate::framework::Error },
 
@@ -43,6 +50,9 @@ pub enum Error {
 
     #[snafu(display("failed to set UID"))]
     ParseClusterUid { source: crate::framework::Error },
+
+    #[snafu(display("failed to parse the container name"))]
+    ParseContainerName { source: crate::framework::Error },
 
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
@@ -133,9 +143,12 @@ fn validate_role_group_config(
     context_names: &ContextNames,
     cluster_name: &ClusterName,
     cluster: &v1alpha1::OpenSearchCluster,
-    role_group_config: &RoleGroup<OpenSearchConfigFragment, GenericProductSpecificCommonConfig>,
+    role_group_config: &RoleGroup<
+        v1alpha1::OpenSearchConfigFragment,
+        GenericProductSpecificCommonConfig,
+    >,
 ) -> Result<OpenSearchRoleGroupConfig> {
-    let merged_role_group: RoleGroup<OpenSearchConfig, _> = with_validated_config(
+    let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _> = with_validated_config(
         role_group_config,
         &cluster.spec.nodes,
         &v1alpha1::OpenSearchConfig::default_config(
@@ -146,6 +159,8 @@ fn validate_role_group_config(
     )
     .context(ValidateOpenSearchConfigSnafu)?;
 
+    let logging = validate_logging_configuration(&merged_role_group.config.config.logging)?;
+
     let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
     let termination_grace_period_seconds = graceful_shutdown_timeout.as_secs().try_into().context(
         TerminationGracePeriodTooLongSnafu {
@@ -155,10 +170,11 @@ fn validate_role_group_config(
 
     let validated_config = ValidatedOpenSearchConfig {
         affinity: merged_role_group.config.config.affinity,
+        listener_class: merged_role_group.config.config.listener_class,
+        logging,
         node_roles: merged_role_group.config.config.node_roles,
         resources: merged_role_group.config.config.resources,
         termination_grace_period_seconds,
-        listener_class: merged_role_group.config.config.listener_class,
     };
 
     let mut env_overrides = EnvVarSet::new();
@@ -182,6 +198,48 @@ fn validate_role_group_config(
     })
 }
 
+fn validate_logging_configuration(
+    logging: &Logging<v1alpha1::Container>,
+) -> Result<ValidatedLogging> {
+    Ok(ValidatedLogging {
+        enable_vector_agent: logging.enable_vector_agent,
+        opensearch_container: validate_logging_configuration_for_container(
+            logging,
+            v1alpha1::Container::OpenSearch,
+        )?,
+        vector_container: validate_logging_configuration_for_container(
+            logging,
+            v1alpha1::Container::Vector,
+        )?,
+    })
+}
+
+fn validate_logging_configuration_for_container(
+    logging: &Logging<v1alpha1::Container>,
+    container: v1alpha1::Container,
+) -> Result<ValidatedContainerLogConfigChoice> {
+    let container_log_config_choice = logging
+        .containers
+        .get(&container)
+        .and_then(|container_log_config| container_log_config.choice.as_ref())
+        // This should never happen because a default configuration should have been set in
+        // `v1alpha1::OpenSearchConfig` for all containers.
+        .context(GetContainerLogConfigurationSnafu { container })?;
+
+    let validated_container_log_config_choice = match container_log_config_choice {
+        ContainerLogConfigChoice::Custom(CustomContainerLogConfig {
+            custom: ConfigMapLogConfig { config_map },
+        }) => ValidatedContainerLogConfigChoice::Custom(
+            ConfigMapName::from_str(config_map).context(ParseContainerNameSnafu)?,
+        ),
+        ContainerLogConfigChoice::Automatic(automatic_log_config) => {
+            ValidatedContainerLogConfigChoice::Automatic(automatic_log_config.clone())
+        }
+    };
+
+    Ok(validated_container_log_config_choice)
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -201,6 +259,11 @@ mod tests {
         },
         kube::api::ObjectMeta,
         kvp::LabelValue,
+        product_logging::spec::{
+            AppenderConfig, AutomaticContainerLogConfig, ConfigMapLogConfigFragment,
+            ContainerLogConfigChoiceFragment, ContainerLogConfigFragment,
+            CustomContainerLogConfigFragment, LogLevel, LoggerConfig, LoggingFragment,
+        },
         role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
         shared::time::Duration,
     };
@@ -208,14 +271,17 @@ mod tests {
 
     use super::{ErrorDiscriminants, validate};
     use crate::{
-        controller::{ContextNames, ValidatedCluster, ValidatedOpenSearchConfig},
+        controller::{
+            ContextNames, ValidatedCluster, ValidatedContainerLogConfigChoice, ValidatedLogging,
+            ValidatedOpenSearchConfig,
+        },
         crd::{
             NodeRoles,
             v1alpha1::{self, OpenSearchClusterSpec, OpenSearchConfigFragment, StorageConfig},
         },
         framework::{
-            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
-            RoleGroupName,
+            ClusterName, ConfigMapName, ControllerName, NamespaceName, OperatorName, ProductName,
+            ProductVersion, RoleGroupName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         },
@@ -283,6 +349,30 @@ mod tests {
                                 }),
                                 ..StackableAffinity::default()
                             },
+                            listener_class: "listener-class-from-role-group-level".to_owned(),
+                            logging: ValidatedLogging {
+                                enable_vector_agent: true,
+                                opensearch_container: ValidatedContainerLogConfigChoice::Custom(
+                                    ConfigMapName::from_str_unsafe("custom-log-config-map")
+                                ),
+                                vector_container: ValidatedContainerLogConfigChoice::Automatic(
+                                    AutomaticContainerLogConfig {
+                                        loggers: [(
+                                            "ROOT".to_owned(),
+                                            LoggerConfig {
+                                                level: LogLevel::INFO
+                                            }
+                                        )]
+                                        .into(),
+                                        console: Some(AppenderConfig {
+                                            level: Some(LogLevel::INFO)
+                                        }),
+                                        file: Some(AppenderConfig {
+                                            level: Some(LogLevel::INFO)
+                                        }),
+                                    },
+                                ),
+                            },
                             node_roles: NodeRoles(
                                 [
                                     v1alpha1::NodeRole::ClusterManager,
@@ -309,7 +399,6 @@ mod tests {
                                 }
                             },
                             termination_grace_period_seconds: 300,
-                            listener_class: "listener-class-from-role-group-level".to_owned(),
                         },
                         config_overrides: [(
                             "opensearch.yml".to_owned(),
@@ -464,6 +553,31 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_err_parse_container_name() {
+        test_validate_err(
+            |cluster| {
+                cluster.spec.nodes.config.config.logging = LoggingFragment {
+                    enable_vector_agent: Some(true),
+                    containers: [(
+                        v1alpha1::Container::OpenSearch,
+                        ContainerLogConfigFragment {
+                            choice: Some(ContainerLogConfigChoiceFragment::Custom(
+                                CustomContainerLogConfigFragment {
+                                    custom: ConfigMapLogConfigFragment {
+                                        config_map: Some("invalid ConfigMap name".to_owned()),
+                                    },
+                                },
+                            )),
+                        },
+                    )]
+                    .into(),
+                }
+            },
+            ErrorDiscriminants::ParseContainerName,
+        );
+    }
+
+    #[test]
     fn test_validate_err_termination_grace_period_too_long() {
         test_validate_err(
             |cluster| {
@@ -525,6 +639,24 @@ mod tests {
                         config: OpenSearchConfigFragment {
                             graceful_shutdown_timeout: Some(Duration::from_minutes_unchecked(5)),
                             listener_class: Some("listener-class-from-role-level".to_owned()),
+                            logging: LoggingFragment {
+                                enable_vector_agent: Some(true),
+                                containers: [(
+                                    v1alpha1::Container::OpenSearch,
+                                    ContainerLogConfigFragment {
+                                        choice: Some(ContainerLogConfigChoiceFragment::Custom(
+                                            CustomContainerLogConfigFragment {
+                                                custom: ConfigMapLogConfigFragment {
+                                                    config_map: Some(
+                                                        "custom-log-config-map".to_owned(),
+                                                    ),
+                                                },
+                                            },
+                                        )),
+                                    },
+                                )]
+                                .into(),
+                            },
                             ..OpenSearchConfigFragment::default()
                         },
                         config_overrides: [(

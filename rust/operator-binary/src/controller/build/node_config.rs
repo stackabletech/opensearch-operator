@@ -3,14 +3,17 @@
 use std::str::FromStr;
 
 use serde_json::{Value, json};
-use stackable_operator::builder::pod::container::FieldPathEnvVar;
+use stackable_operator::{
+    builder::pod::container::FieldPathEnvVar,
+    product_logging::{self},
+};
 
 use super::ValidatedCluster;
 use crate::{
-    controller::OpenSearchRoleGroupConfig,
+    controller::{OpenSearchRoleGroupConfig, ValidatedContainerLogConfigChoice},
     crd::v1alpha1,
     framework::{
-        ServiceName,
+        ConfigMapName, ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
     },
@@ -18,6 +21,9 @@ use crate::{
 
 /// The main configuration file of OpenSearch
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
+
+/// The log configuration file
+pub const CONFIGURATION_FILE_LOG4J2_PROPERTIES: &str = "log4j2.properties";
 
 /// The cluster name.
 /// Type: string
@@ -81,7 +87,7 @@ impl NodeConfig {
     }
 
     /// Creates the main OpenSearch configuration file in YAML format
-    pub fn static_opensearch_config_file(&self) -> String {
+    pub fn static_opensearch_config_file_content(&self) -> String {
         Self::to_yaml(self.static_opensearch_config())
     }
 
@@ -261,6 +267,34 @@ impl NodeConfig {
             String::new()
         }
     }
+
+    pub fn automatic_log_config_file_content(&self) -> Option<String> {
+        if let ValidatedContainerLogConfigChoice::Automatic(log_config) =
+            &self.role_group_config.config.logging.opensearch_container
+        {
+            Some(product_logging::framework::create_log4j2_config(
+                "/stackable/log/opensearch",
+                "opensearch.log4j2.xml",
+                10,
+                // Same as the default layout pattern of the console appender
+                // see https://github.com/opensearch-project/OpenSearch/blob/3.1.0/distribution/src/config/log4j2.properties#L17
+                "[%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n",
+                log_config,
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn custom_log_config_map(&self) -> Option<ConfigMapName> {
+        if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
+            &self.role_group_config.config.logging.opensearch_container
+        {
+            Some(config_map_name.clone())
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -275,13 +309,14 @@ mod tests {
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
 
     use super::*;
     use crate::{
-        controller::ValidatedOpenSearchConfig,
+        controller::{ValidatedLogging, ValidatedOpenSearchConfig},
         crd::NodeRoles,
         framework::{
             ClusterName, NamespaceName, ProductVersion, RoleGroupName,
@@ -289,18 +324,42 @@ mod tests {
         },
     };
 
-    pub fn node_config(
+    struct TestConfig {
         replicas: u16,
-        config_settings: &[(&str, &str)],
-        env_vars: &[(&str, &str)],
-    ) -> NodeConfig {
+        config_settings: &'static [(&'static str, &'static str)],
+        env_vars: &'static [(&'static str, &'static str)],
+        log_config: ValidatedContainerLogConfigChoice,
+    }
+
+    impl Default for TestConfig {
+        fn default() -> Self {
+            Self {
+                replicas: 3,
+                config_settings: &[],
+                env_vars: &[],
+                log_config: ValidatedContainerLogConfigChoice::Automatic(
+                    AutomaticContainerLogConfig::default(),
+                ),
+            }
+        }
+    }
+
+    fn node_config(test_config: TestConfig) -> NodeConfig {
         let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
             .expect("should be a valid ProductImage");
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas,
+            replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: "cluster-internal".to_string(),
+                logging: ValidatedLogging {
+                    enable_vector_agent: true,
+                    opensearch_container: test_config.log_config,
+                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
                     v1alpha1::NodeRole::Data,
@@ -309,18 +368,19 @@ mod tests {
                 ]),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: [(
                 CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-                config_settings
+                test_config
+                    .config_settings
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
             )]
             .into(),
             env_overrides: EnvVarSet::new().with_values(
-                env_vars
+                test_config
+                    .env_vars
                     .iter()
                     .map(|(k, v)| (EnvVarName::from_str_unsafe(k), *v)),
             ),
@@ -359,7 +419,10 @@ mod tests {
 
     #[test]
     pub fn test_static_opensearch_config_file() {
-        let node_config = node_config(2, &[("test", "value")], &[]);
+        let node_config = node_config(TestConfig {
+            config_settings: &[("test", "value")],
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             concat!(
@@ -370,17 +433,23 @@ mod tests {
                 "test: \"value\""
             )
             .to_owned(),
-            node_config.static_opensearch_config_file()
+            node_config.static_opensearch_config_file_content()
         );
     }
 
     #[test]
     pub fn test_tls_on_http_port_enabled() {
-        let node_config_tls_undefined = node_config(2, &[], &[]);
-        let node_config_tls_enabled =
-            node_config(2, &[("plugins.security.ssl.http.enabled", "true")], &[]);
-        let node_config_tls_disabled =
-            node_config(2, &[("plugins.security.ssl.http.enabled", "false")], &[]);
+        let node_config_tls_undefined = node_config(TestConfig::default());
+
+        let node_config_tls_enabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "true")],
+            ..TestConfig::default()
+        });
+
+        let node_config_tls_disabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "false")],
+            ..TestConfig::default()
+        });
 
         assert!(!node_config_tls_undefined.tls_on_http_port_enabled());
         assert!(node_config_tls_enabled.tls_on_http_port_enabled());
@@ -426,7 +495,11 @@ mod tests {
 
     #[test]
     pub fn test_environment_variables() {
-        let node_config = node_config(2, &[], &[("TEST", "value")]);
+        let node_config = node_config(TestConfig {
+            replicas: 2,
+            env_vars: &[("TEST", "value")],
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             EnvVarSet::new()
@@ -453,8 +526,20 @@ mod tests {
 
     #[test]
     pub fn test_discovery_type() {
-        let node_config_single_node = node_config(1, &[], &[]);
-        let node_config_multiple_nodes = node_config(2, &[], &[]);
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        println!(
+            "node_config_single_node: {:?}",
+            node_config_single_node.role_group_config.config
+        );
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 2,
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             "single-node".to_owned(),
@@ -468,8 +553,15 @@ mod tests {
 
     #[test]
     pub fn test_initial_cluster_manager_nodes() {
-        let node_config_single_node = node_config(1, &[], &[]);
-        let node_config_multiple_nodes = node_config(3, &[], &[]);
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 3,
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             "".to_owned(),
@@ -478,6 +570,83 @@ mod tests {
         assert_eq!(
             "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned(),
             node_config_multiple_nodes.initial_cluster_manager_nodes()
+        );
+    }
+
+    #[test]
+    pub fn test_automatic_log_config_file_content() {
+        let automatic_log_config_node_config = node_config(TestConfig {
+            log_config: ValidatedContainerLogConfigChoice::Automatic(
+                AutomaticContainerLogConfig::default(),
+            ),
+            ..TestConfig::default()
+        });
+
+        let custom_log_config_node_config = node_config(TestConfig {
+            log_config: ValidatedContainerLogConfigChoice::Custom(ConfigMapName::from_str_unsafe(
+                "custom-log-config",
+            )),
+            ..TestConfig::default()
+        });
+
+        assert_eq!(
+            Some(concat!(
+                "appenders = FILE, CONSOLE\n\n",
+                "appender.CONSOLE.type = Console\n",
+                "appender.CONSOLE.name = CONSOLE\n",
+                "appender.CONSOLE.target = SYSTEM_ERR\n",
+                "appender.CONSOLE.layout.type = PatternLayout\n",
+                "appender.CONSOLE.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n\n",
+                "appender.CONSOLE.filter.threshold.type = ThresholdFilter\n",
+                "appender.CONSOLE.filter.threshold.level = INFO\n\n",
+                "appender.FILE.type = RollingFile\n",
+                "appender.FILE.name = FILE\n",
+                "appender.FILE.fileName = /stackable/log/opensearch/opensearch.log4j2.xml\n",
+                "appender.FILE.filePattern = /stackable/log/opensearch/opensearch.log4j2.xml.%i\n",
+                "appender.FILE.layout.type = XMLLayout\n",
+                "appender.FILE.policies.type = Policies\n",
+                "appender.FILE.policies.size.type = SizeBasedTriggeringPolicy\n",
+                "appender.FILE.policies.size.size = 5MB\n",
+                "appender.FILE.strategy.type = DefaultRolloverStrategy\n",
+                "appender.FILE.strategy.max = 1\n",
+                "appender.FILE.filter.threshold.type = ThresholdFilter\n",
+                "appender.FILE.filter.threshold.level = INFO\n\n\n",
+                "rootLogger.level=INFO\n",
+                "rootLogger.appenderRefs = CONSOLE, FILE\n",
+                "rootLogger.appenderRef.CONSOLE.ref = CONSOLE\n",
+                "rootLogger.appenderRef.FILE.ref = FILE"
+            ).to_owned()),
+            automatic_log_config_node_config.automatic_log_config_file_content()
+        );
+        assert_eq!(
+            None,
+            custom_log_config_node_config.automatic_log_config_file_content()
+        );
+    }
+
+    #[test]
+    pub fn test_custom_log_config_map() {
+        let custom_log_config_node_config = node_config(TestConfig {
+            log_config: ValidatedContainerLogConfigChoice::Custom(ConfigMapName::from_str_unsafe(
+                "custom-log-config",
+            )),
+            ..TestConfig::default()
+        });
+
+        let automatic_log_config_node_config = node_config(TestConfig {
+            log_config: ValidatedContainerLogConfigChoice::Automatic(
+                AutomaticContainerLogConfig::default(),
+            ),
+            ..TestConfig::default()
+        });
+
+        assert_eq!(
+            Some(ConfigMapName::from_str_unsafe("custom-log-config")),
+            custom_log_config_node_config.custom_log_config_map()
+        );
+        assert_eq!(
+            None,
+            automatic_log_config_node_config.custom_log_config_map()
         );
     }
 }
