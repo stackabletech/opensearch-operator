@@ -35,6 +35,11 @@ tests:
       - opensearch
       - openshift
       - opensearch_home
+  - name: logging
+    dimensions:
+      - opensearch
+      - openshift
+      - opensearch_home
 suites:
   - name: nightly
     patch:
