@@ -234,7 +234,7 @@ impl<'a> RoleGroupBuilder<'a> {
                     &self.resource_names.role_name,
                     &self.resource_names.role_group_name,
                     &self.cluster.image,
-                    &LOG_CONFIG_VOLUME_NAME,
+                    &CONFIG_VOLUME_NAME,
                     &LOG_VOLUME_NAME,
                 )
             });
@@ -433,10 +433,6 @@ impl<'a> RoleGroupBuilder<'a> {
 
         new_container_builder(&v1alpha1::Container::OpenSearch.to_container_name())
             .image_from_product_image(&self.cluster.image)
-            .command(vec![format!(
-                "{opensearch_home}/opensearch-docker-entrypoint.sh"
-            )])
-            .args(self.role_group_config.cli_overrides_to_vec())
             .command(vec![
                 "/bin/bash".to_string(),
                 "-x".to_string(),
@@ -448,8 +444,12 @@ impl<'a> RoleGroupBuilder<'a> {
                 "{COMMON_BASH_TRAP_FUNCTIONS}\n\
                 {remove_vector_shutdown_file_command}\n\
                 prepare_signal_handlers\n\
+                if command --search containerdebug >/dev/null 2>&1; then\n\
                 containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
-                {opensearch_home}/opensearch-docker-entrypoint.sh {extra_args} &\n\
+                else\n\
+                echo >&2 \"containerdebug not installed; Proceed without it.\"\n\
+                fi\n\
+                ./opensearch-docker-entrypoint.sh {extra_args} &\n\
                 wait_for_termination $!\n\
                 {create_vector_shutdown_file_command}",
                 extra_args = self.role_group_config.cli_overrides_to_vec().join(" "),

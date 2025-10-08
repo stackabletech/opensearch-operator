@@ -57,8 +57,54 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
-      - command:
-        - {{ test_scenario['values']['opensearch_home'] }}/opensearch-docker-entrypoint.sh
+      - args:
+        - |-
+
+          prepare_signal_handlers()
+          {
+              unset term_child_pid
+              unset term_kill_needed
+              trap 'handle_term_signal' TERM
+          }
+
+          handle_term_signal()
+          {
+              if [ "${term_child_pid}" ]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              else
+                  term_kill_needed="yes"
+              fi
+          }
+
+          wait_for_termination()
+          {
+              set +e
+              term_child_pid=$1
+              if [[ -v term_kill_needed ]]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              fi
+              wait ${term_child_pid} 2>/dev/null
+              trap - TERM
+              wait ${term_child_pid} 2>/dev/null
+              set -e
+          }
+
+          rm -f /stackable/log/_vector/shutdown
+          prepare_signal_handlers
+          if command --search containerdebug >/dev/null 2>&1; then
+          containerdebug --output=/stackable/log/containerdebug-state.json --loop &
+          else
+          echo >&2 "containerdebug not installed; Proceed without it."
+          fi
+          ./opensearch-docker-entrypoint.sh  &
+          wait_for_termination $!
+          mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -119,6 +165,8 @@ spec:
           name: data
         - mountPath: /stackable/listener
           name: listener
+        - mountPath: /stackable/log
+          name: log
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
           readOnly: true
@@ -139,6 +187,9 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-cluster-manager
         name: log-config
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
       - name: security-config
         secret:
           defaultMode: 420
@@ -253,8 +304,54 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
-      - command:
-        - {{ test_scenario['values']['opensearch_home'] }}/opensearch-docker-entrypoint.sh
+      - args:
+        - |-
+
+          prepare_signal_handlers()
+          {
+              unset term_child_pid
+              unset term_kill_needed
+              trap 'handle_term_signal' TERM
+          }
+
+          handle_term_signal()
+          {
+              if [ "${term_child_pid}" ]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              else
+                  term_kill_needed="yes"
+              fi
+          }
+
+          wait_for_termination()
+          {
+              set +e
+              term_child_pid=$1
+              if [[ -v term_kill_needed ]]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              fi
+              wait ${term_child_pid} 2>/dev/null
+              trap - TERM
+              wait ${term_child_pid} 2>/dev/null
+              set -e
+          }
+
+          rm -f /stackable/log/_vector/shutdown
+          prepare_signal_handlers
+          if command --search containerdebug >/dev/null 2>&1; then
+          containerdebug --output=/stackable/log/containerdebug-state.json --loop &
+          else
+          echo >&2 "containerdebug not installed; Proceed without it."
+          fi
+          ./opensearch-docker-entrypoint.sh  &
+          wait_for_termination $!
+          mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -314,6 +411,8 @@ spec:
           name: data
         - mountPath: /stackable/listener
           name: listener
+        - mountPath: /stackable/log
+          name: log
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
           readOnly: true
@@ -334,6 +433,9 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-data
         name: log-config
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
       - name: security-config
         secret:
           defaultMode: 420

@@ -22,83 +22,41 @@ customConfig:
   transforms:
     validEvents:
       type: filter
-      inputs: [vector]
+      inputs:
+        - vector
       condition: is_null(.errors)
-    filteredAutomaticLogConfigMasterHbase:
+    filteredAutomaticLogConfigOpenSearch:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
-        .pod == "test-opensearch-master-automatic-log-config-0" &&
+        .pod == "opensearch-nodes-automatic-0" &&
         .container == "opensearch"
-    filteredAutomaticLogConfigMasterVector:
+    filteredAutomaticLogConfigVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
-        .pod == "test-opensearch-master-automatic-log-config-0" &&
+        .pod == "opensearch-nodes-automatic-0" &&
         .container == "vector"
-    filteredCustomLogConfigMasterHbase:
+    filteredCustomLogConfigOpenSearch:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
-        .pod == "test-opensearch-master-custom-log-config-0" &&
+        .pod == "opensearch-nodes-custom-0" &&
         .container == "opensearch"
-    filteredCustomLogConfigMasterVector:
+    filteredCustomLogConfigVector:
       type: filter
-      inputs: [validEvents]
+      inputs:
+        - validEvents
       condition: >-
-        .pod == "test-opensearch-master-custom-log-config-0" &&
-        .container == "vector"
-    filteredAutomaticLogConfigRegionserverHbase:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-regionserver-automatic-log-config-0" &&
-        .container == "opensearch"
-    filteredAutomaticLogConfigRegionserverVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-regionserver-automatic-log-config-0" &&
-        .container == "vector"
-    filteredCustomLogConfigRegionserverHbase:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-regionserver-custom-log-config-0" &&
-        .container == "opensearch"
-    filteredCustomLogConfigRegionserverVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-regionserver-custom-log-config-0" &&
-        .container == "vector"
-    filteredAutomaticLogConfigRestserverHbase:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-restserver-automatic-log-config-0" &&
-        .container == "opensearch"
-    filteredAutomaticLogConfigRestserverVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-restserver-automatic-log-config-0" &&
-        .container == "vector"
-    filteredCustomLogConfigRestserverHbase:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-restserver-custom-log-config-0" &&
-        .container == "opensearch"
-    filteredCustomLogConfigRestserverVector:
-      type: filter
-      inputs: [validEvents]
-      condition: >-
-        .pod == "test-opensearch-restserver-custom-log-config-0" &&
+        .pod == "opensearch-nodes-custom-0" &&
         .container == "vector"
     filteredInvalidEvents:
       type: filter
-      inputs: [vector]
+      inputs:
+        - vector
       condition: |-
         .timestamp == from_unix_timestamp!(0) ||
         is_null(.level) ||
@@ -106,7 +64,8 @@ customConfig:
         is_null(.message)
   sinks:
     test:
-      inputs: [filtered*]
+      inputs:
+        - filtered*
       type: blackhole
     stdout:
       inputs:
@@ -116,7 +75,8 @@ customConfig:
         codec: json
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     aggregator:
-      inputs: [vector]
+      inputs:
+        - vector
       type: vector
       address: {{ lookup('env', 'VECTOR_AGGREGATOR') }}
       buffer:

@@ -6,6 +6,6 @@ timeout: 600
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: test-opensearch
+  name: test-log-aggregation
 status:
   succeeded: 1
