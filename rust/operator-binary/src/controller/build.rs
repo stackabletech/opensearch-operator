@@ -79,8 +79,8 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
+            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -202,7 +202,7 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                listener_class: "external-stable".to_owned(),
+                listener_class: ListenerClassName::from_str_unsafe("external-stable"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),

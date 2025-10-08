@@ -241,8 +241,8 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
+            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -263,7 +263,7 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                listener_class: "cluster-internal".to_string(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),

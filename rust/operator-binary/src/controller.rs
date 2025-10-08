@@ -33,8 +33,8 @@ use crate::{
         v1alpha1::{self},
     },
     framework::{
-        ClusterName, ControllerName, HasName, HasUid, NameIsValidLabelValue, NamespaceName,
-        OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
+        ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
+        NamespaceName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
     },
@@ -128,7 +128,7 @@ type OpenSearchNodeResources =
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
-    pub listener_class: String,
+    pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
     pub node_roles: NodeRoles,
     pub resources: OpenSearchNodeResources,
@@ -379,8 +379,8 @@ mod tests {
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, NamespaceName, OperatorName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet,
+            ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
         },
@@ -504,7 +504,7 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                listener_class: "external-stable".to_owned(),
+                listener_class: ListenerClassName::from_str_unsafe("external-stable"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),

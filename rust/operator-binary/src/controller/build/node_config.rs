@@ -285,7 +285,7 @@ mod tests {
         controller::{ValidatedLogging, ValidatedOpenSearchConfig},
         crd::NodeRoles,
         framework::{
-            ClusterName, NamespaceName, ProductVersion, RoleGroupName,
+            ClusterName, ListenerClassName, NamespaceName, ProductVersion, RoleGroupName,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
         },
@@ -315,7 +315,7 @@ mod tests {
             replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                listener_class: "cluster-internal".to_string(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),

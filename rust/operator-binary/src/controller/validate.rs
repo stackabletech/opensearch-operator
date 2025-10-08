@@ -64,9 +64,6 @@ pub enum Error {
     #[snafu(display("failed to set role-group name"))]
     ParseRoleGroupName { source: crate::framework::Error },
 
-    #[snafu(display("failed to set vectorAggregatorConfigMapName"))]
-    ParseVectorAggregatorConfigMapName { source: crate::framework::Error },
-
     #[snafu(display("failed to resolve product image"))]
     ResolveProductImage {
         source: stackable_operator::commons::product_image_selection::Error,
@@ -166,22 +163,12 @@ fn validate_role_group_config(
     )
     .context(ValidateOpenSearchConfigSnafu)?;
 
-    let vector_aggregator_config_map_name = if let Some(config_map_name) = &cluster
-        .spec
-        .cluster_config
-        .vector_aggregator_config_map_name
-    {
-        Some(
-            ConfigMapName::from_str(config_map_name)
-                .context(ParseVectorAggregatorConfigMapNameSnafu)?,
-        )
-    } else {
-        None
-    };
-
     let logging = validate_logging_configuration(
         &merged_role_group.config.config.logging,
-        vector_aggregator_config_map_name,
+        &cluster
+            .spec
+            .cluster_config
+            .vector_aggregator_config_map_name,
     )?;
 
     let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
@@ -223,15 +210,16 @@ fn validate_role_group_config(
 
 fn validate_logging_configuration(
     logging: &Logging<v1alpha1::Container>,
-    vector_aggregator_config_map_name: Option<ConfigMapName>,
+    vector_aggregator_config_map_name: &Option<ConfigMapName>,
 ) -> Result<ValidatedLogging> {
     let opensearch_container =
         validate_logging_configuration_for_container(logging, v1alpha1::Container::OpenSearch)
             .context(ValidateLoggingConfigSnafu)?;
 
     let vector_container = if logging.enable_vector_agent {
-        let vector_aggregator_config_map_name =
-            vector_aggregator_config_map_name.context(GetVectorAggregatorConfigMapNameSnafu)?;
+        let vector_aggregator_config_map_name = vector_aggregator_config_map_name
+            .clone()
+            .context(GetVectorAggregatorConfigMapNameSnafu)?;
         Some(VectorContainerLogConfig {
             log_config: validate_logging_configuration_for_container(
                 logging,
@@ -288,8 +276,8 @@ mod tests {
             v1alpha1::{self},
         },
         framework::{
-            ClusterName, ConfigMapName, ControllerName, NamespaceName, OperatorName, ProductName,
-            ProductVersion, RoleGroupName,
+            ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
+            OperatorName, ProductName, ProductVersion, RoleGroupName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
@@ -360,7 +348,9 @@ mod tests {
                                 }),
                                 ..StackableAffinity::default()
                             },
-                            listener_class: "listener-class-from-role-group-level".to_owned(),
+                            listener_class: ListenerClassName::from_str_unsafe(
+                                "listener-class-from-role-group-level"
+                            ),
                             logging: ValidatedLogging {
                                 opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                                     AutomaticContainerLogConfig {
@@ -581,19 +571,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_vector_aggregator_config_map_name() {
-        test_validate_err(
-            |cluster| {
-                cluster
-                    .spec
-                    .cluster_config
-                    .vector_aggregator_config_map_name = Some("invalid ConfigMap name".to_owned())
-            },
-            ErrorDiscriminants::ParseVectorAggregatorConfigMapName,
-        );
-    }
-
-    #[test]
     fn test_validate_err_validate_logging_config() {
         test_validate_err(
             |cluster| {
@@ -685,14 +662,18 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
-                    vector_aggregator_config_map_name: Some("vector-aggregator".to_owned()),
+                    vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
+                        "vector-aggregator",
+                    )),
                 },
                 cluster_operation: ClusterOperation::default(),
                 nodes: Role {
                     config: CommonConfiguration {
                         config: v1alpha1::OpenSearchConfigFragment {
                             graceful_shutdown_timeout: Some(Duration::from_minutes_unchecked(5)),
-                            listener_class: Some("listener-class-from-role-level".to_owned()),
+                            listener_class: Some(ListenerClassName::from_str_unsafe(
+                                "listener-class-from-role-level",
+                            )),
                             logging: LoggingFragment {
                                 enable_vector_agent: Some(true),
                                 containers: BTreeMap::default(),
@@ -740,9 +721,9 @@ mod tests {
                         RoleGroup {
                             config: CommonConfiguration {
                                 config: v1alpha1::OpenSearchConfigFragment {
-                                    listener_class: Some(
-                                        "listener-class-from-role-group-level".to_owned(),
-                                    ),
+                                    listener_class: Some(ListenerClassName::from_str_unsafe(
+                                        "listener-class-from-role-group-level",
+                                    )),
                                     ..v1alpha1::OpenSearchConfigFragment::default()
                                 },
                                 config_overrides: [(

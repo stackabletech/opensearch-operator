@@ -26,12 +26,15 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter};
 
-use crate::framework::{
-    ClusterName, ContainerName, NameIsValidLabelValue, ProductName, RoleName,
-    role_utils::GenericProductSpecificCommonConfig,
+use crate::{
+    constant,
+    framework::{
+        ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
+        ProductName, RoleName, role_utils::GenericProductSpecificCommonConfig,
+    },
 };
 
-const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+constant!(DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -82,7 +85,7 @@ pub mod versioned {
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub vector_aggregator_config_map_name: Option<String>,
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -151,7 +154,7 @@ pub mod versioned {
 
         /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
         #[fragment_attrs(serde(default))]
-        pub listener_class: String,
+        pub listener_class: ListenerClassName,
 
         #[fragment_attrs(serde(default))]
         pub logging: Logging<Container>,
@@ -257,7 +260,7 @@ impl v1alpha1::OpenSearchConfig {
             ),
             // Defaults taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
+            listener_class: Some(DEFAULT_LISTENER_CLASS.to_owned()),
             logging: product_logging::spec::default_logging(),
             node_roles: Some(NodeRoles(vec![
                 v1alpha1::NodeRole::ClusterManager,

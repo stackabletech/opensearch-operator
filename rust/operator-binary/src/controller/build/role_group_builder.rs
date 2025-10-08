@@ -569,7 +569,7 @@ impl<'a> RoleGroupBuilder<'a> {
         listener::v1alpha1::Listener {
             metadata,
             spec: listener::v1alpha1::ListenerSpec {
-                class_name: Some(listener_class),
+                class_name: Some(listener_class.to_string()),
                 ports: Some(ports.to_vec()),
                 ..listener::v1alpha1::ListenerSpec::default()
             },
@@ -653,9 +653,9 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ConfigMapName, ControllerName, NamespaceName, OperatorName, ProductName,
-            ProductVersion, RoleGroupName, ServiceAccountName, ServiceName,
-            builder::pod::container::EnvVarSet,
+            ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
+            OperatorName, ProductName, ProductVersion, RoleGroupName, ServiceAccountName,
+            ServiceName, builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
             role_utils::GenericProductSpecificCommonConfig,
         },
@@ -693,7 +693,7 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                listener_class: "cluster-internal".to_string(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),
