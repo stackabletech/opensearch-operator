@@ -218,6 +218,7 @@ mod tests {
         str::FromStr,
     };
 
+    use pretty_assertions::assert_eq;
     use serde_json::json;
     use stackable_operator::{
         commons::{
@@ -264,13 +265,10 @@ mod tests {
                 affinity: StackableAffinity::default(),
                 listener_class: "cluster-internal".to_string(),
                 logging: ValidatedLogging {
-                    vector_aggregator_config_map_name: None,
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),
                     ),
-                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
-                        AutomaticContainerLogConfig::default(),
-                    ),
+                    vector_container: None,
                 },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,

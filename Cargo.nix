@@ -1736,6 +1736,16 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "from" ];
       };
+      "diff" = rec {
+        crateName = "diff";
+        version = "0.1.13";
+        edition = "2015";
+        sha256 = "1j0nzjxci2zqx63hdcihkp0a4dkdmzxd7my4m7zk6cjyfy34j9an";
+        authors = [
+          "Utkarsh Kukreti <utkarshkukreti@gmail.com>"
+        ];
+
+      };
       "digest" = rec {
         crateName = "digest";
         version = "0.10.7";
@@ -6180,6 +6190,31 @@ rec {
         };
         resolvedDefaultFeatures = [ "simd" "std" ];
       };
+      "pretty_assertions" = rec {
+        crateName = "pretty_assertions";
+        version = "1.4.1";
+        edition = "2018";
+        sha256 = "0v8iq35ca4rw3rza5is3wjxwsf88303ivys07anc5yviybi31q9s";
+        authors = [
+          "Colin Kiegel <kiegel@gmx.de>"
+          "Florent Fayolle <florent.fayolle69@gmail.com>"
+          "Tom Milligan <code@tommilligan.net>"
+        ];
+        dependencies = [
+          {
+            name = "diff";
+            packageId = "diff";
+          }
+          {
+            name = "yansi";
+            packageId = "yansi";
+          }
+        ];
+        features = {
+          "default" = [ "std" ];
+        };
+        resolvedDefaultFeatures = [ "default" "std" ];
+      };
       "proc-macro-crate" = rec {
         crateName = "proc-macro-crate";
         version = "3.4.0";
@@ -6536,9 +6571,9 @@ rec {
       };
       "regex" = rec {
         crateName = "regex";
-        version = "1.11.2";
+        version = "1.11.3";
         edition = "2021";
-        sha256 = "04k9rzxd11hcahpyihlswy6f1zqw7lspirv4imm4h0lcdl8gvmr3";
+        sha256 = "0b58ya98c4i5cjjiwhpcnjr61cv9g143qhdwhsryggj09098hllb";
         authors = [
           "The Rust Project Developers"
           "Andrew Gallant <jamslam@gmail.com>"
@@ -6594,9 +6629,9 @@ rec {
       };
       "regex-automata" = rec {
         crateName = "regex-automata";
-        version = "0.4.10";
+        version = "0.4.11";
         edition = "2021";
-        sha256 = "1mllcfmgjcl6d52d5k09lwwq9wj5mwxccix4bhmw5spy1gx5i53b";
+        sha256 = "1bawj908pxixpggcnma3xazw53mwyz68lv9hn4yg63nlhv7bjgl3";
         libName = "regex_automata";
         authors = [
           "The Rust Project Developers"
@@ -8240,6 +8275,10 @@ rec {
             features = [ "compat" ];
           }
           {
+            name = "regex";
+            packageId = "regex";
+          }
+          {
             name = "schemars";
             packageId = "schemars 1.0.4";
             features = [ "url2" ];
@@ -8289,6 +8328,10 @@ rec {
           }
         ];
         devDependencies = [
+          {
+            name = "pretty_assertions";
+            packageId = "pretty_assertions";
+          }
           {
             name = "rstest";
             packageId = "rstest";
@@ -13022,6 +13065,24 @@ rec {
           "Vladimir Matveev <vmatveev@citrine.cc>"
         ];
 
+      };
+      "yansi" = rec {
+        crateName = "yansi";
+        version = "1.0.1";
+        edition = "2021";
+        sha256 = "0jdh55jyv0dpd38ij4qh60zglbw9aa8wafqai6m0wa7xaxk3mrfg";
+        authors = [
+          "Sergio Benitez <sb@sergio.bz>"
+        ];
+        features = {
+          "default" = [ "std" ];
+          "detect-env" = [ "std" ];
+          "detect-tty" = [ "is-terminal" "std" ];
+          "hyperlink" = [ "std" ];
+          "is-terminal" = [ "dep:is-terminal" ];
+          "std" = [ "alloc" ];
+        };
+        resolvedDefaultFeatures = [ "alloc" "default" "std" ];
       };
       "yoke" = rec {
         crateName = "yoke";

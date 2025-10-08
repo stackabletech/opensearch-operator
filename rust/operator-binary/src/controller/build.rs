@@ -7,6 +7,7 @@ use role_builder::RoleBuilder;
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
 
 pub mod node_config;
+pub mod product_logging;
 pub mod role_builder;
 pub mod role_group_builder;
 
@@ -203,13 +204,10 @@ mod tests {
                 affinity: StackableAffinity::default(),
                 listener_class: "external-stable".to_owned(),
                 logging: ValidatedLogging {
-                    vector_aggregator_config_map_name: None,
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),
                     ),
-                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
-                        AutomaticContainerLogConfig::default(),
-                    ),
+                    vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
                 resources: OpenSearchNodeResources::default(),

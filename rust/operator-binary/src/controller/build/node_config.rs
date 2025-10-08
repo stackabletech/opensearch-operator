@@ -1,29 +1,23 @@
 //! Configuration of an OpenSearch node
 
-use std::{cmp, str::FromStr};
+use std::str::FromStr;
 
 use serde_json::{Value, json};
-use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar, product_logging::spec::AutomaticContainerLogConfig,
-};
+use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
 use super::ValidatedCluster;
 use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{
-        ConfigMapName, ServiceName,
+        ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
-        product_logging::framework::ValidatedContainerLogConfigChoice,
         role_group_utils,
     },
 };
 
 /// The main configuration file of OpenSearch
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
-
-/// The log configuration file
-pub const CONFIGURATION_FILE_LOG4J2_PROPERTIES: &str = "log4j2.properties";
 
 /// The cluster name.
 /// Type: string
@@ -63,15 +57,6 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.node
 /// Type: boolean
 pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
     "plugins.security.ssl.http.enabled";
-
-pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
-const OPENSEARCH_SERVER_LOG_FILE: &str = "opensearch_server.json";
-/// File name of the Vector config file
-pub const VECTOR_CONFIG_FILE: &str = "vector.json";
-// /// Key in the discovery ConfigMap that holds the vector aggregator address
-// const VECTOR_AGGREGATOR_CM_KEY: &str = "ADDRESS";
-// /// Name of the env var in the vector container that holds the vector aggregator address
-// const VECTOR_AGGREGATOR_ENV_NAME: &str = "VECTOR_AGGREGATOR_ADDRESS";
 
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
@@ -171,19 +156,19 @@ impl NodeConfig {
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
                 &self.discovery_service_name,
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
                 self.initial_cluster_manager_nodes(),
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
                 self.role_group_config
                     .config
                     .node_roles
@@ -276,162 +261,6 @@ impl NodeConfig {
             String::new()
         }
     }
-
-    pub fn automatic_log_config_file_content(&self) -> Option<String> {
-        if let ValidatedContainerLogConfigChoice::Automatic(log_config) =
-            &self.role_group_config.config.logging.opensearch_container
-        {
-            Some(NodeConfig::create_log4j2_config(log_config))
-        } else {
-            None
-        }
-    }
-
-    fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
-        let log_path = format!(
-            "{STACKABLE_LOG_DIR}/{container}/{OPENSEARCH_SERVER_LOG_FILE}",
-            container = v1alpha1::Container::OpenSearch.to_container_name()
-        );
-        // TODO Calculate or move to constants
-        let max_size_in_mib = 10;
-        let number_of_archived_log_files = 1;
-
-        let loggers = config
-            .loggers
-            .iter()
-            .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
-            .flat_map(|(name, logger_config)| {
-                [
-                    (
-                        format!("logger.{name}.name"),
-                        name.escape_default().to_string(),
-                    ),
-                    (
-                        format!("logger.{name}.level"),
-                        logger_config.level.to_log4j_literal(),
-                    ),
-                ]
-            })
-            .collect::<Vec<_>>();
-
-        let root_logger = vec![
-            (
-                "rootLogger.level".to_owned(),
-                config.root_log_level().to_log4j2_literal(),
-            ),
-            (
-                "rootLogger.appenderRef.CONSOLE.ref".to_owned(),
-                "CONSOLE".to_owned(),
-            ),
-            (
-                "rootLogger.appenderRef.FILE.ref".to_owned(),
-                "FILE".to_owned(),
-            ),
-        ];
-
-        let console_appender = vec![
-            ("appender.CONSOLE.type".to_owned(), "Console".to_owned()),
-            ("appender.CONSOLE.name".to_owned(), "CONSOLE".to_owned()),
-            (
-                "appender.CONSOLE.target".to_owned(),
-                "SYSTEM_ERR".to_owned(),
-            ),
-            (
-                "appender.CONSOLE.layout.type".to_owned(),
-                "PatternLayout".to_owned(),
-            ),
-            // Same as the default layout pattern of the console appender
-            // see https://github.com/opensearch-project/OpenSearch/blob/3.1.0/distribution/src/config/log4j2.properties#L17
-            (
-                "appender.CONSOLE.layout.pattern".to_owned(),
-                "[%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n".to_owned(),
-            ),
-            (
-                "appender.CONSOLE.filter.threshold.type".to_owned(),
-                "ThresholdFilter".to_owned(),
-            ),
-            (
-                "appender.CONSOLE.filter.threshold.level".to_owned(),
-                config
-                    .console
-                    .as_ref()
-                    .and_then(|console| console.level)
-                    .unwrap_or_default()
-                    .to_log4j2_literal(),
-            ),
-        ];
-
-        let file_appender = vec![
-            ("appender.FILE.type".to_owned(), "RollingFile".to_owned()),
-            ("appender.FILE.name".to_owned(), "FILE".to_owned()),
-            ("appender.FILE.fileName".to_owned(), log_path.to_owned()),
-            (
-                "appender.FILE.filePattern".to_owned(),
-                format!("{log_path}.%i"),
-            ),
-            (
-                "appender.FILE.layout.type".to_owned(),
-                "OpenSearchJsonLayout".to_owned(),
-            ),
-            (
-                "appender.FILE.layout.type_name".to_owned(),
-                "server".to_owned(),
-            ),
-            (
-                "appender.FILE.policies.type".to_owned(),
-                "Policies".to_owned(),
-            ),
-            (
-                "appender.FILE.policies.size.type".to_owned(),
-                "SizeBasedTriggeringPolicy".to_owned(),
-            ),
-            (
-                "appender.FILE.policies.size.size".to_owned(),
-                format!(
-                    "{max_log_file_size_in_mib}MB",
-                    max_log_file_size_in_mib =
-                        cmp::max(1, max_size_in_mib / (1 + number_of_archived_log_files)),
-                ),
-            ),
-            (
-                "appender.FILE.strategy.type".to_owned(),
-                "DefaultRolloverStrategy".to_owned(),
-            ),
-            (
-                "appender.FILE.strategy.max".to_owned(),
-                number_of_archived_log_files.to_string(),
-            ),
-            (
-                "appender.FILE.filter.threshold.type".to_owned(),
-                "ThresholdFilter".to_owned(),
-            ),
-            (
-                "appender.FILE.filter.threshold.level".to_owned(),
-                config
-                    .file
-                    .as_ref()
-                    .and_then(|file| file.level)
-                    .unwrap_or_default()
-                    .to_log4j2_literal(),
-            ),
-        ];
-
-        [root_logger, loggers, console_appender, file_appender]
-            .iter()
-            .flatten()
-            .map(|(key, value)| format!("{key} = {value}\n"))
-            .collect()
-    }
-
-    pub fn custom_log_config_map(&self) -> Option<ConfigMapName> {
-        if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
-            &self.role_group_config.config.logging.opensearch_container
-        {
-            Some(config_map_name.clone())
-        } else {
-            None
-        }
-    }
 }
 
 #[cfg(test)]
@@ -457,6 +286,7 @@ mod tests {
         crd::NodeRoles,
         framework::{
             ClusterName, NamespaceName, ProductVersion, RoleGroupName,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -465,7 +295,6 @@ mod tests {
         replicas: u16,
         config_settings: &'static [(&'static str, &'static str)],
         env_vars: &'static [(&'static str, &'static str)],
-        log_config: ValidatedContainerLogConfigChoice,
     }
 
     impl Default for TestConfig {
@@ -474,9 +303,6 @@ mod tests {
                 replicas: 3,
                 config_settings: &[],
                 env_vars: &[],
-                log_config: ValidatedContainerLogConfigChoice::Automatic(
-                    AutomaticContainerLogConfig::default(),
-                ),
             }
         }
     }
@@ -491,11 +317,10 @@ mod tests {
                 affinity: StackableAffinity::default(),
                 listener_class: "cluster-internal".to_string(),
                 logging: ValidatedLogging {
-                    vector_aggregator_config_map_name: None,
-                    opensearch_container: test_config.log_config,
-                    vector_container: ValidatedContainerLogConfigChoice::Automatic(
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
                         AutomaticContainerLogConfig::default(),
                     ),
+                    vector_container: None,
                 },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
@@ -640,21 +465,21 @@ mod tests {
 
         assert_eq!(
             EnvVarSet::new()
-                .with_value(EnvVarName::from_str_unsafe("TEST"), "value",)
+                .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
                 .with_value(
-                    EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
+                    &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
                     "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1",
                 )
                 .with_value(
-                    EnvVarName::from_str_unsafe("discovery.seed_hosts"),
+                    &EnvVarName::from_str_unsafe("discovery.seed_hosts"),
                     "my-opensearch-cluster-manager",
                 )
                 .with_field_path(
-                    EnvVarName::from_str_unsafe("node.name"),
+                    &EnvVarName::from_str_unsafe("node.name"),
                     FieldPathEnvVar::Name
                 )
                 .with_value(
-                    EnvVarName::from_str_unsafe("node.roles"),
+                    &EnvVarName::from_str_unsafe("node.roles"),
                     "cluster_manager,data,ingest,remote_cluster_client"
                 ),
             node_config.environment_variables()
@@ -707,83 +532,6 @@ mod tests {
         assert_eq!(
             "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned(),
             node_config_multiple_nodes.initial_cluster_manager_nodes()
-        );
-    }
-
-    #[test]
-    pub fn test_automatic_log_config_file_content() {
-        let automatic_log_config_node_config = node_config(TestConfig {
-            log_config: ValidatedContainerLogConfigChoice::Automatic(
-                AutomaticContainerLogConfig::default(),
-            ),
-            ..TestConfig::default()
-        });
-
-        let custom_log_config_node_config = node_config(TestConfig {
-            log_config: ValidatedContainerLogConfigChoice::Custom(ConfigMapName::from_str_unsafe(
-                "custom-log-config",
-            )),
-            ..TestConfig::default()
-        });
-
-        assert_eq!(
-            Some(concat!(
-                "appenders = FILE, CONSOLE\n\n",
-                "appender.CONSOLE.type = Console\n",
-                "appender.CONSOLE.name = CONSOLE\n",
-                "appender.CONSOLE.target = SYSTEM_ERR\n",
-                "appender.CONSOLE.layout.type = PatternLayout\n",
-                "appender.CONSOLE.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n\n",
-                "appender.CONSOLE.filter.threshold.type = ThresholdFilter\n",
-                "appender.CONSOLE.filter.threshold.level = INFO\n\n",
-                "appender.FILE.type = RollingFile\n",
-                "appender.FILE.name = FILE\n",
-                "appender.FILE.fileName = /stackable/log/opensearch/opensearch.log4j2.xml\n",
-                "appender.FILE.filePattern = /stackable/log/opensearch/opensearch.log4j2.xml.%i\n",
-                "appender.FILE.layout.type = XMLLayout\n",
-                "appender.FILE.policies.type = Policies\n",
-                "appender.FILE.policies.size.type = SizeBasedTriggeringPolicy\n",
-                "appender.FILE.policies.size.size = 5MB\n",
-                "appender.FILE.strategy.type = DefaultRolloverStrategy\n",
-                "appender.FILE.strategy.max = 1\n",
-                "appender.FILE.filter.threshold.type = ThresholdFilter\n",
-                "appender.FILE.filter.threshold.level = INFO\n\n\n",
-                "rootLogger.level=INFO\n",
-                "rootLogger.appenderRefs = CONSOLE, FILE\n",
-                "rootLogger.appenderRef.CONSOLE.ref = CONSOLE\n",
-                "rootLogger.appenderRef.FILE.ref = FILE"
-            ).to_owned()),
-            automatic_log_config_node_config.automatic_log_config_file_content()
-        );
-        assert_eq!(
-            None,
-            custom_log_config_node_config.automatic_log_config_file_content()
-        );
-    }
-
-    #[test]
-    pub fn test_custom_log_config_map() {
-        let custom_log_config_node_config = node_config(TestConfig {
-            log_config: ValidatedContainerLogConfigChoice::Custom(ConfigMapName::from_str_unsafe(
-                "custom-log-config",
-            )),
-            ..TestConfig::default()
-        });
-
-        let automatic_log_config_node_config = node_config(TestConfig {
-            log_config: ValidatedContainerLogConfigChoice::Automatic(
-                AutomaticContainerLogConfig::default(),
-            ),
-            ..TestConfig::default()
-        });
-
-        assert_eq!(
-            Some(ConfigMapName::from_str_unsafe("custom-log-config")),
-            custom_log_config_node_config.custom_log_config_map()
-        );
-        assert_eq!(
-            None,
-            automatic_log_config_node_config.custom_log_config_map()
         );
     }
 }

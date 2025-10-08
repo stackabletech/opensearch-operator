@@ -204,7 +204,7 @@ fn validate_role_group_config(
 
     for (env_var_name, env_var_value) in merged_role_group.config.env_overrides {
         env_overrides = env_overrides.with_value(
-            EnvVarName::from_str(&env_var_name).context(ParseEnvironmentVariableSnafu)?,
+            &EnvVarName::from_str(&env_var_name).context(ParseEnvironmentVariableSnafu)?,
             env_var_value,
         );
     }
@@ -229,7 +229,6 @@ fn validate_logging_configuration(
         validate_logging_configuration_for_container(logging, v1alpha1::Container::OpenSearch)
             .context(ValidateLoggingConfigSnafu)?;
 
-    // TODO Move to framework?
     let vector_container = if logging.enable_vector_agent {
         let vector_aggregator_config_map_name =
             vector_aggregator_config_map_name.context(GetVectorAggregatorConfigMapNameSnafu)?;
@@ -253,8 +252,9 @@ fn validate_logging_configuration(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{collections::BTreeMap, str::FromStr};
 
+    use pretty_assertions::assert_eq;
     use stackable_operator::{
         commons::{
             affinity::StackableAffinity,
@@ -291,7 +291,9 @@ mod tests {
             ClusterName, ConfigMapName, ControllerName, NamespaceName, OperatorName, ProductName,
             ProductVersion, RoleGroupName,
             builder::pod::container::{EnvVarName, EnvVarSet},
-            product_logging::framework::ValidatedContainerLogConfigChoice,
+            product_logging::framework::{
+                ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
+            },
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         },
     };
@@ -360,27 +362,44 @@ mod tests {
                             },
                             listener_class: "listener-class-from-role-group-level".to_owned(),
                             logging: ValidatedLogging {
-                                opensearch_container: ValidatedContainerLogConfigChoice::Custom(
-                                    ConfigMapName::from_str_unsafe("custom-log-config-map")
+                                opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                                    AutomaticContainerLogConfig {
+                                        loggers: [(
+                                            "ROOT".to_owned(),
+                                            LoggerConfig {
+                                                level: LogLevel::INFO
+                                            }
+                                        )]
+                                        .into(),
+                                        console: Some(AppenderConfig {
+                                            level: Some(LogLevel::INFO)
+                                        }),
+                                        file: Some(AppenderConfig {
+                                            level: Some(LogLevel::INFO)
+                                        }),
+                                    },
                                 ),
-                                vector_container: None,
-                                // ValidatedContainerLogConfigChoice::Automatic(
-                                //     AutomaticContainerLogConfig {
-                                //         loggers: [(
-                                //             "ROOT".to_owned(),
-                                //             LoggerConfig {
-                                //                 level: LogLevel::INFO
-                                //             }
-                                //         )]
-                                //         .into(),
-                                //         console: Some(AppenderConfig {
-                                //             level: Some(LogLevel::INFO)
-                                //         }),
-                                //         file: Some(AppenderConfig {
-                                //             level: Some(LogLevel::INFO)
-                                //         }),
-                                //     },
-                                // ),
+                                vector_container: Some(VectorContainerLogConfig {
+                                    log_config: ValidatedContainerLogConfigChoice::Automatic(
+                                        AutomaticContainerLogConfig {
+                                            loggers: [(
+                                                "ROOT".to_owned(),
+                                                LoggerConfig {
+                                                    level: LogLevel::INFO
+                                                },
+                                            )]
+                                            .into(),
+                                            console: Some(AppenderConfig {
+                                                level: Some(LogLevel::INFO)
+                                            }),
+                                            file: Some(AppenderConfig {
+                                                level: Some(LogLevel::INFO)
+                                            }),
+                                        },
+                                    ),
+                                    vector_aggregator_config_map_name:
+                                        ConfigMapName::from_str_unsafe("vector-aggregator"),
+                                }),
                             },
                             node_roles: NodeRoles(
                                 [
@@ -561,30 +580,53 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_validate_err_parse_container_name() {
-    //     test_validate_err(
-    //         |cluster| {
-    //             cluster.spec.nodes.config.config.logging = LoggingFragment {
-    //                 enable_vector_agent: Some(true),
-    //                 containers: [(
-    //                     v1alpha1::Container::OpenSearch,
-    //                     ContainerLogConfigFragment {
-    //                         choice: Some(ContainerLogConfigChoiceFragment::Custom(
-    //                             CustomContainerLogConfigFragment {
-    //                                 custom: ConfigMapLogConfigFragment {
-    //                                     config_map: Some("invalid ConfigMap name".to_owned()),
-    //                                 },
-    //                             },
-    //                         )),
-    //                     },
-    //                 )]
-    //                 .into(),
-    //             }
-    //         },
-    //         ErrorDiscriminants::ParseContainerName,
-    //     );
-    // }
+    #[test]
+    fn test_validate_err_parse_vector_aggregator_config_map_name() {
+        test_validate_err(
+            |cluster| {
+                cluster
+                    .spec
+                    .cluster_config
+                    .vector_aggregator_config_map_name = Some("invalid ConfigMap name".to_owned())
+            },
+            ErrorDiscriminants::ParseVectorAggregatorConfigMapName,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_validate_logging_config() {
+        test_validate_err(
+            |cluster| {
+                cluster.spec.nodes.config.config.logging.containers = [(
+                    v1alpha1::Container::OpenSearch,
+                    ContainerLogConfigFragment {
+                        choice: Some(ContainerLogConfigChoiceFragment::Custom(
+                            CustomContainerLogConfigFragment {
+                                custom: ConfigMapLogConfigFragment {
+                                    config_map: Some("invalid ConfigMap name".to_owned()),
+                                },
+                            },
+                        )),
+                    },
+                )]
+                .into()
+            },
+            ErrorDiscriminants::ValidateLoggingConfig,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_get_vector_aggregator_config_map_name() {
+        test_validate_err(
+            |cluster| {
+                cluster
+                    .spec
+                    .cluster_config
+                    .vector_aggregator_config_map_name = None
+            },
+            ErrorDiscriminants::GetVectorAggregatorConfigMapName,
+        );
+    }
 
     #[test]
     fn test_validate_err_termination_grace_period_too_long() {
@@ -643,7 +685,7 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
-                    vector_aggregator_config_map_name: None,
+                    vector_aggregator_config_map_name: Some("vector-aggregator".to_owned()),
                 },
                 cluster_operation: ClusterOperation::default(),
                 nodes: Role {
@@ -653,21 +695,7 @@ mod tests {
                             listener_class: Some("listener-class-from-role-level".to_owned()),
                             logging: LoggingFragment {
                                 enable_vector_agent: Some(true),
-                                containers: [(
-                                    v1alpha1::Container::OpenSearch,
-                                    ContainerLogConfigFragment {
-                                        choice: Some(ContainerLogConfigChoiceFragment::Custom(
-                                            CustomContainerLogConfigFragment {
-                                                custom: ConfigMapLogConfigFragment {
-                                                    config_map: Some(
-                                                        "custom-log-config-map".to_owned(),
-                                                    ),
-                                                },
-                                            },
-                                        )),
-                                    },
-                                )]
-                                .into(),
+                                containers: BTreeMap::default(),
                             },
                             ..v1alpha1::OpenSearchConfigFragment::default()
                         },

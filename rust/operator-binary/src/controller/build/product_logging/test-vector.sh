@@ -6,6 +6,6 @@ NAMESPACE=default \
 CLUSTER_NAME=opensearch \
 ROLE_NAME=nodes \
 ROLE_GROUP_NAME=cluster-manager \
-VECTOR_AGGREGATOR=vector-aggregator \
+VECTOR_AGGREGATOR_ADDRESS=vector-aggregator \
 VECTOR_FILE_LOG_LEVEL=info \
 vector test vector.yaml vector-test.yaml

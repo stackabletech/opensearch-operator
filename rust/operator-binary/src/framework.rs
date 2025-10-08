@@ -32,8 +32,9 @@ pub mod kvp;
 pub mod product_logging;
 pub mod role_group_utils;
 pub mod role_utils;
+pub mod validation;
 
-#[derive(Snafu, Debug, EnumDiscriminants)]
+#[derive(Debug, EnumDiscriminants, Snafu)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display("empty strings are not allowed"))]
@@ -41,6 +42,11 @@ pub enum Error {
 
     #[snafu(display("maximum length exceeded"))]
     LengthExceeded { length: usize, max_length: usize },
+
+    #[snafu(display("not a valid ConfigMap key"))]
+    InvalidConfigMapKey {
+        source: crate::framework::validation::Error,
+    },
 
     #[snafu(display("not a valid label value"))]
     InvalidLabelValue {
@@ -168,14 +174,17 @@ macro_rules! attributed_string_type {
             }
         );
     };
+    (@from_str $name:ident, $s:expr, is_config_map_key) => {
+        $crate::framework::validation::is_config_map_key($s).context($crate::framework::InvalidConfigMapKeySnafu)?;
+    };
+    (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
+        stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
+    };
     (@from_str $name:ident, $s:expr, is_rfc_1123_dns_subdomain_name) => {
         stackable_operator::validation::is_lowercase_rfc_1123_subdomain($s).context($crate::framework::InvalidRfc1123DnsSubdomainNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_label_name) => {
         stackable_operator::validation::is_lowercase_rfc_1123_label($s).context($crate::framework::InvalidRfc1123LabelNameSnafu)?;
-    };
-    (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
-        stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         stackable_operator::kvp::LabelValue::from_str($s).context($crate::framework::InvalidLabelValueSnafu)?;
@@ -188,6 +197,8 @@ macro_rules! attributed_string_type {
             // type arithmetic would be better
             pub const MAX_LENGTH: usize = $max_length;
         }
+    };
+    (@trait_impl $name:ident, is_config_map_key) => {
     };
     (@trait_impl $name:ident, is_rfc_1035_label_name) => {
         impl $name {
@@ -233,6 +244,14 @@ macro_rules! attributed_string_type {
     };
 }
 
+#[macro_export(local_inner_macros)]
+macro_rules! constant {
+    ($qualifier:vis $name:ident: $type:ident = $value:literal) => {
+        $qualifier static $name: std::sync::LazyLock<$type> =
+            std::sync::LazyLock::new(|| $type::from_str($value).expect("should be a valid $name"));
+    };
+}
+
 /// Returns the minimum of the given values.
 ///
 /// As opposed to [`std::cmp::min`], this function can be used at compile-time.
@@ -256,6 +275,15 @@ attributed_string_type! {
     "opensearch-nodes-default",
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
+}
+attributed_string_type! {
+    ConfigMapKey,
+    "The key for a ConfigMap or Secret",
+    "log4j2.properties",
+    // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    // TODO Use a custom regex?
+    is_config_map_key
 }
 attributed_string_type! {
     ContainerName,

@@ -5,20 +5,42 @@ use stackable_operator::{
     builder::pod::{container::FieldPathEnvVar, resources::ResourceRequirementsBuilder},
     commons::product_image_selection::ResolvedProductImage,
     k8s_openapi::api::core::v1::{Container, VolumeMount},
-    product_logging::spec::{
-        AppenderConfig, AutomaticContainerLogConfig, ConfigMapLogConfig, ContainerLogConfigChoice,
-        CustomContainerLogConfig, LogLevel, Logging,
+    product_logging::{
+        framework::VECTOR_CONFIG_FILE,
+        spec::{
+            AppenderConfig, AutomaticContainerLogConfig, ConfigMapLogConfig,
+            ContainerLogConfigChoice, CustomContainerLogConfig, LogLevel, Logging,
+        },
     },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::framework::{
-    ClusterName, ConfigMapName, ContainerName, RoleGroupName, RoleName, VolumeName,
-    builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
+use crate::{
+    constant,
+    framework::{
+        ClusterName, ConfigMapKey, ConfigMapName, ContainerName, RoleGroupName, RoleName,
+        VolumeName,
+        builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
+    },
 };
 
-const STACKABLE_LOG_DIR: &str = "/stackable/log";
-const VECTOR_CONFIG_FILE: &str = "vector.yaml";
+// Public variant of `stackable_operator::product_logging::framework::STACKABLE_CONFIG_DIR`
+const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
+
+// Public variant of `stackable_operator::product_logging::framework::VECTOR_LOG_DIR`
+const VECTOR_CONTROL_DIR: &str = "_vector";
+
+// Public variant of `stackable_operator::product_logging::framework::SHUTDOWN_FILE`
+const SHUTDOWN_FILE: &str = "shutdown";
+
+// Public variant of `stackable_operator::product_logging::framework::STACKABLE_LOG_DIR`
+pub const STACKABLE_LOG_DIR: &str = "/stackable/log";
+
+// Public variant of `stackable_operator::product_logging::framework::VECTOR_AGGREGATOR_CM_KEY`
+constant!(pub VECTOR_AGGREGATOR_CM_KEY: ConfigMapKey = "ADDRESS");
+
+// Public variant of `stackable_operator::product_logging::framework::VECTOR_AGGREGATOR_ADDRESS`
+constant!(pub VECTOR_AGGREGATOR_ENV_NAME: EnvVarName = "VECTOR_AGGREGATOR_ADDRESS");
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -85,7 +107,7 @@ pub fn vector_container(
     image: &ResolvedProductImage,
     log_config_volume_name: &VolumeName,
     log_volume_name: &VolumeName,
-) -> Option<Container> {
+) -> Container {
     let log_level = if let ValidatedContainerLogConfigChoice::Automatic(log_config) =
         &vector_container_log_config.log_config
     {
@@ -107,37 +129,37 @@ pub fn vector_container(
         };
 
     let env_vars = EnvVarSet::new()
-        .with_value(EnvVarName::from_str_unsafe("CLUSTER_NAME"), cluster_name)
-        .with_value(EnvVarName::from_str_unsafe("LOG_DIR"), "/stackable/log")
+        .with_value(&EnvVarName::from_str_unsafe("CLUSTER_NAME"), cluster_name)
+        .with_value(&EnvVarName::from_str_unsafe("LOG_DIR"), "/stackable/log")
         .with_field_path(
-            EnvVarName::from_str_unsafe("NAMESPACE"),
+            &EnvVarName::from_str_unsafe("NAMESPACE"),
             FieldPathEnvVar::Namespace,
         )
         .with_value(
-            EnvVarName::from_str_unsafe("OPENSEARCH_SERVER_LOG_FILE"),
+            // TODO parameter
+            &EnvVarName::from_str_unsafe("OPENSEARCH_SERVER_LOG_FILE"),
             "opensearch_server.json",
         )
         .with_value(
-            EnvVarName::from_str_unsafe("ROLE_GROUP_NAME"),
+            &EnvVarName::from_str_unsafe("ROLE_GROUP_NAME"),
             role_group_name,
         )
-        .with_value(EnvVarName::from_str_unsafe("ROLE_NAME"), role_name)
+        .with_value(&EnvVarName::from_str_unsafe("ROLE_NAME"), role_name)
         .with_config_map_key_ref(
-            EnvVarName::from_str_unsafe("VECTOR_AGGREGATOR"),
+            &VECTOR_AGGREGATOR_ENV_NAME,
             &vector_container_log_config.vector_aggregator_config_map_name,
-            // TODO type-safe?
-            "ADDRESS",
+            &VECTOR_AGGREGATOR_CM_KEY,
         )
         .with_value(
-            EnvVarName::from_str_unsafe("VECTOR_CONFIG_YAML"),
-            format!("/stackable/config/{VECTOR_CONFIG_FILE}"),
+            &EnvVarName::from_str_unsafe("VECTOR_CONFIG_YAML"),
+            format!("{STACKABLE_CONFIG_DIR}/{VECTOR_CONFIG_FILE}"),
         )
         .with_value(
-            EnvVarName::from_str_unsafe("VECTOR_FILE_LOG_LEVEL"),
+            &EnvVarName::from_str_unsafe("VECTOR_FILE_LOG_LEVEL"),
             vector_file_log_level.to_vector_literal(),
         )
         .with_value(
-            EnvVarName::from_str_unsafe("VECTOR_LOG"),
+            &EnvVarName::from_str_unsafe("VECTOR_LOG"),
             log_level.to_vector_literal(),
         );
 
@@ -148,7 +170,7 @@ pub fn vector_container(
         .with_memory_limit("128Mi")
         .build();
 
-    let container = new_container_builder(container_name)
+    new_container_builder(container_name)
             .image_from_product_image(image)
             .command(vec![
                 "/bin/bash".to_string(),
@@ -166,15 +188,13 @@ pub fn vector_container(
                 fi\n\
                 sleep 1\n\
                 kill $vector_pid",
-                vector_control_directory = format!("{STACKABLE_LOG_DIR}/_vector"),
-                // TODO
-                SHUTDOWN_FILE = "shutdown"
+                vector_control_directory = format!("{STACKABLE_LOG_DIR}/{VECTOR_CONTROL_DIR}"),
             )])
             .add_env_vars(env_vars.into())
             .add_volume_mounts([
                 VolumeMount {
                     mount_path: format!(
-                        "/stackable/config/{VECTOR_CONFIG_FILE}"
+                        "{STACKABLE_CONFIG_DIR}/{VECTOR_CONFIG_FILE}"
                     ),
                     name: log_config_volume_name.to_string(),
                     read_only: Some(true),
@@ -189,7 +209,30 @@ pub fn vector_container(
             ])
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .resources(resources)
-            .build();
-
-    Some(container)
+            .build()
 }
+
+// #[test]
+// fn test_validate_err_parse_container_name() {
+//     test_validate_err(
+//         |cluster| {
+//             cluster.spec.nodes.config.config.logging = LoggingFragment {
+//                 enable_vector_agent: Some(true),
+//                 containers: [(
+//                     v1alpha1::Container::OpenSearch,
+//                     ContainerLogConfigFragment {
+//                         choice: Some(ContainerLogConfigChoiceFragment::Custom(
+//                             CustomContainerLogConfigFragment {
+//                                 custom: ConfigMapLogConfigFragment {
+//                                     config_map: Some("invalid ConfigMap name".to_owned()),
+//                                 },
+//                             },
+//                         )),
+//                     },
+//                 )]
+//                 .into(),
+//             }
+//         },
+//         ErrorDiscriminants::ParseContainerName,
+//     );
+// }
