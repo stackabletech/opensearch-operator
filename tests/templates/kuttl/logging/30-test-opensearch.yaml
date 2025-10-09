@@ -9,7 +9,6 @@ spec:
       containers:
         - name: test-log-aggregation
           image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
-          # TODO Extend the metrics Job or reduce this one?
           command:
             - python
           args:

@@ -6,9 +6,6 @@ dimensions:
       # To use a custom image, add a comma and the full name after the product version, e.g.:
       # - 3.1.0,oci.stackable.tech/sandbox/opensearch:3.1.0-stackable0.0.0-dev
       # - 3.1.0,localhost:5000/sdp/opensearch:3.1.0-stackable0.0.0-dev
-  - name: openshift
-    values:
-      - "false"
   - name: opensearch_home
     values:
       - /stackable/opensearch
@@ -16,28 +13,23 @@ tests:
   - name: smoke
     dimensions:
       - opensearch
-      - openshift
       - opensearch_home
   - name: external-access
     dimensions:
       - opensearch
-      - openshift
       - opensearch_home
   # requires an image with the OpenSearch Prometheus exporter
   - name: metrics
     dimensions:
       - opensearch
-      - openshift
   - name: ldap
     dimensions:
       - opensearch
-      - openshift
       - opensearch_home
   # requires an image with Vector
   - name: logging
     dimensions:
       - opensearch
-      - openshift
 suites:
   - name: nightly
     patch:
@@ -55,8 +47,6 @@ suites:
       - dimensions:
           - expr: last
       - dimensions:
-          - name: openshift
-            expr: "true"
           - name: opensearch
             expr: last
   - name: original-image
