@@ -184,7 +184,10 @@ spec:
                           nullable: true
                           type: string
                         listenerClass:
-                          description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
+                          description: |-
+                            This field controls which
+                            [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html)
+                            is used to expose the HTTP communication.
                           maxLength: 253
                           minLength: 1
                           nullable: true
@@ -529,7 +532,10 @@ spec:
                                 nullable: true
                                 type: string
                               listenerClass:
-                                description: This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
+                                description: |-
+                                  This field controls which
+                                  [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html)
+                                  is used to expose the HTTP communication.
                                 maxLength: 253
                                 minLength: 1
                                 nullable: true

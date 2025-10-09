@@ -2,7 +2,7 @@
 #
 # A downside of these test cases is that they compare the whole event and that the message can
 # contain source code positions in vector.yaml, e.g. "function call error for \"parse_timestamp\" at (584:643)". Please adapt the tests if you change VRL code in vector.yaml.
-
+---
 tests:
   - name: Test opensearch_server log entry without stacktrace
     inputs:
@@ -42,7 +42,7 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,363Z", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}", 
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,363Z", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}",
             "stacktrace": ["org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]",
             "Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower",
             "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]",

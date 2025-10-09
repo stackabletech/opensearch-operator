@@ -61,18 +61,18 @@ pub mod versioned {
     ))]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterSpec {
-        // no doc - docs in ProductImage struct.
+        // no doc - docs in ProductImage struct
         pub image: ProductImage,
 
         /// Configuration that applies to all roles and role groups
         #[serde(default)]
         pub cluster_config: v1alpha1::OpenSearchClusterConfig,
 
-        // no doc - docs in ClusterOperation struct.
+        // no doc - docs in ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        // no doc - docs in Role struct.
+        // no doc - docs in Role struct
         pub nodes:
             Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
     }
@@ -158,7 +158,7 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub listener_class: ListenerClassName,
 
-        /// Logging configuration
+        // no doc - docs in Logging struct
         #[fragment_attrs(serde(default))]
         pub logging: Logging<Container>,
 
