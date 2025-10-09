@@ -111,6 +111,14 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: opensearch-credentials
+data:
+  admin: QUpWRnNHSkJicFQ2bUNobg==               # AJVFsGJBbpT6mChn
+  kibanaserver: RTRrRU51RW1rcUgzanlIQw==        # E4kENuEmkqH3jyHC
+---
+apiVersion: v1
+kind: Secret
+metadata:
   name: opensearch-security-config
 stringData:
   action_groups.yml: |

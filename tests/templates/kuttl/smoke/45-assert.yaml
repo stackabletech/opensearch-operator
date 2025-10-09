@@ -1,0 +1,10 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+metadata:
+  name: test
+timeout: 300
+commands:
+  - script: |-
+      sleep 60 # After the OpenSearch Dashboards container has become ready it still takes some time until the application has completely started.
+      kubectl exec -n $NAMESPACE python-0 -- python /tmp/test-script/test.py

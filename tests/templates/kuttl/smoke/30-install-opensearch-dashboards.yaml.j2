@@ -1,0 +1,12 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: >
+      helm install opensearch-dashboards opensearch-dashboards
+      --repo https://opensearch-project.github.io/helm-charts
+      --version "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+      --values 30_opensearch-dashboards-values.yaml
+      --namespace  $NAMESPACE
+      --wait
+    timeout: 600
