@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#38]).
+  - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
+  - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.
+  - `EOS_DISABLED` (`--eos-disabled`) to disable the EoS checker completely.
 - Basic operator for OpenSearch 3.x with the following configuration options ([#10]):
   - Cluster operations like `reconciliationPaused` and `stopped`
   - Image selection (defaults to the official OpenSearch image for now)
@@ -27,3 +31,4 @@ All notable changes to this project will be documented in this file.
 [#18]: https://github.com/stackabletech/opensearch-operator/pull/18
 [#26]: https://github.com/stackabletech/opensearch-operator/pull/26
 [#34]: https://github.com/stackabletech/opensearch-operator/pull/34
+[#38]: https://github.com/stackabletech/opensearch-operator/pull/38
