@@ -1,0 +1,17 @@
+opensearchHosts: https://opensearch-nodes-cluster-manager:9200
+image:
+  repository: oci.stackable.tech/sdp/opensearch-dashboards
+  tag: {{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable0.0.0-dev
+service:
+  type: NodePort
+serviceAccount:
+  # The Helm chart appends "-dashboards", so that the actual
+  # ServiceAccount name is "opensearch-dashboards".
+  # see https://github.com/opensearch-project/helm-charts/blob/opensearch-dashboards-2.27.1/charts/opensearch-dashboards/templates/_helpers.tpl#L58
+  name: opensearch
+extraEnvs:
+  - name: OPENSEARCH_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-credentials
+        key: kibanaserver

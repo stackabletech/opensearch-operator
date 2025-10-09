@@ -1,0 +1,23 @@
+# All fields are checked that are set by the operator.
+# This helps to detect unintentional changes. It is also a good reference for the output of the
+# operator. The maintenance effort should be okay as long as it is only done in the smoke test.
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-cluster-manager
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-data
+status:
+  readyReplicas: 1
+  replicas: 1
