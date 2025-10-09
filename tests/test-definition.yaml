@@ -35,6 +35,11 @@ tests:
       - opensearch
       - openshift
       - opensearch_home
+  - name: opensearch-dashboards
+    dimensions:
+      - opensearch
+      - openshift
+      - opensearch_home
 suites:
   - name: nightly
     patch:
@@ -44,6 +49,7 @@ suites:
   - name: smoke-latest
     select:
       - smoke
+      - opensearch-dashboards
     patch:
       - dimensions:
           - expr: last
