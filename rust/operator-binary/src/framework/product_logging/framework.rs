@@ -105,7 +105,7 @@ where
     Ok(validated_container_log_config_choice)
 }
 
-/// Builds the Vector container for the [`PodTemplateSpec`]
+/// Builds the Vector container
 pub fn vector_container(
     container_name: &ContainerName,
     image: &ResolvedProductImage,
