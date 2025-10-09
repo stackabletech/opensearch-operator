@@ -152,10 +152,13 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Duration,
 
-        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
+        /// This field controls which
+        /// [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html)
+        /// is used to expose the HTTP communication.
         #[fragment_attrs(serde(default))]
         pub listener_class: ListenerClassName,
 
+        /// Logging configuration
         #[fragment_attrs(serde(default))]
         pub logging: Logging<Container>,
 
@@ -169,7 +172,6 @@ pub mod versioned {
         pub resources: Resources<StorageConfig>,
     }
 
-    // TODO All derives required?
     #[derive(
         Clone,
         Debug,
@@ -258,10 +260,10 @@ impl v1alpha1::OpenSearchConfig {
             graceful_shutdown_timeout: Some(
                 Duration::from_str("2m").expect("should be a valid duration"),
             ),
-            // Defaults taken from the Helm chart, see
-            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
             listener_class: Some(DEFAULT_LISTENER_CLASS.to_owned()),
             logging: product_logging::spec::default_logging(),
+            // Defaults taken from the Helm chart, see
+            // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
             node_roles: Some(NodeRoles(vec![
                 v1alpha1::NodeRole::ClusterManager,
                 v1alpha1::NodeRole::Ingest,

@@ -12,8 +12,11 @@ static CONFIG_MAP_KEY_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!("^{CONFIG_MAP_KEY_FMT}$")).expect("failed to compile ConfigMap key regex")
 });
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Eq, PartialEq, Snafu)]
 pub enum Error {
+    #[snafu(display("value is empty"))]
+    Empty { value: String },
+
     #[snafu(display("value does not match the regular expression"))]
     Regex {
         value: String,
@@ -34,9 +37,11 @@ pub fn is_config_map_key(value: &str) -> Result {
     // When adding this function to stackable_operator, use the private functions like
     // validate_all.
 
+    ensure!(!value.is_empty(), EmptySnafu { value });
+
     let max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH;
     ensure!(
-        value.len() < max_length,
+        value.len() <= max_length,
         TooLongSnafu {
             value: value.to_owned(),
             max_length
@@ -53,4 +58,39 @@ pub fn is_config_map_key(value: &str) -> Result {
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CONFIG_MAP_KEY_ERROR_MSG, CONFIG_MAP_KEY_FMT, Error, is_config_map_key};
+
+    #[test]
+    fn test_is_config_map_key() {
+        assert_eq!(Ok(()), is_config_map_key("_a-A.1"));
+
+        assert_eq!(
+            Err(Error::Empty {
+                value: "".to_owned()
+            }),
+            is_config_map_key("")
+        );
+
+        assert_eq!(Ok(()), is_config_map_key(&"a".repeat(253)));
+        assert_eq!(
+            Err(Error::TooLong {
+                value: "a".repeat(254),
+                max_length: 253
+            }),
+            is_config_map_key(&"a".repeat(254))
+        );
+
+        assert_eq!(
+            Err(Error::Regex {
+                value: " ".to_string(),
+                regex: CONFIG_MAP_KEY_FMT,
+                message: CONFIG_MAP_KEY_ERROR_MSG,
+            }),
+            is_config_map_key(" ")
+        );
+    }
 }

@@ -24,7 +24,7 @@ pub fn new_container_builder(container_name: &ContainerName) -> ContainerBuilder
     ContainerBuilder::new(container_name.as_ref()).expect("should be a valid container name")
 }
 
-// TODO Use attributed_string_type instead?
+// TODO Use attributed_string_type instead
 /// Validated environment variable name
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EnvVarName(String);
@@ -139,7 +139,7 @@ impl EnvVarSet {
         self
     }
 
-    /// Adds an environment variable with the given name and field path to this set
+    /// Adds an environment variable with the given ConfigMap key reference to this set
     ///
     /// An [`EnvVar`] with the same name is overridden.
     pub fn with_config_map_key_ref(
@@ -180,10 +180,15 @@ mod tests {
 
     use stackable_operator::{
         builder::pod::container::FieldPathEnvVar,
-        k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+        k8s_openapi::api::core::v1::{
+            ConfigMapKeySelector, EnvVar, EnvVarSource, ObjectFieldSelector,
+        },
     };
 
     use super::{EnvVarName, EnvVarSet};
+    use crate::framework::{
+        ConfigMapKey, ConfigMapName, ContainerName, builder::pod::container::new_container_builder,
+    };
 
     #[test]
     fn test_envvarname_fromstr() {
@@ -197,6 +202,12 @@ mod tests {
         assert!(EnvVarName::from_str("€").is_err());
         // equals sign
         assert!(EnvVarName::from_str("=").is_err());
+    }
+
+    #[test]
+    fn test_new_container_builder() {
+        // Test that the function does not panic
+        new_container_builder(&ContainerName::from_str_unsafe("valid-container-name"));
     }
 
     #[test]
@@ -320,6 +331,31 @@ mod tests {
                     field_ref: Some(ObjectFieldSelector {
                         field_path: "metadata.name".to_owned(),
                         ..ObjectFieldSelector::default()
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            }),
+            env_var_set.get(&EnvVarName::from_str_unsafe("ENV"))
+        );
+    }
+
+    #[test]
+    fn test_envvarset_with_config_map_key_ref() {
+        let env_var_set = EnvVarSet::new().with_config_map_key_ref(
+            &EnvVarName::from_str_unsafe("ENV"),
+            &ConfigMapName::from_str_unsafe("config-map"),
+            &ConfigMapKey::from_str_unsafe("key"),
+        );
+
+        assert_eq!(
+            Some(&EnvVar {
+                name: "ENV".to_owned(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    config_map_key_ref: Some(ConfigMapKeySelector {
+                        key: "key".to_owned(),
+                        name: "config-map".to_owned(),
+                        ..ConfigMapKeySelector::default()
                     }),
                     ..EnvVarSource::default()
                 }),

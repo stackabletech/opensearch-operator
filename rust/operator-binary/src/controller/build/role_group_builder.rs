@@ -18,7 +18,7 @@ use stackable_operator::{
         },
         apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
     },
-    kvp::{Annotations, Label, Labels},
+    kvp::{Annotation, Annotations, Label, Labels},
     product_logging::framework::{
         VECTOR_CONFIG_FILE, calculate_log_volume_size_limit, create_vector_shutdown_file_command,
         remove_vector_shutdown_file_command,
@@ -36,7 +36,9 @@ use crate::{
     constant,
     controller::{
         ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
-        build::product_logging::config::MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE,
+        build::product_logging::config::{
+            MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
+        },
     },
     crd::v1alpha1,
     framework::{
@@ -217,6 +219,13 @@ impl<'a> RoleGroupBuilder<'a> {
         let metadata = ObjectMetaBuilder::new()
             .with_labels(self.recommended_labels())
             .with_labels(node_role_labels)
+            .with_annotation(
+                Annotation::try_from((
+                    "kubectl.kubernetes.io/default-container".to_owned(),
+                    v1alpha1::Container::OpenSearch.to_container_name(),
+                ))
+                .expect("should be a valid annotation"),
+            )
             .build();
 
         let opensearch_container = self.build_opensearch_container();
@@ -229,13 +238,12 @@ impl<'a> RoleGroupBuilder<'a> {
             .map(|vector_container_log_config| {
                 vector_container(
                     &v1alpha1::Container::Vector.to_container_name(),
-                    vector_container_log_config,
-                    &self.resource_names.cluster_name,
-                    &self.resource_names.role_name,
-                    &self.resource_names.role_group_name,
                     &self.cluster.image,
+                    vector_container_log_config,
+                    &self.resource_names,
                     &CONFIG_VOLUME_NAME,
                     &LOG_VOLUME_NAME,
+                    vector_config_file_extra_env_vars(),
                 )
             });
 
@@ -294,7 +302,6 @@ impl<'a> RoleGroupBuilder<'a> {
                         .pod_anti_affinity
                         .clone(),
                 }),
-                // TODO Add annotation that the opensearch container is the main one
                 containers: [Some(opensearch_container), vector_container]
                     .into_iter()
                     .flatten()
@@ -768,7 +775,7 @@ mod tests {
             .expect("should be serializable");
 
         // The content of log4j2.properties is already tested in the
-        // `conrtoller::build::product_logging::config` module.
+        // `controller::build::product_logging::config` module.
         config_map["data"]["log4j2.properties"].take();
         // The content of opensearch.yml is already tested in the `controller::build::node_config`
         // module.
@@ -860,6 +867,9 @@ mod tests {
                     "serviceName": "my-opensearch-cluster-nodes-default-headless",
                     "template": {
                         "metadata": {
+                            "annotations": {
+                                "kubectl.kubernetes.io/default-container": "opensearch",
+                            },
                             "labels": {
                                 "app.kubernetes.io/component": "nodes",
                                 "app.kubernetes.io/instance": "my-opensearch-cluster",
@@ -912,8 +922,12 @@ mod tests {
                                             "\n",
                                             "rm -f /stackable/log/_vector/shutdown\n",
                                             "prepare_signal_handlers\n",
+                                            "if command --search containerdebug >/dev/null 2>&1; then\n",
                                             "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
-                                            "/stackable/opensearch/opensearch-docker-entrypoint.sh  &\n",
+                                            "else\n",
+                                            "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",
+                                            "fi\n",
+                                            "./opensearch-docker-entrypoint.sh  &\n",
                                             "wait_for_termination $!\n",
                                             "mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown"
                                         )
@@ -1092,7 +1106,7 @@ mod tests {
                                     "volumeMounts": [
                                         {
                                             "mountPath": "/stackable/config/vector.yaml",
-                                            "name": "log-config",
+                                            "name": "config",
                                             "readOnly": true,
                                             "subPath": "vector.yaml",
                                         },

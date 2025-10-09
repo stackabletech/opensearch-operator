@@ -101,6 +101,18 @@ pub trait NameIsValidLabelValue {
 /// Restricted string type with attributes like maximum length.
 ///
 /// Fully-qualified types are used to ease the import into other modules.
+///
+/// # Examples
+///
+/// ```rust
+/// attributed_string_type! {
+///     ConfigMapName,
+///     "The name of a ConfigMap",
+///     "opensearch-nodes-default",
+///     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+///     is_rfc_1123_dns_subdomain_name
+/// }
+/// ```
 #[macro_export(local_inner_macros)]
 macro_rules! attributed_string_type {
     ($name:ident, $description:literal, $example:literal $(, $attribute:tt)*) => {
@@ -282,6 +294,16 @@ macro_rules! attributed_string_type {
     };
 }
 
+/// Use [`std::sync::LazyLock`] to define a static "constant" from a string.
+///
+/// The string is converted into the given type with [`std::str::FromStr::from_str`].
+///
+/// # Examples
+///
+/// ```rust
+/// constant!(DATA_VOLUME_NAME: VolumeName = "data");
+/// constant!(pub CONFIG_VOLUME_NAME: VolumeName = "config");
+/// ```
 #[macro_export(local_inner_macros)]
 macro_rules! constant {
     ($qualifier:vis $name:ident: $type:ident = $value:literal) => {

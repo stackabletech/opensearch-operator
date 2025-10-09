@@ -1,13 +1,21 @@
-use std::cmp;
+//! OpenSearch specific log configuration
+
+use std::{cmp, collections::BTreeMap};
 
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
-    product_logging::spec::AutomaticContainerLogConfig,
+    product_logging::spec::{AppenderConfig, AutomaticContainerLogConfig, LogLevel, LoggerConfig},
 };
 
-use crate::{crd::v1alpha1, framework::product_logging::framework::STACKABLE_LOG_DIR};
+use crate::{
+    crd::v1alpha1::{self},
+    framework::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        product_logging::framework::STACKABLE_LOG_DIR,
+    },
+};
 
-/// The log configuration file
+/// OpenSearch log configuration file
 pub const CONFIGURATION_FILE_LOG4J2_PROPERTIES: &str = "log4j2.properties";
 
 const OPENSEARCH_SERVER_LOG_FILE: &str = "opensearch_server.json";
@@ -17,24 +25,39 @@ pub const MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity 
     unit: BinaryMultiple::Mebi,
 };
 
+/// Create a log4j2 configuration from the given automatic log configuration
 pub fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
-    let log_path = format!(
-        "{STACKABLE_LOG_DIR}/{container}/{OPENSEARCH_SERVER_LOG_FILE}",
-        container = v1alpha1::Container::OpenSearch.to_container_name()
-    );
+    [
+        log4j2_root_logger_config(&config.root_log_level()),
+        log4j2_loggers_config(&config.loggers),
+        log4j2_console_appender_config(&config.console),
+        log4j2_file_appender_config(&config.file),
+    ]
+    .iter()
+    .flatten()
+    .map(|(key, value)| format!("{key} = {value}\n"))
+    .collect()
+}
 
-    let number_of_archived_log_files = 1;
-    let max_log_files_size_in_mib = MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE
-        .scale_to(BinaryMultiple::Mebi)
-        .floor()
-        .value as u32;
-    let max_log_file_size_in_mib = cmp::max(
-        1,
-        max_log_files_size_in_mib / (1 + number_of_archived_log_files),
-    );
+fn log4j2_root_logger_config(root_log_level: &LogLevel) -> Vec<(String, String)> {
+    vec![
+        (
+            "rootLogger.level".to_owned(),
+            root_log_level.to_log4j2_literal(),
+        ),
+        (
+            "rootLogger.appenderRef.CONSOLE.ref".to_owned(),
+            "CONSOLE".to_owned(),
+        ),
+        (
+            "rootLogger.appenderRef.FILE.ref".to_owned(),
+            "FILE".to_owned(),
+        ),
+    ]
+}
 
-    let loggers = config
-        .loggers
+fn log4j2_loggers_config(loggers_config: &BTreeMap<String, LoggerConfig>) -> Vec<(String, String)> {
+    loggers_config
         .iter()
         .filter(|(name, _)| name.as_str() != AutomaticContainerLogConfig::ROOT_LOGGER)
         .enumerate()
@@ -50,24 +73,13 @@ pub fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
                 ),
             ]
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+}
 
-    let root_logger = vec![
-        (
-            "rootLogger.level".to_owned(),
-            config.root_log_level().to_log4j2_literal(),
-        ),
-        (
-            "rootLogger.appenderRef.CONSOLE.ref".to_owned(),
-            "CONSOLE".to_owned(),
-        ),
-        (
-            "rootLogger.appenderRef.FILE.ref".to_owned(),
-            "FILE".to_owned(),
-        ),
-    ];
-
-    let console_appender = vec![
+fn log4j2_console_appender_config(
+    console_appender_config: &Option<AppenderConfig>,
+) -> Vec<(String, String)> {
+    vec![
         ("appender.CONSOLE.type".to_owned(), "Console".to_owned()),
         ("appender.CONSOLE.name".to_owned(), "CONSOLE".to_owned()),
         (
@@ -90,16 +102,34 @@ pub fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
         ),
         (
             "appender.CONSOLE.filter.threshold.level".to_owned(),
-            config
-                .console
+            console_appender_config
                 .as_ref()
                 .and_then(|console| console.level)
                 .unwrap_or_default()
                 .to_log4j2_literal(),
         ),
-    ];
+    ]
+}
 
-    let file_appender = vec![
+fn log4j2_file_appender_config(
+    file_appender_config: &Option<AppenderConfig>,
+) -> Vec<(String, String)> {
+    let log_path = format!(
+        "{STACKABLE_LOG_DIR}/{container}/{OPENSEARCH_SERVER_LOG_FILE}",
+        container = v1alpha1::Container::OpenSearch.to_container_name()
+    );
+
+    let number_of_archived_log_files = 1;
+    let max_log_files_size_in_mib = MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE
+        .scale_to(BinaryMultiple::Mebi)
+        .floor()
+        .value as u32;
+    let max_log_file_size_in_mib = cmp::max(
+        1,
+        max_log_files_size_in_mib / (1 + number_of_archived_log_files),
+    );
+
+    vec![
         ("appender.FILE.type".to_owned(), "RollingFile".to_owned()),
         ("appender.FILE.name".to_owned(), "FILE".to_owned()),
         ("appender.FILE.fileName".to_owned(), log_path.to_owned()),
@@ -141,24 +171,29 @@ pub fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
         ),
         (
             "appender.FILE.filter.threshold.level".to_owned(),
-            config
-                .file
+            file_appender_config
                 .as_ref()
                 .and_then(|file| file.level)
                 .unwrap_or_default()
                 .to_log4j2_literal(),
         ),
-    ];
-
-    [root_logger, loggers, console_appender, file_appender]
-        .iter()
-        .flatten()
-        .map(|(key, value)| format!("{key} = {value}\n"))
-        .collect()
+    ]
 }
 
+/// Returns the Vector configuration file content as YAML
 pub fn vector_config_file_content() -> String {
     include_str!("vector.yaml").to_owned()
+}
+
+/// Returns the OpenSearch specific environment variables used in the Vector configuration file
+///
+/// The common environment variables are already set in
+/// [`crate::framework::product_logging::framework::vector_container`].
+pub fn vector_config_file_extra_env_vars() -> EnvVarSet {
+    EnvVarSet::new().with_value(
+        &EnvVarName::from_str_unsafe("OPENSEARCH_SERVER_LOG_FILE"),
+        "opensearch_server.json",
+    )
 }
 
 #[cfg(test)]
@@ -167,7 +202,7 @@ mod tests {
         AppenderConfig, AutomaticContainerLogConfig, LogLevel, LoggerConfig,
     };
 
-    use super::create_log4j2_config;
+    use super::{create_log4j2_config, vector_config_file_extra_env_vars};
 
     #[test]
     pub fn test_create_log4j2_config() {
@@ -226,5 +261,11 @@ mod tests {
             ).to_owned();
 
         assert_eq!(expected_config, log4j2_config);
+    }
+
+    #[test]
+    pub fn test_vector_config_file_extra_env_vars() {
+        // Test that the function does not panic
+        vector_config_file_extra_env_vars();
     }
 }

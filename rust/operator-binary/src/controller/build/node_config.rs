@@ -493,11 +493,6 @@ mod tests {
             ..TestConfig::default()
         });
 
-        println!(
-            "node_config_single_node: {:?}",
-            node_config_single_node.role_group_config.config
-        );
-
         let node_config_multiple_nodes = node_config(TestConfig {
             replicas: 2,
             ..TestConfig::default()

@@ -124,7 +124,7 @@ type OpenSearchRoleGroupConfig =
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
 
-/// The validated [`v1alpha1::OpenSearchConfig`]
+/// Validated [`v1alpha1::OpenSearchConfig`]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
@@ -135,6 +135,7 @@ pub struct ValidatedOpenSearchConfig {
     pub termination_grace_period_seconds: i64,
 }
 
+/// Validated log configuration per container
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedLogging {
     pub opensearch_container: ValidatedContainerLogConfigChoice,

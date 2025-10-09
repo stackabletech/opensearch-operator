@@ -35,6 +35,8 @@ spec:
   serviceName: opensearch-nodes-cluster-manager-headless
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
         app.kubernetes.io/instance: opensearch
@@ -280,6 +282,8 @@ spec:
   serviceName: opensearch-nodes-data-headless
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
         app.kubernetes.io/instance: opensearch
