@@ -175,6 +175,70 @@ spec:
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
           readOnly: true
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      - args:
+        - |-
+          # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
+          vector & vector_pid=$!
+          if [ ! -f "/stackable/log/_vector/shutdown" ]; then
+          mkdir -p /stackable/log/_vector
+          inotifywait -qq --event create /stackable/log/_vector;
+          fi
+          sleep 1
+          kill $vector_pid
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: CLUSTER_NAME
+          value: opensearch
+        - name: LOG_DIR
+          value: /stackable/log
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: OPENSEARCH_SERVER_LOG_FILE
+          value: opensearch_server.json
+        - name: ROLE_GROUP_NAME
+          value: cluster-manager
+        - name: ROLE_NAME
+          value: nodes
+        - name: VECTOR_AGGREGATOR_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              key: ADDRESS
+              name: vector-aggregator-discovery
+        - name: VECTOR_CONFIG_YAML
+          value: /stackable/config/vector.yaml
+        - name: VECTOR_FILE_LOG_LEVEL
+          value: info
+        - name: VECTOR_LOG
+          value: info
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: vector
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /stackable/config/vector.yaml
+          name: config
+          readOnly: true
+          subPath: vector.yaml
+        - mountPath: /stackable/log
+          name: log
+{% endif %}
       securityContext:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
@@ -423,6 +487,70 @@ spec:
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
           readOnly: true
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      - args:
+        - |-
+          # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
+          vector & vector_pid=$!
+          if [ ! -f "/stackable/log/_vector/shutdown" ]; then
+          mkdir -p /stackable/log/_vector
+          inotifywait -qq --event create /stackable/log/_vector;
+          fi
+          sleep 1
+          kill $vector_pid
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: CLUSTER_NAME
+          value: opensearch
+        - name: LOG_DIR
+          value: /stackable/log
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: OPENSEARCH_SERVER_LOG_FILE
+          value: opensearch_server.json
+        - name: ROLE_GROUP_NAME
+          value: data
+        - name: ROLE_NAME
+          value: nodes
+        - name: VECTOR_AGGREGATOR_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              key: ADDRESS
+              name: vector-aggregator-discovery
+        - name: VECTOR_CONFIG_YAML
+          value: /stackable/config/vector.yaml
+        - name: VECTOR_FILE_LOG_LEVEL
+          value: info
+        - name: VECTOR_LOG
+          value: info
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: vector
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /stackable/config/vector.yaml
+          name: config
+          readOnly: true
+          subPath: vector.yaml
+        - mountPath: /stackable/log
+          name: log
+{% endif %}
       securityContext:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
