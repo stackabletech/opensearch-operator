@@ -2,10 +2,12 @@ use std::{collections::BTreeMap, fmt::Display, str::FromStr};
 
 use snafu::Snafu;
 use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar,
-    k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+    builder::pod::container::{ContainerBuilder, FieldPathEnvVar},
+    k8s_openapi::api::core::v1::{ConfigMapKeySelector, EnvVar, EnvVarSource, ObjectFieldSelector},
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
+
+use crate::framework::{ConfigMapKey, ConfigMapName, ContainerName};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -17,6 +19,12 @@ pub enum Error {
     ParseEnvVarName { env_var_name: String },
 }
 
+/// Infallible variant of [`stackable_operator::builder::pod::container::ContainerBuilder::new`]
+pub fn new_container_builder(container_name: &ContainerName) -> ContainerBuilder {
+    ContainerBuilder::new(container_name.as_ref()).expect("should be a valid container name")
+}
+
+// TODO Use attributed_string_type instead
 /// Validated environment variable name
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EnvVarName(String);
@@ -65,8 +73,8 @@ impl EnvVarSet {
     }
 
     /// Returns a reference to the [`EnvVar`] with the given name
-    pub fn get(&self, env_var_name: impl Into<EnvVarName>) -> Option<&EnvVar> {
-        self.0.get(&env_var_name.into())
+    pub fn get(&self, env_var_name: &EnvVarName) -> Option<&EnvVar> {
+        self.0.get(env_var_name)
     }
 
     /// Moves all [`EnvVar`]s from the given set into this one.
@@ -81,25 +89,22 @@ impl EnvVarSet {
     /// Adds the given [`EnvVar`]s to this set
     ///
     /// [`EnvVar`]s with the same name are overridden.
-    pub fn with_values<I, K, V>(self, env_vars: I) -> Self
+    pub fn with_values<I, V>(self, env_vars: I) -> Self
     where
-        I: IntoIterator<Item = (K, V)>,
-        K: Into<EnvVarName>,
+        I: IntoIterator<Item = (EnvVarName, V)>,
         V: Into<String>,
     {
         env_vars
             .into_iter()
             .fold(self, |extended_env_vars, (name, value)| {
-                extended_env_vars.with_value(name, value)
+                extended_env_vars.with_value(&name, value)
             })
     }
 
     /// Adds an environment variable with the given name and string value to this set
     ///
     /// An [`EnvVar`] with the same name is overridden.
-    pub fn with_value(mut self, name: impl Into<EnvVarName>, value: impl Into<String>) -> Self {
-        let name: EnvVarName = name.into();
-
+    pub fn with_value(mut self, name: &EnvVarName, value: impl Into<String>) -> Self {
         self.0.insert(
             name.clone(),
             EnvVar {
@@ -115,13 +120,7 @@ impl EnvVarSet {
     /// Adds an environment variable with the given name and field path to this set
     ///
     /// An [`EnvVar`] with the same name is overridden.
-    pub fn with_field_path(
-        mut self,
-        name: impl Into<EnvVarName>,
-        field_path: FieldPathEnvVar,
-    ) -> Self {
-        let name: EnvVarName = name.into();
-
+    pub fn with_field_path(mut self, name: &EnvVarName, field_path: FieldPathEnvVar) -> Self {
         self.0.insert(
             name.clone(),
             EnvVar {
@@ -131,6 +130,34 @@ impl EnvVarSet {
                     field_ref: Some(ObjectFieldSelector {
                         field_path: field_path.to_string(),
                         ..ObjectFieldSelector::default()
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            },
+        );
+
+        self
+    }
+
+    /// Adds an environment variable with the given ConfigMap key reference to this set
+    ///
+    /// An [`EnvVar`] with the same name is overridden.
+    pub fn with_config_map_key_ref(
+        mut self,
+        name: &EnvVarName,
+        config_map_name: &ConfigMapName,
+        config_map_key: &ConfigMapKey,
+    ) -> Self {
+        self.0.insert(
+            name.clone(),
+            EnvVar {
+                name: name.to_string(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    config_map_key_ref: Some(ConfigMapKeySelector {
+                        key: config_map_key.to_string(),
+                        name: config_map_name.to_string(),
+                        ..ConfigMapKeySelector::default()
                     }),
                     ..EnvVarSource::default()
                 }),
@@ -153,10 +180,15 @@ mod tests {
 
     use stackable_operator::{
         builder::pod::container::FieldPathEnvVar,
-        k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector},
+        k8s_openapi::api::core::v1::{
+            ConfigMapKeySelector, EnvVar, EnvVarSource, ObjectFieldSelector,
+        },
     };
 
     use super::{EnvVarName, EnvVarSet};
+    use crate::framework::{
+        ConfigMapKey, ConfigMapName, ContainerName, builder::pod::container::new_container_builder,
+    };
 
     #[test]
     fn test_envvarname_fromstr() {
@@ -170,6 +202,12 @@ mod tests {
         assert!(EnvVarName::from_str("€").is_err());
         // equals sign
         assert!(EnvVarName::from_str("=").is_err());
+    }
+
+    #[test]
+    fn test_new_container_builder() {
+        // Test that the function does not panic
+        new_container_builder(&ContainerName::from_str_unsafe("valid-container-name"));
     }
 
     #[test]
@@ -198,12 +236,12 @@ mod tests {
         ]);
         let env_var_set2 = EnvVarSet::new()
             .with_value(
-                EnvVarName::from_str_unsafe("ENV2"),
+                &EnvVarName::from_str_unsafe("ENV2"),
                 "value2 from env_var_set2",
             )
-            .with_field_path(EnvVarName::from_str_unsafe("ENV3"), FieldPathEnvVar::Name)
+            .with_field_path(&EnvVarName::from_str_unsafe("ENV3"), FieldPathEnvVar::Name)
             .with_value(
-                EnvVarName::from_str_unsafe("ENV4"),
+                &EnvVarName::from_str_unsafe("ENV4"),
                 "value4 from env_var_set2",
             );
 
@@ -268,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_envvarset_with_value() {
-        let env_var_set = EnvVarSet::new().with_value(EnvVarName::from_str_unsafe("ENV"), "value");
+        let env_var_set = EnvVarSet::new().with_value(&EnvVarName::from_str_unsafe("ENV"), "value");
 
         assert_eq!(
             Some(&EnvVar {
@@ -276,14 +314,14 @@ mod tests {
                 value: Some("value".to_owned()),
                 value_from: None
             }),
-            env_var_set.get(EnvVarName::from_str_unsafe("ENV"))
+            env_var_set.get(&EnvVarName::from_str_unsafe("ENV"))
         );
     }
 
     #[test]
     fn test_envvarset_with_field_path() {
         let env_var_set = EnvVarSet::new()
-            .with_field_path(EnvVarName::from_str_unsafe("ENV"), FieldPathEnvVar::Name);
+            .with_field_path(&EnvVarName::from_str_unsafe("ENV"), FieldPathEnvVar::Name);
 
         assert_eq!(
             Some(&EnvVar {
@@ -297,7 +335,32 @@ mod tests {
                     ..EnvVarSource::default()
                 }),
             }),
-            env_var_set.get(EnvVarName::from_str_unsafe("ENV"))
+            env_var_set.get(&EnvVarName::from_str_unsafe("ENV"))
+        );
+    }
+
+    #[test]
+    fn test_envvarset_with_config_map_key_ref() {
+        let env_var_set = EnvVarSet::new().with_config_map_key_ref(
+            &EnvVarName::from_str_unsafe("ENV"),
+            &ConfigMapName::from_str_unsafe("config-map"),
+            &ConfigMapKey::from_str_unsafe("key"),
+        );
+
+        assert_eq!(
+            Some(&EnvVar {
+                name: "ENV".to_owned(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    config_map_key_ref: Some(ConfigMapKeySelector {
+                        key: "key".to_owned(),
+                        name: "config-map".to_owned(),
+                        ..ConfigMapKeySelector::default()
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            }),
+            env_var_set.get(&EnvVarName::from_str_unsafe("ENV"))
         );
     }
 }

@@ -20,6 +20,8 @@
 //! become less frequent, then this module can be incorporated into stackable-operator. The module
 //! structure should already resemble the one of stackable-operator.
 
+use std::str::FromStr;
+
 use snafu::Snafu;
 use stackable_operator::validation::{
     RFC_1035_LABEL_MAX_LENGTH, RFC_1123_LABEL_MAX_LENGTH, RFC_1123_SUBDOMAIN_MAX_LENGTH,
@@ -29,10 +31,12 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 pub mod builder;
 pub mod cluster_resources;
 pub mod kvp;
+pub mod product_logging;
 pub mod role_group_utils;
 pub mod role_utils;
+pub mod validation;
 
-#[derive(Snafu, Debug, EnumDiscriminants)]
+#[derive(Debug, EnumDiscriminants, Snafu)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display("empty strings are not allowed"))]
@@ -40,6 +44,11 @@ pub enum Error {
 
     #[snafu(display("maximum length exceeded"))]
     LengthExceeded { length: usize, max_length: usize },
+
+    #[snafu(display("not a valid ConfigMap key"))]
+    InvalidConfigMapKey {
+        source: crate::framework::validation::Error,
+    },
 
     #[snafu(display("not a valid label value"))]
     InvalidLabelValue {
@@ -92,6 +101,18 @@ pub trait NameIsValidLabelValue {
 /// Restricted string type with attributes like maximum length.
 ///
 /// Fully-qualified types are used to ease the import into other modules.
+///
+/// # Examples
+///
+/// ```rust
+/// attributed_string_type! {
+///     ConfigMapName,
+///     "The name of a ConfigMap",
+///     "opensearch-nodes-default",
+///     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+///     is_rfc_1123_dns_subdomain_name
+/// }
+/// ```
 #[macro_export(local_inner_macros)]
 macro_rules! attributed_string_type {
     ($name:ident, $description:literal, $example:literal $(, $attribute:tt)*) => {
@@ -142,6 +163,27 @@ macro_rules! attributed_string_type {
             }
         }
 
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let string: String = serde::Deserialize::deserialize(deserializer)?;
+                $name::from_str(&string).map_err(|err| serde::de::Error::custom(&err))
+            }
+        }
+
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                self.0.serialize(serializer)
+            }
+        }
+
+        impl stackable_operator::config::merge::Atomic for $name {}
+
         #[cfg(test)]
         impl $name {
             #[allow(dead_code)]
@@ -167,14 +209,17 @@ macro_rules! attributed_string_type {
             }
         );
     };
+    (@from_str $name:ident, $s:expr, is_config_map_key) => {
+        $crate::framework::validation::is_config_map_key($s).context($crate::framework::InvalidConfigMapKeySnafu)?;
+    };
+    (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
+        stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
+    };
     (@from_str $name:ident, $s:expr, is_rfc_1123_dns_subdomain_name) => {
         stackable_operator::validation::is_lowercase_rfc_1123_subdomain($s).context($crate::framework::InvalidRfc1123DnsSubdomainNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_rfc_1123_label_name) => {
         stackable_operator::validation::is_lowercase_rfc_1123_label($s).context($crate::framework::InvalidRfc1123LabelNameSnafu)?;
-    };
-    (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
-        stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
     };
     (@from_str $name:ident, $s:expr, is_valid_label_value) => {
         stackable_operator::kvp::LabelValue::from_str($s).context($crate::framework::InvalidLabelValueSnafu)?;
@@ -187,6 +232,23 @@ macro_rules! attributed_string_type {
             // type arithmetic would be better
             pub const MAX_LENGTH: usize = $max_length;
         }
+
+        // The JsonSchema implementation requires `max_length`.
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                std::stringify!($name).into()
+            }
+
+            fn json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": $name::MAX_LENGTH
+                })
+            }
+        }
+    };
+    (@trait_impl $name:ident, is_config_map_key) => {
     };
     (@trait_impl $name:ident, is_rfc_1035_label_name) => {
         impl $name {
@@ -232,6 +294,24 @@ macro_rules! attributed_string_type {
     };
 }
 
+/// Use [`std::sync::LazyLock`] to define a static "constant" from a string.
+///
+/// The string is converted into the given type with [`std::str::FromStr::from_str`].
+///
+/// # Examples
+///
+/// ```rust
+/// constant!(DATA_VOLUME_NAME: VolumeName = "data");
+/// constant!(pub CONFIG_VOLUME_NAME: VolumeName = "config");
+/// ```
+#[macro_export(local_inner_macros)]
+macro_rules! constant {
+    ($qualifier:vis $name:ident: $type:ident = $value:literal) => {
+        $qualifier static $name: std::sync::LazyLock<$type> =
+            std::sync::LazyLock::new(|| $type::from_str($value).expect("should be a valid $name"));
+    };
+}
+
 /// Returns the minimum of the given values.
 ///
 /// As opposed to [`std::cmp::min`], this function can be used at compile-time.
@@ -255,6 +335,21 @@ attributed_string_type! {
     "opensearch-nodes-default",
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
+}
+attributed_string_type! {
+    ConfigMapKey,
+    "The key for a ConfigMap or Secret",
+    "log4j2.properties",
+    // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    is_config_map_key
+}
+attributed_string_type! {
+    ContainerName,
+    "The name of a container in a Pod",
+    "opensearch",
+    (max_length = RFC_1123_LABEL_MAX_LENGTH),
+    is_rfc_1123_label_name
 }
 attributed_string_type! {
     ClusterRoleName,
@@ -422,19 +517,26 @@ attributed_string_type! {
 mod tests {
     use std::str::FromStr;
 
+    use schemars::{JsonSchema, SchemaGenerator};
+    use serde_json::{Number, Value, json};
     use uuid::uuid;
 
     use super::{
-        ClusterName, ClusterRoleName, ConfigMapName, ControllerName, ErrorDiscriminants,
-        NamespaceName, OperatorName, PersistentVolumeClaimName, ProductVersion, RoleBindingName,
-        RoleGroupName, RoleName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
+        ClusterName, ClusterRoleName, ConfigMapKey, ConfigMapName, ContainerName, ControllerName,
+        ErrorDiscriminants, ListenerClassName, ListenerName, NamespaceName, OperatorName,
+        PersistentVolumeClaimName, ProductVersion, RoleBindingName, RoleGroupName, RoleName,
+        ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
     };
     use crate::framework::{NameIsValidLabelValue, ProductName};
 
     #[test]
     fn test_attributed_string_type_examples() {
         ConfigMapName::test_example();
+        ConfigMapKey::test_example();
+        ContainerName::test_example();
         ClusterRoleName::test_example();
+        ListenerName::test_example();
+        ListenerClassName::test_example();
         NamespaceName::test_example();
         PersistentVolumeClaimName::test_example();
         RoleBindingName::test_example();
@@ -501,6 +603,123 @@ mod tests {
         assert_eq!(
             Err(ErrorDiscriminants::LengthExceeded),
             T::from_str("testX").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
+        JsonSchemaTest,
+        "JsonSchemaTest test",
+        "test",
+        (max_length = 4)
+    }
+
+    #[test]
+    fn test_attributed_string_type_json_schema() {
+        type T = JsonSchemaTest;
+
+        T::test_example();
+        assert_eq!("JsonSchemaTest", JsonSchemaTest::schema_name());
+        assert_eq!(
+            json!({
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4
+            }),
+            JsonSchemaTest::json_schema(&mut SchemaGenerator::default())
+        );
+    }
+
+    attributed_string_type! {
+        SerializeTest,
+        "serde::Serialize test",
+        "test"
+    }
+
+    #[test]
+    fn test_attributed_string_type_serialize() {
+        type T = SerializeTest;
+
+        T::test_example();
+        assert_eq!(
+            "\"test\"".to_owned(),
+            serde_json::to_string(&T::from_str_unsafe("test")).expect("should be serializable")
+        );
+    }
+
+    attributed_string_type! {
+        DeserializeTest,
+        "serde::Deserialize test",
+        "test",
+        (max_length = 4),
+        is_rfc_1123_label_name
+    }
+
+    #[test]
+    fn test_attributed_string_type_deserialize() {
+        type T = DeserializeTest;
+
+        T::test_example();
+        assert_eq!(
+            T::from_str_unsafe("test"),
+            serde_json::from_value(Value::String("test".to_owned()))
+                .expect("should be deserializable")
+        );
+        assert_eq!(
+            Err("empty strings are not allowed".to_owned()),
+            serde_json::from_value::<T>(Value::String("".to_owned()))
+                .map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("maximum length exceeded".to_owned()),
+            serde_json::from_value::<T>(Value::String("testx".to_owned()))
+                .map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("not a valid label name as defined in RFC 1123".to_owned()),
+            serde_json::from_value::<T>(Value::String("-".to_owned()))
+                .map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("invalid type: null, expected a string".to_owned()),
+            serde_json::from_value::<T>(Value::Null).map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("invalid type: boolean `true`, expected a string".to_owned()),
+            serde_json::from_value::<T>(Value::Bool(true)).map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("invalid type: integer `1`, expected a string".to_owned()),
+            serde_json::from_value::<T>(Value::Number(
+                Number::from_i128(1).expect("should be a valid number")
+            ))
+            .map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("invalid type: sequence, expected a string".to_owned()),
+            serde_json::from_value::<T>(Value::Array(vec![])).map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("invalid type: map, expected a string".to_owned()),
+            serde_json::from_value::<T>(Value::Object(serde_json::Map::new()))
+                .map_err(|err| err.to_string())
+        );
+    }
+
+    attributed_string_type! {
+        IsConfigMapKeyTest,
+        "is_config_map_key test",
+        "a_B-c.1",
+        is_config_map_key
+    }
+
+    #[test]
+    fn test_attributed_string_type_is_config_map_key() {
+        type T = IsConfigMapKeyTest;
+
+        T::test_example();
+        assert_eq!(
+            Err(ErrorDiscriminants::InvalidConfigMapKey),
+            T::from_str(" ").map_err(ErrorDiscriminants::from)
         );
     }
 

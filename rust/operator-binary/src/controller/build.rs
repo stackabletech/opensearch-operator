@@ -7,6 +7,7 @@ use role_builder::RoleBuilder;
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
 
 pub mod node_config;
+pub mod product_logging;
 pub mod role_builder;
 pub mod role_group_builder;
 
@@ -65,6 +66,7 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::Resource,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -73,12 +75,12 @@ mod tests {
     use crate::{
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedOpenSearchConfig,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
+            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -200,10 +202,16 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: ListenerClassName::from_str_unsafe("external-stable"),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                },
                 node_roles: NodeRoles(node_roles.to_vec()),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
-                listener_class: "external-stable".to_owned(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),

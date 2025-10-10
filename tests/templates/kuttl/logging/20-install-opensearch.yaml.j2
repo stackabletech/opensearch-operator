@@ -1,4 +1,18 @@
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-log-config
+data:
+  log4j2.properties: |
+    rootLogger.level = INFO
+    rootLogger.appenderRef.FILE.ref = FILE
+    appender.FILE.type = File
+    appender.FILE.name = FILE
+    appender.FILE.fileName = /stackable/log/opensearch/opensearch_server.json
+    appender.FILE.layout.type = OpenSearchJsonLayout
+    appender.FILE.layout.type_name = server
+---
 apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
 metadata:
@@ -12,20 +26,31 @@ spec:
     productVersion: "{{ test_scenario['values']['opensearch'] }}"
 {% endif %}
     pullPolicy: IfNotPresent
-{% if lookup('env', 'VECTOR_AGGREGATOR') %}
   clusterConfig:
-    vectorAggregatorConfigMapName: vector-aggregator-discovery
-{% endif %}
+    vectorAggregatorConfigMapName: opensearch-vector-aggregator-discovery
   nodes:
-    config:
-      logging:
-        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
     roleGroups:
-      cluster-manager:
+      automatic:
         config:
-          nodeRoles:
-            - cluster_manager
-          listenerClass: test-external-stable-$NAMESPACE
+          logging:
+            enableVectorAgent: true
+            containers:
+              opensearch:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
+              vector:
+                console:
+                  level: INFO
+                file:
+                  level: INFO
+                loggers:
+                  ROOT:
+                    level: INFO
         replicas: 1
         podOverrides:
           spec:
@@ -35,12 +60,15 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
-      data1:
+                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-automatic-headless
+      custom:
         config:
-          nodeRoles:
-            - data
-          listenerClass: test-external-unstable-$NAMESPACE
+          logging:
+            enableVectorAgent: true
+            containers:
+              opensearch:
+                custom:
+                  configMap: custom-log-config
         replicas: 1
         podOverrides:
           spec:
@@ -50,28 +78,7 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data1-headless
-      data2:
-        config:
-          nodeRoles:
-            - data
-          listenerClass: test-cluster-internal-$NAMESPACE
-        replicas: 1
-        podOverrides:
-          spec:
-            volumes:
-              - name: tls
-                ephemeral:
-                  volumeClaimTemplate:
-                    metadata:
-                      annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data2-headless
-    envOverrides:
-      # Only required for the official image
-      # The official image (built with https://github.com/opensearch-project/opensearch-build)
-      # installs a demo configuration if not disabled explicitly.
-      DISABLE_INSTALL_DEMO_CONFIG: "true"
-      OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
+                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-custom-headless
     configOverrides:
       opensearch.yml:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
@@ -84,23 +91,23 @@ spec:
         cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
         plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
     podOverrides:
       spec:
         containers:
           - name: opensearch
             volumeMounts:
               - name: security-config
-                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
+                mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
               - name: tls
-                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
+                mountPath: /stackable/opensearch/config/tls
                 readOnly: true
         volumes:
           - name: security-config

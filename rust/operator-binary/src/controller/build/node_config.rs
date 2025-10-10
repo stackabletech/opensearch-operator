@@ -81,7 +81,7 @@ impl NodeConfig {
     }
 
     /// Creates the main OpenSearch configuration file in YAML format
-    pub fn static_opensearch_config_file(&self) -> String {
+    pub fn static_opensearch_config_file_content(&self) -> String {
         Self::to_yaml(self.static_opensearch_config())
     }
 
@@ -156,19 +156,19 @@ impl NodeConfig {
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
                 &self.discovery_service_name,
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
                 self.initial_cluster_manager_nodes(),
             )
             .with_value(
-                EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
                 self.role_group_config
                     .config
                     .node_roles
@@ -275,32 +275,53 @@ mod tests {
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
 
     use super::*;
     use crate::{
-        controller::ValidatedOpenSearchConfig,
+        controller::{ValidatedLogging, ValidatedOpenSearchConfig},
         crd::NodeRoles,
         framework::{
-            ClusterName, NamespaceName, ProductVersion, RoleGroupName,
+            ClusterName, ListenerClassName, NamespaceName, ProductVersion, RoleGroupName,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
-    pub fn node_config(
+    struct TestConfig {
         replicas: u16,
-        config_settings: &[(&str, &str)],
-        env_vars: &[(&str, &str)],
-    ) -> NodeConfig {
+        config_settings: &'static [(&'static str, &'static str)],
+        env_vars: &'static [(&'static str, &'static str)],
+    }
+
+    impl Default for TestConfig {
+        fn default() -> Self {
+            Self {
+                replicas: 3,
+                config_settings: &[],
+                env_vars: &[],
+            }
+        }
+    }
+
+    fn node_config(test_config: TestConfig) -> NodeConfig {
         let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
             .expect("should be a valid ProductImage");
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas,
+            replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
                     v1alpha1::NodeRole::Data,
@@ -309,18 +330,19 @@ mod tests {
                 ]),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: [(
                 CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-                config_settings
+                test_config
+                    .config_settings
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
             )]
             .into(),
             env_overrides: EnvVarSet::new().with_values(
-                env_vars
+                test_config
+                    .env_vars
                     .iter()
                     .map(|(k, v)| (EnvVarName::from_str_unsafe(k), *v)),
             ),
@@ -359,7 +381,10 @@ mod tests {
 
     #[test]
     pub fn test_static_opensearch_config_file() {
-        let node_config = node_config(2, &[("test", "value")], &[]);
+        let node_config = node_config(TestConfig {
+            config_settings: &[("test", "value")],
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             concat!(
@@ -370,17 +395,23 @@ mod tests {
                 "test: \"value\""
             )
             .to_owned(),
-            node_config.static_opensearch_config_file()
+            node_config.static_opensearch_config_file_content()
         );
     }
 
     #[test]
     pub fn test_tls_on_http_port_enabled() {
-        let node_config_tls_undefined = node_config(2, &[], &[]);
-        let node_config_tls_enabled =
-            node_config(2, &[("plugins.security.ssl.http.enabled", "true")], &[]);
-        let node_config_tls_disabled =
-            node_config(2, &[("plugins.security.ssl.http.enabled", "false")], &[]);
+        let node_config_tls_undefined = node_config(TestConfig::default());
+
+        let node_config_tls_enabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "true")],
+            ..TestConfig::default()
+        });
+
+        let node_config_tls_disabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "false")],
+            ..TestConfig::default()
+        });
 
         assert!(!node_config_tls_undefined.tls_on_http_port_enabled());
         assert!(node_config_tls_enabled.tls_on_http_port_enabled());
@@ -426,25 +457,29 @@ mod tests {
 
     #[test]
     pub fn test_environment_variables() {
-        let node_config = node_config(2, &[], &[("TEST", "value")]);
+        let node_config = node_config(TestConfig {
+            replicas: 2,
+            env_vars: &[("TEST", "value")],
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             EnvVarSet::new()
-                .with_value(EnvVarName::from_str_unsafe("TEST"), "value",)
+                .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
                 .with_value(
-                    EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
+                    &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
                     "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1",
                 )
                 .with_value(
-                    EnvVarName::from_str_unsafe("discovery.seed_hosts"),
+                    &EnvVarName::from_str_unsafe("discovery.seed_hosts"),
                     "my-opensearch-cluster-manager",
                 )
                 .with_field_path(
-                    EnvVarName::from_str_unsafe("node.name"),
+                    &EnvVarName::from_str_unsafe("node.name"),
                     FieldPathEnvVar::Name
                 )
                 .with_value(
-                    EnvVarName::from_str_unsafe("node.roles"),
+                    &EnvVarName::from_str_unsafe("node.roles"),
                     "cluster_manager,data,ingest,remote_cluster_client"
                 ),
             node_config.environment_variables()
@@ -453,8 +488,15 @@ mod tests {
 
     #[test]
     pub fn test_discovery_type() {
-        let node_config_single_node = node_config(1, &[], &[]);
-        let node_config_multiple_nodes = node_config(2, &[], &[]);
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 2,
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             "single-node".to_owned(),
@@ -468,8 +510,15 @@ mod tests {
 
     #[test]
     pub fn test_initial_cluster_manager_nodes() {
-        let node_config_single_node = node_config(1, &[], &[]);
-        let node_config_multiple_nodes = node_config(3, &[], &[]);
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 3,
+            ..TestConfig::default()
+        });
 
         assert_eq!(
             "".to_owned(),

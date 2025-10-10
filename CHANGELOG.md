@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
   images can be used which have a different directory structure than the Stackable image ([#18]).
 - Add Prometheus labels and annotations to role-group services ([#26]).
 - Helm: Allow Pod `priorityClassName` to be configured ([#34]).
+- Support log configuration and log aggregation ([#40]).
 
 [#10]: https://github.com/stackabletech/opensearch-operator/pull/10
 [#17]: https://github.com/stackabletech/opensearch-operator/pull/17
@@ -32,3 +33,4 @@ All notable changes to this project will be documented in this file.
 [#26]: https://github.com/stackabletech/opensearch-operator/pull/26
 [#34]: https://github.com/stackabletech/opensearch-operator/pull/34
 [#38]: https://github.com/stackabletech/opensearch-operator/pull/38
+[#40]: https://github.com/stackabletech/opensearch-operator/pull/40
