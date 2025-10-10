@@ -732,7 +732,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
-    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
   ownerReferences:
@@ -758,7 +758,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
-    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
   ownerReferences:
