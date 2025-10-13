@@ -2,13 +2,9 @@ import logging
 import os
 import requests
 import sys
-import urllib3
-
-# disable tls insecure warnings
-urllib3.disable_warnings()
 
 logging.basicConfig(
-    level="INFO", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
+    level="DEBUG", format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout
 )
 
 namespace = os.environ["NAMESPACE"]
