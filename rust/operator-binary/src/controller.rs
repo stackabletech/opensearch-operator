@@ -33,8 +33,9 @@ use crate::{
         v1alpha1::{self},
     },
     framework::{
-        ClusterName, ControllerName, HasName, HasUid, NameIsValidLabelValue, NamespaceName,
-        OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
+        ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
+        NamespaceName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
+        product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
     },
 };
@@ -123,14 +124,28 @@ type OpenSearchRoleGroupConfig =
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
 
-/// The validated [`v1alpha1::OpenSearchConfig`]
+/// Validated [`v1alpha1::OpenSearchConfig`]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
+    pub listener_class: ListenerClassName,
+    pub logging: ValidatedLogging,
     pub node_roles: NodeRoles,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
-    pub listener_class: String,
+}
+
+/// Validated log configuration per container
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedLogging {
+    pub opensearch_container: ValidatedContainerLogConfigChoice,
+    pub vector_container: Option<VectorContainerLogConfig>,
+}
+
+impl ValidatedLogging {
+    pub fn is_vector_agent_enabled(&self) -> bool {
+        self.vector_container.is_some()
+    }
 }
 
 /// The validated [`v1alpha1::OpenSearchCluster`]
@@ -355,17 +370,20 @@ mod tests {
         commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
 
-    use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster};
+    use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, NamespaceName, OperatorName, ProductVersion, RoleGroupName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
+            RoleGroupName, builder::pod::container::EnvVarSet,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+            role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -487,10 +505,16 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: ListenerClassName::from_str_unsafe("external-stable"),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                },
                 node_roles: NodeRoles(node_roles.to_vec()),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
-                listener_class: "external-stable".to_owned(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),

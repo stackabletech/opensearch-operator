@@ -78,6 +78,8 @@ spec:
                   requests:
                     storage: "1"
       serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
       restartPolicy: OnFailure
 ---
 apiVersion: v1
