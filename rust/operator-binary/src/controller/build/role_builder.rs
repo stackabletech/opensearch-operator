@@ -218,6 +218,7 @@ mod tests {
         str::FromStr,
     };
 
+    use pretty_assertions::assert_eq;
     use serde_json::json;
     use stackable_operator::{
         commons::{
@@ -227,6 +228,7 @@ mod tests {
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
     };
     use uuid::uuid;
@@ -234,12 +236,13 @@ mod tests {
     use super::RoleBuilder;
     use crate::{
         controller::{
-            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedOpenSearchConfig,
+            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
+            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
         },
     };
@@ -260,6 +263,13 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                },
                 node_roles: NodeRoles(vec![
                     v1alpha1::NodeRole::ClusterManager,
                     v1alpha1::NodeRole::Data,
@@ -268,7 +278,6 @@ mod tests {
                 ]),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
             config_overrides: HashMap::default(),
             env_overrides: EnvVarSet::default(),

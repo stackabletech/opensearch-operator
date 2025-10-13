@@ -35,6 +35,8 @@ spec:
   serviceName: opensearch-nodes-cluster-manager-headless
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
         app.kubernetes.io/instance: opensearch
@@ -57,8 +59,54 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
-      - command:
-        - {{ test_scenario['values']['opensearch_home'] }}/opensearch-docker-entrypoint.sh
+      - args:
+        - |-
+
+          prepare_signal_handlers()
+          {
+              unset term_child_pid
+              unset term_kill_needed
+              trap 'handle_term_signal' TERM
+          }
+
+          handle_term_signal()
+          {
+              if [ "${term_child_pid}" ]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              else
+                  term_kill_needed="yes"
+              fi
+          }
+
+          wait_for_termination()
+          {
+              set +e
+              term_child_pid=$1
+              if [[ -v term_kill_needed ]]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              fi
+              wait ${term_child_pid} 2>/dev/null
+              trap - TERM
+              wait ${term_child_pid} 2>/dev/null
+              set -e
+          }
+
+          rm -f /stackable/log/_vector/shutdown
+          prepare_signal_handlers
+          if command --search containerdebug >/dev/null 2>&1; then
+          containerdebug --output=/stackable/log/containerdebug-state.json --loop &
+          else
+          echo >&2 "containerdebug not installed; Proceed without it."
+          fi
+          ./opensearch-docker-entrypoint.sh  &
+          wait_for_termination $!
+          mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -111,16 +159,86 @@ spec:
           name: config
           readOnly: true
           subPath: opensearch.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/log4j2.properties
+          name: log-config
+          readOnly: true
+          subPath: log4j2.properties
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/data
           name: data
         - mountPath: /stackable/listener
           name: listener
+        - mountPath: /stackable/log
+          name: log
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
           readOnly: true
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
           readOnly: true
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      - args:
+        - |-
+          # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
+          vector & vector_pid=$!
+          if [ ! -f "/stackable/log/_vector/shutdown" ]; then
+          mkdir -p /stackable/log/_vector
+          inotifywait -qq --event create /stackable/log/_vector;
+          fi
+          sleep 1
+          kill $vector_pid
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: CLUSTER_NAME
+          value: opensearch
+        - name: LOG_DIR
+          value: /stackable/log
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: OPENSEARCH_SERVER_LOG_FILE
+          value: opensearch_server.json
+        - name: ROLE_GROUP_NAME
+          value: cluster-manager
+        - name: ROLE_NAME
+          value: nodes
+        - name: VECTOR_AGGREGATOR_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              key: ADDRESS
+              name: vector-aggregator-discovery
+        - name: VECTOR_CONFIG_YAML
+          value: /stackable/config/vector.yaml
+        - name: VECTOR_FILE_LOG_LEVEL
+          value: info
+        - name: VECTOR_LOG
+          value: info
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: vector
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /stackable/config/vector.yaml
+          name: config
+          readOnly: true
+          subPath: vector.yaml
+        - mountPath: /stackable/log
+          name: log
+{% endif %}
       securityContext:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
@@ -131,6 +249,13 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-cluster-manager
         name: config
+      - configMap:
+          defaultMode: 420
+          name: opensearch-nodes-cluster-manager
+        name: log-config
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
       - name: security-config
         secret:
           defaultMode: 420
@@ -221,6 +346,8 @@ spec:
   serviceName: opensearch-nodes-data-headless
   template:
     metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
         app.kubernetes.io/instance: opensearch
@@ -245,8 +372,54 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
-      - command:
-        - {{ test_scenario['values']['opensearch_home'] }}/opensearch-docker-entrypoint.sh
+      - args:
+        - |-
+
+          prepare_signal_handlers()
+          {
+              unset term_child_pid
+              unset term_kill_needed
+              trap 'handle_term_signal' TERM
+          }
+
+          handle_term_signal()
+          {
+              if [ "${term_child_pid}" ]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              else
+                  term_kill_needed="yes"
+              fi
+          }
+
+          wait_for_termination()
+          {
+              set +e
+              term_child_pid=$1
+              if [[ -v term_kill_needed ]]; then
+                  kill -TERM "${term_child_pid}" 2>/dev/null
+              fi
+              wait ${term_child_pid} 2>/dev/null
+              trap - TERM
+              wait ${term_child_pid} 2>/dev/null
+              set -e
+          }
+
+          rm -f /stackable/log/_vector/shutdown
+          prepare_signal_handlers
+          if command --search containerdebug >/dev/null 2>&1; then
+          containerdebug --output=/stackable/log/containerdebug-state.json --loop &
+          else
+          echo >&2 "containerdebug not installed; Proceed without it."
+          fi
+          ./opensearch-docker-entrypoint.sh  &
+          wait_for_termination $!
+          mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
@@ -298,16 +471,86 @@ spec:
           name: config
           readOnly: true
           subPath: opensearch.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/log4j2.properties
+          name: log-config
+          readOnly: true
+          subPath: log4j2.properties
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/data
           name: data
         - mountPath: /stackable/listener
           name: listener
+        - mountPath: /stackable/log
+          name: log
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
           readOnly: true
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
           readOnly: true
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+      - args:
+        - |-
+          # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
+          vector & vector_pid=$!
+          if [ ! -f "/stackable/log/_vector/shutdown" ]; then
+          mkdir -p /stackable/log/_vector
+          inotifywait -qq --event create /stackable/log/_vector;
+          fi
+          sleep 1
+          kill $vector_pid
+        command:
+        - /bin/bash
+        - -x
+        - -euo
+        - pipefail
+        - -c
+        env:
+        - name: CLUSTER_NAME
+          value: opensearch
+        - name: LOG_DIR
+          value: /stackable/log
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: OPENSEARCH_SERVER_LOG_FILE
+          value: opensearch_server.json
+        - name: ROLE_GROUP_NAME
+          value: data
+        - name: ROLE_NAME
+          value: nodes
+        - name: VECTOR_AGGREGATOR_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              key: ADDRESS
+              name: vector-aggregator-discovery
+        - name: VECTOR_CONFIG_YAML
+          value: /stackable/config/vector.yaml
+        - name: VECTOR_FILE_LOG_LEVEL
+          value: info
+        - name: VECTOR_LOG
+          value: info
+        image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+        imagePullPolicy: IfNotPresent
+        name: vector
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 250m
+            memory: 128Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /stackable/config/vector.yaml
+          name: config
+          readOnly: true
+          subPath: vector.yaml
+        - mountPath: /stackable/log
+          name: log
+{% endif %}
       securityContext:
         fsGroup: 1000
       serviceAccount: opensearch-serviceaccount
@@ -318,6 +561,13 @@ spec:
           defaultMode: 420
           name: opensearch-nodes-data
         name: config
+      - configMap:
+          defaultMode: 420
+          name: opensearch-nodes-data
+        name: log-config
+      - emptyDir:
+          sizeLimit: 30Mi
+        name: log
       - name: security-config
         secret:
           defaultMode: 420
@@ -610,7 +860,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
-    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-cluster-manager
   ownerReferences:
@@ -636,7 +886,7 @@ metadata:
     app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
-    app.kubernetes.io/version: 3.1.0
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
   name: opensearch-nodes-data
   ownerReferences:
