@@ -5,10 +5,10 @@ image:
 service:
   type: NodePort
 serviceAccount:
-  # The Helm chart appends "-dashboards", so that the actual
-  # ServiceAccount name is "opensearch-dashboards".
-  # see https://github.com/opensearch-project/helm-charts/blob/opensearch-dashboards-2.27.1/charts/opensearch-dashboards/templates/_helpers.tpl#L58
-  name: opensearch
+  create: false
+  # Use the ServiceAccount of OpenSearch because its permissions are already configured to work on
+  # OpenShift.
+  name: opensearch-serviceaccount
 extraEnvs:
   - name: OPENSEARCH_PASSWORD
     valueFrom:
