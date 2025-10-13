@@ -17,6 +17,7 @@ use stackable_operator::{
     },
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
+    product_logging::{self, spec::Logging},
     role_utils::{GenericRoleConfig, Role},
     schemars::{self, JsonSchema},
     shared::time::Duration,
@@ -25,12 +26,15 @@ use stackable_operator::{
 };
 use strum::{Display, EnumIter};
 
-use crate::framework::{
-    ClusterName, NameIsValidLabelValue, ProductName, RoleName,
-    role_utils::GenericProductSpecificCommonConfig,
+use crate::{
+    constant,
+    framework::{
+        ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
+        ProductName, RoleName, role_utils::GenericProductSpecificCommonConfig,
+    },
 };
 
-const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
+constant!(DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -43,7 +47,6 @@ const DEFAULT_LISTENER_CLASS: &str = "cluster-internal";
     )
 )]
 pub mod versioned {
-
     /// An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for
     /// OpenSearch. Find more information on how to use it and the resources that the operator
     /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
@@ -58,16 +61,31 @@ pub mod versioned {
     ))]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterSpec {
-        // no doc - docs in ProductImage struct.
+        // no doc - docs in ProductImage struct
         pub image: ProductImage,
 
-        // no doc - docs in ClusterOperation struct.
+        /// Configuration that applies to all roles and role groups
+        #[serde(default)]
+        pub cluster_config: v1alpha1::OpenSearchClusterConfig,
+
+        // no doc - docs in ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
 
-        // no doc - docs in Role struct.
+        // no doc - docs in Role struct
         pub nodes:
             Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchClusterConfig {
+        /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
+        /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
+        /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
+        /// to learn how to configure log aggregation with Vector.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -134,6 +152,16 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub graceful_shutdown_timeout: Duration,
 
+        /// This field controls which
+        /// [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html)
+        /// is used to expose the HTTP communication.
+        #[fragment_attrs(serde(default))]
+        pub listener_class: ListenerClassName,
+
+        // no doc - docs in Logging struct
+        #[fragment_attrs(serde(default))]
+        pub logging: Logging<Container>,
+
         /// Roles of the OpenSearch node.
         ///
         /// Consult the [node roles
@@ -142,10 +170,27 @@ pub mod versioned {
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
+    }
 
-        /// This field controls which [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) is used to expose the HTTP communication.
-        #[fragment_attrs(serde(default))]
-        pub listener_class: String,
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Display,
+        Eq,
+        EnumIter,
+        JsonSchema,
+        Ord,
+        PartialEq,
+        PartialOrd,
+        Serialize,
+    )]
+    pub enum Container {
+        #[serde(rename = "opensearch")]
+        OpenSearch,
+
+        #[serde(rename = "vector")]
+        Vector,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -215,6 +260,8 @@ impl v1alpha1::OpenSearchConfig {
             graceful_shutdown_timeout: Some(
                 Duration::from_str("2m").expect("should be a valid duration"),
             ),
+            listener_class: Some(DEFAULT_LISTENER_CLASS.to_owned()),
+            logging: product_logging::spec::default_logging(),
             // Defaults taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
             node_roles: Some(NodeRoles(vec![
@@ -248,7 +295,6 @@ impl v1alpha1::OpenSearchConfig {
                     },
                 },
             },
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_string()),
         }
     }
 }
@@ -268,8 +314,24 @@ impl NodeRoles {
 
 impl Atomic for NodeRoles {}
 
+impl v1alpha1::Container {
+    /// Returns the validated container name
+    ///
+    /// This name should match the one defined by the user (see the serde annotation at
+    /// [`v1alpha1::Container`], but it could differ if it was renamed.
+    pub fn to_container_name(&self) -> ContainerName {
+        ContainerName::from_str(match self {
+            v1alpha1::Container::OpenSearch => "opensearch",
+            v1alpha1::Container::Vector => "vector",
+        })
+        .expect("should be a valid container name")
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use strum::IntoEnumIterator;
+
     use crate::crd::v1alpha1;
 
     #[test]
@@ -291,5 +353,13 @@ mod tests {
             v1alpha1::NodeRole::ClusterManager,
             serde_json::from_str("\"cluster_manager\"").expect("should be deserializable")
         );
+    }
+
+    #[test]
+    fn test_to_container_name() {
+        for container in v1alpha1::Container::iter() {
+            // Test that the function does not panic
+            container.to_container_name();
+        }
     }
 }
