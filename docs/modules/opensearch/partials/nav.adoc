@@ -8,6 +8,7 @@
 ** xref:opensearch:usage-guide/configuration-environment-overrides.adoc[]
 ** xref:opensearch:usage-guide/monitoring.adoc[]
 ** xref:opensearch:usage-guide/logging.adoc[]
+** xref:opensearch:usage-guide/opensearch-dashboards.adoc[]
 ** xref:opensearch:usage-guide/operations/index.adoc[]
 *** xref:opensearch:usage-guide/operations/cluster-operations.adoc[]
 *** xref:opensearch:usage-guide/operations/pod-placement.adoc[]

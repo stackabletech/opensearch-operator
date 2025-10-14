@@ -1,0 +1,23 @@
+= OpenSearch Dashboards
+:description: OpenSearch Dashboards
+:official-helm-chart: https://docs.opensearch.org/latest/install-and-configure/install-dashboards/helm/
+
+OpenSearch Dashboards is currently not managed by the operator but the Stackable Data Platform provides a supported OCI image.
+
+One way to deploy OpenSearch Dashboards is by using the {official-helm-chart}[official Helm chart{external-link-icon}^].
+
+A basic `values.yaml` file to deploy OpenSearch Dashboards with this chart might look like this:
+
+[source,yaml]
+----
+opensearchHosts: https://opensearch.<opensearch-namespace>.svc.cluster.local:9200 # <1>
+image:
+  repository: oci.stackable.tech/sdp/opensearch-dashboards # <2>
+  tag: 3.1.0-stackable{{ versions.opensearch }}
+serviceAccount: # <3>
+  create: false
+  name: opensearch-serviceaccount
+----
+<1> Address of the OpenSearch Service deployed by the operator
+<2> Use the OCI image provided by the Stackable Data Platform
+<3> If running on OpenShift, use the ServiceAccount of OpenSearch because its permissions are already configured to work on OpenShift.
