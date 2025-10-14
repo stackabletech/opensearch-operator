@@ -1,0 +1,38 @@
+= Troubleshooting
+
+== Errors and warnings in the OpenSearch logs
+
+=== SSLHandshakeException: Insufficient buffer remaining for AEAD cipher fragment (2). Needs to be more than tag size (16)
+
+The Stackable image of OpenSearch 3.1 uses OpenJDK 21 which is the latest supported JDK version in OpenSearch 3.1.
+When using TLSv1.3, which is the default, the following warning can appear in the OpenSearch logs:
+
+----
+[WARN ][o.o.h.AbstractHttpServerTransport] [opensearch-nodes-default-0] caught exception while handling client http traffic, closing connection Netty4HttpChannel{localAddress=/...:9200, remoteAddress=/...}
+io.netty.handler.codec.DecoderException: javax.net.ssl.SSLHandshakeException: Insufficient buffer remaining for AEAD cipher fragment (2). Needs to be more than tag size (16)
+----
+
+This means that a TLS connection could not be established.
+Unfortunately, the message does not contain the reason.
+The issue with this message is fixed in JDK 24, see https://bugs.openjdk.org/browse/JDK-8331682[JDK-8331682{external-link-icon}^].
+OpenSearch 3.2, which supports JDK 24, will therefore show a proper message.
+
+To find out the reason in OpenSearch 3.1, you could temporarily use TLSv1.2 which is not affected by this JDK bug:
+
+[source,yaml]
+----
+nodes:
+  configOverrides:
+    opensearch.yml:
+      plugins.security.ssl.http.enabled_protocols: TLSv1.2
+----
+
+Instead of the warning above, an error message is shown, e.g.:
+
+----
+[ERROR][o.o.h.n.s.SecureNetty4HttpServerTransport] [opensearch-nodes-default-0] Exception during establishing a SSL connection: javax.net.ssl.SSLHandshakeException: Received fatal alert: unknown_ca
+javax.net.ssl.SSLHandshakeException: Received fatal alert: unknown_ca
+----
+
+In this case, the OpenSearch client cannot verify the certificate chain because it does not have the CA certificate which is used to sign the OpenSearch node certificate.
+See xref:home:secret-operator:usage.adoc[Usage of the Secret Operator], how to provide the CA certificate to the OpenSearch client and to solve this problem.
