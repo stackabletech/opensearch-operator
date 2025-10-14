@@ -14,14 +14,9 @@ spec:
         - name: test-opensearch-dashboards
           image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
           command:
-            - /bin/bash
-            - -euxo
-            - pipefail
-            - -c
+            - python
           args:
-            - |
-              sleep 60
-              python scripts/test.py
+            - scripts/test.py
           env:
             - name: NAMESPACE
               valueFrom:

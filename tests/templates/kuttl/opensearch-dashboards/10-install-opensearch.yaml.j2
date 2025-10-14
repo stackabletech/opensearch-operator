@@ -33,7 +33,7 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
+                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-default-headless
     envOverrides:
       # Only required for the official image
       # The official image (built with https://github.com/opensearch-project/opensearch-build)

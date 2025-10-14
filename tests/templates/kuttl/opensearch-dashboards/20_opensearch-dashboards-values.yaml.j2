@@ -18,8 +18,9 @@ config:
   opensearch_dashboards.yml:
     opensearch:
       username: kibanaserver
-      password: kibanaserver
-      requestHeadersWhitelist: [authorization, securitytenant]
+      requestHeadersWhitelist:
+        - authorization
+        - securitytenant
       ssl:
         verificationMode: full
         certificateAuthorities: [/stackable/opensearch-dashboards/config/tls/ca.crt]
@@ -46,7 +47,7 @@ extraVolumes:
 extraVolumeMounts:
   - name: tls
     mountPath: /stackable/opensearch-dashboards/config/tls
-    # The Helm chart only adds a volume mount at /usr/share/opensearch-dashboards
+  # The Helm chart only adds a volume mount at /usr/share/opensearch-dashboards
   - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
     name: config
     subPath: opensearch_dashboards.yml
