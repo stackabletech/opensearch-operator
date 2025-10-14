@@ -33,7 +33,6 @@ tests:
   - name: opensearch-dashboards
     dimensions:
       - opensearch
-      - openshift
       - opensearch_home
 suites:
   - name: nightly
