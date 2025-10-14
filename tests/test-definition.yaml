@@ -60,6 +60,7 @@ suites:
       - smoke
       - external-access
       - ldap
+      - opensearch-dashboards
     patch:
       - dimensions:
           - name: opensearch
