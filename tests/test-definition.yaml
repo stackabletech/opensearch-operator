@@ -30,6 +30,10 @@ tests:
   - name: logging
     dimensions:
       - opensearch
+  - name: opensearch-dashboards
+    dimensions:
+      - opensearch
+      - opensearch_home
 suites:
   - name: nightly
     patch:
@@ -39,6 +43,7 @@ suites:
   - name: smoke-latest
     select:
       - smoke
+      - opensearch-dashboards
     patch:
       - dimensions:
           - expr: last
@@ -54,6 +59,7 @@ suites:
       - smoke
       - external-access
       - ldap
+      - opensearch-dashboards
     patch:
       - dimensions:
           - name: opensearch
