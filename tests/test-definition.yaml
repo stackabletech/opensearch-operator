@@ -34,6 +34,10 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
+  # requires the repository-s3 plugin
+  - name: snapshot-s3
+    dimensions:
+      - opensearch
 suites:
   - name: nightly
     patch:

@@ -1,0 +1,150 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-snapshot
+spec:
+  template:
+    spec:
+      containers:
+        - name: test-snapshot
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/test.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: test-opensearch
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-opensearch
+data:
+  test.py: |
+    from opensearchpy import OpenSearch
+    from opensearchpy.exceptions import RequestError
+
+    host = 'opensearch'
+    port = 9200
+    auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
+    ca_certs_path = '/stackable/tls/ca.crt'
+
+    # TODO Enable hostname verification
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True,
+        http_auth = auth,
+        use_ssl = True,
+        verify_certs = True,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False,
+        ca_certs = ca_certs_path
+    )
+
+    # Create an index
+    index_name = 'test-index'
+
+    try:
+      response = client.indices.create(index=index_name)
+      print(f'Creating index; {response=}')
+    except RequestError as err:
+      if err.error == 'resource_already_exists_exception':
+        print(f'The index was already created in a prior test run; {index_name=}')
+      else:
+        raise
+
+    # Add a document to the index
+    response = client.index(
+      index = index_name,
+      body = {
+        'name': 'Stackable'
+      },
+      id = 1,
+    )
+
+    print(f'Adding document; {response=}')
+
+    # Create snapshot repository
+    snapshot_repository = "snapshot_repository"
+
+    response = client.snapshot.create_repository(
+      repository=snapshot_repository,
+      body={
+        "type": "s3",
+        "settings": {
+          "bucket": "opensearch"
+        }
+      }
+    )
+
+    print(f'Creating snapshot repository; {response=}')
+
+    # Create snapshot
+    snapshot = "test_snapshot"
+
+    try:
+      response = client.snapshot.create(
+        repository=snapshot_repository,
+        snapshot=snapshot,
+        body={
+          "indices": index_name
+        }
+      )
+      print(f'Creating snapshot; {response=}')
+    except RequestError as err:
+      if err.error == 'invalid_snapshot_name_exception':
+        print(f'The snapshot was already created in a prior test run; {snapshot=}')
+      else:
+        raise
+
+    # Delete the index.
+    response = client.indices.delete(index=index_name)
+
+    print(f'Deleting index; {response=}')
