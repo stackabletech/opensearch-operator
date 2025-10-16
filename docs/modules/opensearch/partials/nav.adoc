@@ -14,6 +14,7 @@
 *** xref:opensearch:usage-guide/operations/pod-placement.adoc[]
 *** xref:opensearch:usage-guide/operations/pod-disruptions.adoc[]
 *** xref:opensearch:usage-guide/operations/graceful-shutdown.adoc[]
+* xref:opensearch:troubleshooting/index.adoc[]
 * xref:opensearch:reference/index.adoc[]
 ** xref:opensearch:reference/crds.adoc[]
 *** {crd-docs}/opensearch.stackable.tech/opensearchcluster/v1alpha1/[OpenSearchCluster {external-link-icon}^]
