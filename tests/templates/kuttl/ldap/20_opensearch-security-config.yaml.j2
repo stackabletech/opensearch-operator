@@ -34,6 +34,17 @@ stringData:
     config:
       dynamic:
         authc:
+          # Allow internal authentication for debugging purposes, so that OpenSearch Dashboards can
+          # be used which uses the internal user kibanaserver.
+          internal_auth:
+            order: 0
+            http_enabled: true
+            transport_enabled: true
+            http_authenticator:
+              type: basic
+              challenge: false
+            authentication_backend:
+              type: internal
           ldap:
             http_enabled: true
             transport_enabled: true
@@ -48,11 +59,28 @@ stringData:
                 hosts:
                   - openldap.$NAMESPACE.svc.cluster.local:1636
                 pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
-                userbase: ou=users,dc=example,dc=org
+                userbase: ou=users,dc=stackable,dc=tech
                 username_attribute: uid
                 usersearch: (cn={0})
                 verify_hostnames: true
-        authz: {}
+        authz:
+          ldap:
+            http_enabled: true
+            transport_enabled: true
+            authorization_backend:
+              type: ldap
+              config:
+                enable_ssl: true
+                hosts:
+                  - openldap.$NAMESPACE.svc.cluster.local:1636
+                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                userbase: ou=users,dc=stackable,dc=tech
+                username_attribute: uid
+                usersearch: (cn={0})
+                verify_hostnames: true
+                rolesearch: (member={0})
+                rolebase: ou=groups,dc=stackable,dc=tech
+                rolename: cn
   internal_users.yml: |
     ---
     # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
@@ -82,6 +110,20 @@ stringData:
     _meta:
       type: roles
       config_version: 2
+
+    test-role:
+      reserved: false
+      cluster_permissions:
+        - indices:data/write/bulk*
+      index_permissions:
+        - index_patterns:
+            - "*"
+          allowed_actions:
+            - indices:admin/create
+            - indices:admin/delete
+            - indices:admin/mapping/put
+            - indices:data/write/bulk*
+            - indices:data/write/index
   roles_mapping.yml: |
     ---
     _meta:
@@ -92,13 +134,16 @@ stringData:
       reserved: false
       backend_roles:
         - admin
-      users:
-        - integrationtest
 
     kibana_server:
       reserved: true
       users:
         - kibanaserver
+
+    test-role:
+      reserved: false
+      backend_roles:
+        - testgroup
   tenants.yml: |
     ---
     _meta:
