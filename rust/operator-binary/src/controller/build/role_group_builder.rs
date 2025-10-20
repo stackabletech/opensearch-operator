@@ -1127,12 +1127,14 @@ mod tests {
                             "volumes": [
                                 {
                                     "configMap": {
+                                        "defaultMode": 0o660,
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "config"
                                 },
                                 {
                                     "configMap": {
+                                        "defaultMode": 0o660,
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "log-config"
