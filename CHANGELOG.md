@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - Add Prometheus labels and annotations to role-group services ([#26]).
 - Helm: Allow Pod `priorityClassName` to be configured ([#34]).
 - Support log configuration and log aggregation ([#40]).
+- Ensure that the permissions of the configuration files are correct ([#47]).
 
 [#10]: https://github.com/stackabletech/opensearch-operator/pull/10
 [#17]: https://github.com/stackabletech/opensearch-operator/pull/17
@@ -34,3 +35,4 @@ All notable changes to this project will be documented in this file.
 [#34]: https://github.com/stackabletech/opensearch-operator/pull/34
 [#38]: https://github.com/stackabletech/opensearch-operator/pull/38
 [#40]: https://github.com/stackabletech/opensearch-operator/pull/40
+[#47]: https://github.com/stackabletech/opensearch-operator/pull/47

@@ -246,11 +246,11 @@ spec:
       terminationGracePeriodSeconds: 120
       volumes:
       - configMap:
-          defaultMode: 420
+          defaultMode: 0o660
           name: opensearch-nodes-cluster-manager
         name: config
       - configMap:
-          defaultMode: 420
+          defaultMode: 0o660
           name: opensearch-nodes-cluster-manager
         name: log-config
       - emptyDir:
@@ -258,7 +258,7 @@ spec:
         name: log
       - name: security-config
         secret:
-          defaultMode: 420
+          defaultMode: 0o660
           secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
@@ -558,11 +558,11 @@ spec:
       terminationGracePeriodSeconds: 120
       volumes:
       - configMap:
-          defaultMode: 420
+          defaultMode: 0o660
           name: opensearch-nodes-data
         name: config
       - configMap:
-          defaultMode: 420
+          defaultMode: 0o660
           name: opensearch-nodes-data
         name: log-config
       - emptyDir:
@@ -570,7 +570,7 @@ spec:
         name: log
       - name: security-config
         secret:
-          defaultMode: 420
+          defaultMode: 0o660
           secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:

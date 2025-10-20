@@ -260,6 +260,7 @@ impl<'a> RoleGroupBuilder<'a> {
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
                 config_map: Some(ConfigMapVolumeSource {
+                    default_mode: Some(0o660),
                     name: self.resource_names.role_group_config_map().to_string(),
                     ..Default::default()
                 }),
@@ -268,6 +269,7 @@ impl<'a> RoleGroupBuilder<'a> {
             Volume {
                 name: LOG_CONFIG_VOLUME_NAME.to_string(),
                 config_map: Some(ConfigMapVolumeSource {
+                    default_mode: Some(0o660),
                     name: log_config_volume_config_map.to_string(),
                     ..Default::default()
                 }),
@@ -1125,12 +1127,14 @@ mod tests {
                             "volumes": [
                                 {
                                     "configMap": {
+                                        "defaultMode": 0o660,
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "config"
                                 },
                                 {
                                     "configMap": {
+                                        "defaultMode": 0o660,
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "log-config"
