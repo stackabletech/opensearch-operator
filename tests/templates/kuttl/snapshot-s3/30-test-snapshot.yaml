@@ -83,7 +83,6 @@ data:
     auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
     ca_certs_path = '/stackable/tls/ca.crt'
 
-    # TODO Enable hostname verification
     client = OpenSearch(
         hosts = [{'host': host, 'port': port}],
         http_compress = True,
