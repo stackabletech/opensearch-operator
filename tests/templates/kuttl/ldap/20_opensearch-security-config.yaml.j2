@@ -1,0 +1,151 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-security-config
+stringData:
+  action_groups.yml: |
+    ---
+    _meta:
+      type: actiongroups
+      config_version: 2
+  allowlist.yml: |
+    ---
+    _meta:
+      type: allowlist
+      config_version: 2
+
+    config:
+      enabled: false
+  audit.yml: |
+    ---
+    _meta:
+      type: audit
+      config_version: 2
+
+    config:
+      enabled: false
+  config.yml: |
+    ---
+    _meta:
+      type: config
+      config_version: 2
+
+    config:
+      dynamic:
+        authc:
+          # Allow internal authentication for debugging purposes, so that OpenSearch Dashboards can
+          # be used which uses the internal user kibanaserver.
+          internal_auth:
+            order: 0
+            http_enabled: true
+            transport_enabled: true
+            http_authenticator:
+              type: basic
+              challenge: false
+            authentication_backend:
+              type: internal
+          ldap:
+            http_enabled: true
+            transport_enabled: true
+            order: 1
+            http_authenticator:
+              type: basic
+              challenge: false
+            authentication_backend:
+              type: ldap
+              config:
+                enable_ssl: true
+                hosts:
+                  - openldap.$NAMESPACE.svc.cluster.local:1636
+                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                userbase: ou=users,dc=stackable,dc=tech
+                username_attribute: uid
+                usersearch: (cn={0})
+                verify_hostnames: true
+        authz:
+          ldap:
+            http_enabled: true
+            transport_enabled: true
+            authorization_backend:
+              type: ldap
+              config:
+                enable_ssl: true
+                hosts:
+                  - openldap.$NAMESPACE.svc.cluster.local:1636
+                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                userbase: ou=users,dc=stackable,dc=tech
+                username_attribute: uid
+                usersearch: (cn={0})
+                verify_hostnames: true
+                rolesearch: (member={0})
+                rolebase: ou=groups,dc=stackable,dc=tech
+                rolename: cn
+  internal_users.yml: |
+    ---
+    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
+
+    _meta:
+      type: internalusers
+      config_version: 2
+
+    admin:
+      hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+      reserved: true
+      backend_roles:
+        - admin
+      description: OpenSearch admin user
+
+    kibanaserver:
+      hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
+      reserved: true
+      description: OpenSearch Dashboards user
+  nodes_dn.yml: |
+    ---
+    _meta:
+      type: nodesdn
+      config_version: 2
+  roles.yml: |
+    ---
+    _meta:
+      type: roles
+      config_version: 2
+
+    test-role:
+      reserved: false
+      cluster_permissions:
+        - indices:data/write/bulk*
+      index_permissions:
+        - index_patterns:
+            - "*"
+          allowed_actions:
+            - indices:admin/create
+            - indices:admin/delete
+            - indices:admin/mapping/put
+            - indices:data/write/bulk*
+            - indices:data/write/index
+  roles_mapping.yml: |
+    ---
+    _meta:
+      type: rolesmapping
+      config_version: 2
+
+    all_access:
+      reserved: false
+      backend_roles:
+        - admin
+
+    kibana_server:
+      reserved: true
+      users:
+        - kibanaserver
+
+    test-role:
+      reserved: false
+      backend_roles:
+        - testgroup
+  tenants.yml: |
+    ---
+    _meta:
+      type: tenants
+      config_version: 2

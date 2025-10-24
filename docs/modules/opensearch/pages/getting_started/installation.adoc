@@ -29,7 +29,7 @@ The tool will show
 include::example$getting_started/install_output.txt[]
 
 TIP: Consult the xref:management:stackablectl:quickstart.adoc[] to learn more about how to use `stackablectl`.
-For example, you can use the `--cluster kind` flag to create a Kubernetes cluster with link:https://kind.sigs.k8s.io/[kind].
+For example, you can use the `--cluster kind` flag to create a Kubernetes cluster with https://kind.sigs.k8s.io/[kind{external-link-icon}^].
 --
 
 Helm::

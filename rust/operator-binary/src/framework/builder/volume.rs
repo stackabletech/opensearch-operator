@@ -1,12 +1,14 @@
 use stackable_operator::{
     builder::pod::volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
     k8s_openapi::api::core::v1::Volume,
-    time::Duration,
+    shared::time::Duration,
 };
 
+use crate::framework::TlsSecretClassName;
+
 pub fn build_tls_volume(
-    volume_name: &str,
-    tls_secret_class_name: &str,
+    volume_name: &String,
+    tls_secret_class_name: &TlsSecretClassName,
     service_scopes: impl IntoIterator<Item = impl AsRef<str>>,
     secret_format: SecretFormat,
     requested_secret_lifetime: &Duration,

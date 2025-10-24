@@ -1,13 +1,14 @@
 use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
-use crd::{OpenSearchCluster, v1alpha1};
+use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
 use framework::OperatorName;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{
     YamlSchema as _,
-    cli::{Command, ProductOperatorRun},
+    cli::{Command, RunArguments},
+    eos::EndOfSupportChecker,
     k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
     kube::{
         core::DeserializeGuard,
@@ -42,6 +43,11 @@ pub enum Error {
         source: stackable_operator::telemetry::tracing::Error,
     },
 
+    #[snafu(display("failed to initialize end-of-support checker"))]
+    InitEndOfSupportChecker {
+        source: stackable_operator::eos::Error,
+    },
+
     #[snafu(display("failed to merge CRD versions"))]
     MergeCrd {
         source: stackable_operator::kube::core::crd::MergeError,
@@ -71,18 +77,19 @@ async fn main() -> Result<()> {
     let opts = Opts::parse();
     match opts.cmd {
         Command::Crd => {
-            OpenSearchCluster::merged_crd(OpenSearchCluster::V1Alpha1)
+            OpenSearchCluster::merged_crd(OpenSearchClusterVersion::V1Alpha1)
                 .context(MergeCrdSnafu)?
                 .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())
                 .context(SerializeCrdSnafu)?;
         }
-        Command::Run(ProductOperatorRun {
+        Command::Run(RunArguments {
+            operator_environment: _,
             product_config: _,
             watch_namespace,
-            telemetry_arguments,
-            cluster_info_opts,
+            maintenance,
+            common,
         }) => {
-            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, telemetry_arguments)
+            let _tracing_guard = Tracing::pre_configured(built_info::PKG_NAME, common.telemetry)
                 .init()
                 .context(InitTracingSnafu)?;
 
@@ -96,12 +103,18 @@ async fn main() -> Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            let eos_checker =
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)
+                    .context(InitEndOfSupportCheckerSnafu)?
+                    .run()
+                    .map(Ok);
+
             let operator_name = OperatorName::from_str("opensearch.stackable.tech")
                 .expect("should be a valid operator name");
 
             let client = stackable_operator::client::initialize_operator(
                 Some(format!("{operator_name}")),
-                &cluster_info_opts,
+                &common.cluster_info,
             )
             .await
             .context(CreateClientSnafu)?;
@@ -121,7 +134,7 @@ async fn main() -> Result<()> {
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::OpenSearchCluster>>(&client),
                 watcher::Config::default(),
             );
-            controller
+            let controller = controller
                 .owns(
                     watch_namespace.get_api::<Service>(&client),
                     watcher::Config::default(),
@@ -153,7 +166,9 @@ async fn main() -> Result<()> {
                         }
                     },
                 )
-                .await;
+                .map(Ok);
+
+            futures::try_join!(controller, eos_checker)?;
         }
     }
 

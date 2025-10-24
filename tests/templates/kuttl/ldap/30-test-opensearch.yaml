@@ -1,0 +1,110 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-opensearch
+spec:
+  template:
+    spec:
+      containers:
+        - name: test-opensearch
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/test.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: test-opensearch
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-opensearch
+data:
+  test.py: |
+    from opensearchpy import OpenSearch
+
+    host = 'opensearch'
+    port = 9200
+    auth = ('integrationtest', 'integrationtest')
+    ca_certs_path = '/stackable/tls/ca.crt'
+
+    client = OpenSearch(
+        hosts = [{'host': host, 'port': port}],
+        http_compress = True,
+        http_auth = auth,
+        use_ssl = True,
+        verify_certs = True,
+        ssl_assert_hostname = False,
+        ssl_show_warn = False,
+        ca_certs = ca_certs_path
+    )
+
+    # Create an index
+    index_name = 'test-index'
+
+    response = client.indices.create(index=index_name)
+
+    print(f'Creating index; {response=}')
+
+    # Add a document to the index
+    response = client.index(
+      index = index_name,
+      body = {
+        'name': 'Stackable'
+      },
+      id = 1,
+    )
+
+    print(f'Adding document; {response=}')
+
+    # Delete the index.
+    response = client.indices.delete(index=index_name)
+
+    print(f'Deleting index; {response=}')

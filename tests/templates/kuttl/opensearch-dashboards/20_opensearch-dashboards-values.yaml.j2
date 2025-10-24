@@ -1,0 +1,55 @@
+image:
+  repository: oci.stackable.tech/sdp/opensearch-dashboards
+  tag: {{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable0.0.0-dev
+service:
+  type: NodePort
+serviceAccount:
+  create: false
+  # Use the ServiceAccount of OpenSearch because its permissions are already configured to work on
+  # OpenShift.
+  name: opensearch-serviceaccount
+extraEnvs:
+  - name: OPENSEARCH_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-credentials
+        key: kibanaserver
+config:
+  opensearch_dashboards.yml:
+    opensearch:
+      username: kibanaserver
+      requestHeadersWhitelist:
+        - authorization
+        - securitytenant
+      ssl:
+        verificationMode: full
+        certificateAuthorities: [/stackable/opensearch-dashboards/config/tls/ca.crt]
+    opensearch_security:
+      multitenancy:
+        enabled: true
+        tenants.preferred: [Private, Global]
+      readonly_mode.roles: [kibana_read_only]
+      cookie.secure: false
+extraVolumes:
+  - name: tls
+    ephemeral:
+      volumeClaimTemplate:
+        metadata:
+          annotations:
+            secrets.stackable.tech/class: tls
+        spec:
+          storageClassName: secrets.stackable.tech
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: "1"
+extraVolumeMounts:
+  - name: tls
+    mountPath: /stackable/opensearch-dashboards/config/tls
+  # The Helm chart only adds a volume mount at /usr/share/opensearch-dashboards
+  - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
+    name: config
+    subPath: opensearch_dashboards.yml
+podSecurityContext:
+  fsGroup: 1000

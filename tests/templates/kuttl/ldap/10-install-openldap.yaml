@@ -1,0 +1,105 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openldap
+  serviceName: openldap
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openldap
+    spec:
+      containers:
+        - name: openldap
+          image: bitnamilegacy/openldap:2.6
+          env:
+            # LDAP baseDN of the LDAP tree
+            - name: LDAP_ROOT
+              value: dc=stackable,dc=tech
+            # LDAP database admin user
+            - name: LDAP_ADMIN_USERNAME
+              value: admin
+            # LDAP database admin password
+            - name: LDAP_ADMIN_PASSWORD
+              value: admin
+            # Comma separated list of LDAP users to create in the default LDAP tree
+            - name: LDAP_USERS
+              value: integrationtest
+            # Comma separated list of passwords to use for LDAP users
+            - name: LDAP_PASSWORDS
+              value: integrationtest
+            # Name for the user's organizational unit
+            - name: LDAP_USER_OU
+              value: users
+            # Name for the group's organizational unit
+            - name: LDAP_GROUP_OU
+              value: groups
+            # Group used to group created users
+            - name: LDAP_GROUP
+              value: testgroup
+            # Whether to enable TLS for traffic or not
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            # File containing the certificate file for the TLS traffic
+            - name: LDAP_TLS_CERT_FILE
+              value: /tls/tls.crt
+            # File containing the key for certificate
+            - name: LDAP_TLS_KEY_FILE
+              value: /tls/tls.key
+            # File containing the CA of the certificate
+            - name: LDAP_TLS_CA_FILE
+              value: /tls/ca.crt
+          ports:
+            - name: ldap
+              containerPort: 1389
+            - name: tls-ldap
+              containerPort: 1636
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+          startupProbe:
+            tcpSocket:
+              port: 1389
+          readinessProbe:
+            tcpSocket:
+              port: 1389
+          # See https://github.com/bitnami/containers/issues/40841#issuecomment-1649977191
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+      serviceAccountName: test-service-account
+      volumes:
+        - name: tls
+          csi:
+            driver: secrets.stackable.tech
+            volumeAttributes:
+              secrets.stackable.tech/class: tls
+              secrets.stackable.tech/scope: pod
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+  labels:
+    app.kubernetes.io/name: openldap
+spec:
+  type: ClusterIP
+  ports:
+    - name: ldap
+      port: 1389
+      targetPort: ldap
+    - name: tls-ldap
+      port: 1636
+      targetPort: tls-ldap
+  selector:
+    app.kubernetes.io/name: openldap

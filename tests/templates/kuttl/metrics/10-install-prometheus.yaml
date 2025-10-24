@@ -1,0 +1,17 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  # The kube-prometheus-stack Helm chart installs cluster wide
+  # resources, e.g. ClusterRoles. If all test cases use the same Helm
+  # chart version, then their contents are equal. Therefore, it is safe
+  # to take ownership instead of failing if the resources already exist.
+  - script: >
+      helm install prometheus-stack
+      --namespace $NAMESPACE
+      --version 77.0.1
+      --values 10_kube-prometheus-stack-values.yaml
+      --take-ownership
+      --wait
+      oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
+    timeout: 600

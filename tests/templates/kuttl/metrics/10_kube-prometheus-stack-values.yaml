@@ -1,0 +1,17 @@
+---
+alertmanager:
+  enabled: false
+grafana:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+kubernetesServiceMonitors:
+  enabled: false
+nodeExporter:
+  enabled: false
+prometheus:
+  serviceMonitor:
+    selfMonitor: false
+prometheusOperator:
+  serviceMonitor:
+    selfMonitor: false

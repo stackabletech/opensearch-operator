@@ -1,123 +1,103 @@
-use serde_json::{Map, Value, json};
+//! Configuration of an OpenSearch node
+
+use std::str::FromStr;
+
+use serde_json::{Value, json};
 use stackable_operator::builder::pod::container::FieldPathEnvVar;
 
 use super::ValidatedCluster;
 use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
-    framework::{builder::pod::container::EnvVarSet, role_group_utils},
+    framework::{
+        ServiceName,
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        role_group_utils,
+    },
 };
 
+/// The main configuration file of OpenSearch
 pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
-// TODO Document how to enter config_overrides of various types, e.g. string, list, boolean,
-// object, ...
-
-// Configuration file format
-//
-// This is not well documented.
-//
-// A list setting can be written as
-// - a comma-separated list, e.g.
-//   ```
-//   setting: a,b,c
-//   ```
-//   Commas in the values cannot be escaped.
-// - a JSON list, e.g.
-//   ```
-//   setting: ["a", "b", "c"]
-//   ```
-// - a YAML list, e.g.
-//   ```
-//   setting:
-//     - a
-//     - b
-//     - c
-//   ```
-// - a (legacy) flat list, e.g.
-//   ```
-//   setting.0: a
-//   setting.1: b
-//   setting.2: b
-//   ```
-
-/// type: string
+/// The cluster name.
+/// Type: string
 pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
-/// type: list of strings
+/// The list of hosts that perform discovery when a node is started.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
-/// type: string
+/// By default, OpenSearch forms a multi-node cluster. Set `discovery.type` to `single-node` to
+/// form a single-node cluster.
+/// Type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
-/// type: list of strings
+/// A list of cluster-manager-eligible nodes used to bootstrap the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
     "cluster.initial_cluster_manager_nodes";
 
-/// type: string
+/// Binds an OpenSearch node to an address.
+/// Type: string
 pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 
-/// type: string
+/// A descriptive name for the node.
+/// Type: string
 pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
-/// type: list of strings
+/// Defines one or more roles for an OpenSearch node.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
-/// type: list of strings
+/// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
+/// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
-/// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_DISABLE_INSTALL_DEMO: &str = "DISABLE_INSTALL_DEMO_CONFIG";
+/// Whether to enable TLS on the REST layer. If enabled, only HTTPS is allowed.
+/// Type: boolean
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
+    "plugins.security.ssl.http.enabled";
 
+/// Path to the cert PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_TYPE: &str = "plugins.security.audit.type";
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH: &str =
+    "plugins.security.ssl.http.pemcert_filepath";
 
+/// Path to the key PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_LOG4J_LEVEL: &str =
-    "plugins.security.audit.config.log4j.level";
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH: &str =
+    "plugins.security.ssl.http.pemkey_filepath";
 
+/// Path to the trusted CAs PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_LOG4J_LOGGER_NAME: &str =
-    "plugins.security.audit.config.log4j.logger_name";
-
-/// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_RESTAPI_ROLES_ENABLED: &str =
-    "plugins.security.restapi.roles_enabled";
-
-/// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX: &str =
-    "allow_default_init_securityindex";
-
-/// type: string
-pub const TLS_HTTP_ENABLED: &str = "plugins.security.ssl.http.enabled";
-
-/// type: string
-pub const TLS_HTTP_PEMCERT_FILEPATH: &str = "plugins.security.ssl.http.pemcert_filepath";
-
-/// type: string
-pub const TLS_HTTP_PEMKEY_FILEPATH: &str = "plugins.security.ssl.http.pemkey_filepath";
-
-/// type: string
-pub const TLS_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
     "plugins.security.ssl.http.pemtrustedcas_filepath";
 
-/// type: string
-pub const TLS_TRANSPORT_ENABLED: &str = "plugins.security.ssl.transport.enabled";
+/// Whether to enable TLS on internal node-to-node communication using the transport port.
+/// type: boolean
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED: &str =
+    "plugins.security.ssl.transport.enabled";
 
+/// Path to the cert PEM file used for TLS on the transport PORT.
 /// type: string
-pub const TLS_TRANSPORT_PEMCERT_FILEPATH: &str = "plugins.security.ssl.transport.pemcert_filepath";
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemcert_filepath";
 
+/// Path to the key PEM file used for TLS on the transport PORT.
 /// type: string
-pub const TLS_TRANSPORT_PEMKEY_FILEPATH: &str = "plugins.security.ssl.transport.pemkey_filepath";
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemkey_filepath";
 
+/// Path to the trusted CAs PEM file used for TLS on the transport PORT.
 /// type: string
-pub const TLS_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
     "plugins.security.ssl.transport.pemtrustedcas_filepath";
 
+/// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
-    discovery_service_name: String,
+    discovery_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -126,7 +106,7 @@ impl NodeConfig {
     pub fn new(
         cluster: ValidatedCluster,
         role_group_config: OpenSearchRoleGroupConfig,
-        discovery_service_name: String,
+        discovery_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
@@ -135,9 +115,41 @@ impl NodeConfig {
         }
     }
 
-    /// static for the cluster
-    pub fn static_opensearch_config(&self) -> Map<String, Value> {
-        let mut config = Map::new();
+    /// Creates the main OpenSearch configuration file in YAML format
+    pub fn opensearch_config_file_content(&self) -> String {
+        Self::to_yaml(self.opensearch_config())
+    }
+
+    pub fn opensearch_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = self.static_opensearch_config();
+
+        if self.cluster.cluster_config.tls.secret_class.is_some() {
+            config.append(&mut self.tls_config());
+        }
+
+        for (setting, value) in self
+            .role_group_config
+            .config_overrides
+            .get(CONFIGURATION_FILE_OPENSEARCH_YML)
+            .into_iter()
+            .flatten()
+        {
+            config.insert(setting.to_owned(), json!(value));
+        }
+
+        // Ensure a deterministic result
+        config.sort_keys();
+
+        config
+    }
+
+    /// Creates the main OpenSearch configuration file as JSON map
+    ///
+    /// The file should only contain cluster-wide configuration options. Node-specific options
+    /// should be defined as environment variables.
+    pub fn static_opensearch_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = serde_json::Map::new();
+
         config.insert(
             CONFIG_OPTION_CLUSTER_NAME.to_owned(),
             json!(self.cluster.name.to_string()),
@@ -161,104 +173,88 @@ impl NodeConfig {
         config
     }
 
-    pub fn tls_config(&self) -> Map<String, Value> {
-        let mut config = Map::new();
+    pub fn tls_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = serde_json::Map::new();
+
         // TLS config for HTTP port
-        config.insert(TLS_HTTP_ENABLED.to_owned(), json!("true".to_string()));
         config.insert(
-            TLS_HTTP_PEMCERT_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
+            json!("true".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
             json!("/stackable/tls/tls.crt".to_string()),
         );
         config.insert(
-            TLS_HTTP_PEMKEY_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
             json!("/stackable/tls/tls.key".to_string()),
         );
         config.insert(
-            TLS_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
             json!("/stackable/tls/ca.crt".to_string()),
         );
         // TLS config for TRANSPORT port
-        config.insert(TLS_TRANSPORT_ENABLED.to_owned(), json!("true".to_string()));
         config.insert(
-            TLS_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
+            json!("true".to_string()),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
             json!("/stackable/tls/tls.crt".to_string()),
         );
         config.insert(
-            TLS_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
             json!("/stackable/tls/tls.key".to_string()),
         );
         config.insert(
-            TLS_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
             json!("/stackable/tls/ca.crt".to_string()),
         );
 
         config
     }
 
-    pub fn security_config(&self) -> Map<String, Value> {
-        let mut config = Map::new();
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_TYPE.to_owned(),
-            json!("log4j".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_AUDIT_LOG4J_LEVEL.to_owned(),
-            json!("INFO".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_LOG4J_LOGGER_NAME.to_owned(),
-            json!("oseaudit".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_RESTAPI_ROLES_ENABLED.to_owned(),
-            json!("all_access".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX.to_owned(),
-            json!("true".to_string()),
-        );
-
-        config
+    /// Returns `true` if TLS is enabled on the HTTP port
+    pub fn tls_on_http_port_enabled(&self) -> bool {
+        self.opensearch_config()
+            .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
+            .and_then(Self::value_as_bool)
+            == Some(true)
     }
 
-    pub fn build_config_file(
-        &self,
-        file_name: &str,
-        mut config: serde_json::Map<String, Value>,
-    ) -> String {
-        for (setting, value) in self
-            .role_group_config
-            .config_overrides
-            .get(file_name)
-            .into_iter()
-            .flatten()
-        {
-            config.insert(setting.to_owned(), json!(value));
-        }
-
-        // Ensure a deterministic result
-        config.sort_keys();
-
-        Self::to_yaml(config)
+    /// Converts the given JSON value to [`bool`] if possible
+    pub fn value_as_bool(value: &Value) -> Option<bool> {
+        value.as_bool().or(
+            // OpenSearch parses the strings "true" and "false" as boolean, see
+            // https://github.com/opensearch-project/OpenSearch/blob/3.1.0/libs/common/src/main/java/org/opensearch/common/Booleans.java#L45-L84
+            value
+                .as_str()
+                .and_then(|value| FromStr::from_str(value).ok()),
+        )
     }
 
-    /// different for every node
+    /// Creates environment variables for the OpenSearch configurations
+    ///
+    /// The environment variables should only contain node-specific configuration options.
+    /// Cluster-wide options should be added to the configuration file.
     pub fn environment_variables(&self) -> EnvVarSet {
         EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.
-            // The node name is used e.g. for `{INITIAL_CLUSTER_MANAGER_NODES}`.
-            .with_field_path(CONFIG_OPTION_NODE_NAME, FieldPathEnvVar::Name)
+            // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
+            .with_field_path(
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
+                FieldPathEnvVar::Name,
+            )
             .with_value(
-                CONFIG_OPTION_DISCOVERY_SEED_HOSTS,
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
                 &self.discovery_service_name,
             )
             .with_value(
-                CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES,
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
                 self.initial_cluster_manager_nodes(),
             )
-            .with_value(CONFIG_OPTION_PLUGINS_SECURITY_DISABLE_INSTALL_DEMO, "true")
             .with_value(
-                CONFIG_OPTION_NODE_ROLES,
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
                 self.role_group_config
                     .config
                     .node_roles
@@ -269,7 +265,7 @@ impl NodeConfig {
                     // is safe.
                     .join(","),
             )
-            .with_values(self.role_group_config.env_overrides.clone())
+            .merge(self.role_group_config.env_overrides.clone())
     }
 
     fn to_yaml(kv: serde_json::Map<String, Value>) -> String {
@@ -279,9 +275,9 @@ impl NodeConfig {
             .join("\n")
     }
 
-    /// Configuration for `{DISCOVERY_TYPE}`
+    /// Configuration for `discovery.type`
     ///
-    /// "zen" is the default if `{DISCOVERY_TYPE}` is not set.
+    /// "zen" is the default if `discovery.type` is not set.
     /// It is nevertheless explicitly set here.
     /// see <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/discovery/DiscoveryModule.java#L88-L89>
     ///
@@ -326,7 +322,7 @@ impl NodeConfig {
                 .cluster
                 .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
 
-            // This setting requires node names as set in `{NODE_NAME}`.
+            // This setting requires node names as set in NODE_NAME.
             // The node names are set to the pod names with
             // `valueFrom.fieldRef.fieldPath: metadata.name`, so it is okay to calculate the pod
             // names here and use them as node names.
@@ -355,121 +351,272 @@ impl NodeConfig {
 
 #[cfg(test)]
 mod tests {
-
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::collections::BTreeMap;
 
     use stackable_operator::{
         commons::{
-            affinity::StackableAffinity, product_image_selection::ProductImage,
+            affinity::StackableAffinity,
+            product_image_selection::{ProductImage, ResolvedProductImage},
             resources::Resources,
         },
-        k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, ObjectFieldSelector, PodTemplateSpec},
-        kube::api::ObjectMeta,
+        k8s_openapi::api::core::v1::PodTemplateSpec,
+        kvp::LabelValue,
+        product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
+    use uuid::uuid;
 
     use super::*;
     use crate::{
-        controller::ValidatedOpenSearchConfig,
-        crd::{
-            NodeRoles,
-            v1alpha1::{OpenSearchClusterConfig, OpenSearchTls},
+        controller::{ValidatedLogging, ValidatedOpenSearchConfig},
+        crd::{NodeRoles, v1alpha1::OpenSearchClusterConfig},
+        framework::{
+            ClusterName, ListenerClassName, NamespaceName, ProductVersion, RoleGroupName,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+            role_utils::GenericProductSpecificCommonConfig,
         },
-        framework::{ClusterName, ProductVersion, role_utils::GenericProductSpecificCommonConfig},
     };
 
-    #[test]
-    pub fn test_environment_variables() {
-        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.0.0"}"#)
+    struct TestConfig {
+        replicas: u16,
+        config_settings: &'static [(&'static str, &'static str)],
+        env_vars: &'static [(&'static str, &'static str)],
+    }
+
+    impl Default for TestConfig {
+        fn default() -> Self {
+            Self {
+                replicas: 3,
+                config_settings: &[],
+                env_vars: &[],
+            }
+        }
+    }
+
+    fn node_config(test_config: TestConfig) -> NodeConfig {
+        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
             .expect("should be a valid ProductImage");
-        let cluster = ValidatedCluster {
-            metadata: ObjectMeta::default(),
-            image: image.clone(),
-            product_version: ProductVersion::from_str(image.product_version())
-                .expect("should be a valid ProductVersion"),
-            name: ClusterName::from_str("my-opensearch-cluster")
-                .expect("should be a valid ClusterName"),
-            namespace: "default".to_owned(),
-            uid: "0b1e30e6-326e-4c1a-868d-ad6598b49e8b".to_owned(),
-            cluster_config: OpenSearchClusterConfig {
-                tls: OpenSearchTls {
-                    secret_class: "my-tls-secret-class".to_owned(),
-                },
-            },
-            role_config: GenericRoleConfig::default(),
-            role_group_configs: BTreeMap::new(),
-        };
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: 1,
+            replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
-                node_roles: NodeRoles::default(),
+                listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
+                logging: ValidatedLogging {
+                    opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
+                        AutomaticContainerLogConfig::default(),
+                    ),
+                    vector_container: None,
+                },
+                node_roles: NodeRoles(vec![
+                    v1alpha1::NodeRole::ClusterManager,
+                    v1alpha1::NodeRole::Data,
+                    v1alpha1::NodeRole::Ingest,
+                    v1alpha1::NodeRole::RemoteClusterClient,
+                ]),
+                requested_secret_lifetime: Duration::from_str("15d")
+                    .expect("should be a valid duration"),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
-                listener_class: "cluster-internal".to_string(),
             },
-            config_overrides: HashMap::default(),
-            env_overrides: [("TEST".to_owned(), "value".to_owned())].into(),
+            config_overrides: [(
+                CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
+                test_config
+                    .config_settings
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            )]
+            .into(),
+            env_overrides: EnvVarSet::new().with_values(
+                test_config
+                    .env_vars
+                    .iter()
+                    .map(|(k, v)| (EnvVarName::from_str_unsafe(k), *v)),
+            ),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
         };
 
-        let node_config = NodeConfig::new(
-            cluster,
-            role_group_config,
-            "my-opensearch-cluster-manager".to_owned(),
+        let cluster = ValidatedCluster::new(
+            ResolvedProductImage {
+                product_version: "3.1.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                    .expect("should be a valid label value"),
+                image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                image_pull_policy: "Always".to_owned(),
+                pull_secrets: None,
+            },
+            ProductVersion::from_str_unsafe(image.product_version()),
+            ClusterName::from_str_unsafe("my-opensearch-cluster"),
+            NamespaceName::from_str_unsafe("default"),
+            uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
+            OpenSearchClusterConfig::default(),
+            GenericRoleConfig::default(),
+            [(
+                RoleGroupName::from_str_unsafe("default"),
+                role_group_config.clone(),
+            )]
+            .into(),
         );
 
-        let env_vars = node_config.environment_variables();
+        NodeConfig::new(
+            cluster,
+            role_group_config,
+            ServiceName::from_str_unsafe("my-opensearch-cluster-manager"),
+        )
+    }
 
-        // TODO Test EnvVarSet and compare EnvVarSets
+    #[test]
+    pub fn test_static_opensearch_config_file() {
+        let node_config = node_config(TestConfig {
+            config_settings: &[("test", "value")],
+            ..TestConfig::default()
+        });
+
         assert_eq!(
-            vec![
-                EnvVar {
-                    name: "DISABLE_INSTALL_DEMO_CONFIG".to_owned(),
-                    value: Some("true".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "TEST".to_owned(),
-                    value: Some("value".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "cluster.initial_cluster_manager_nodes".to_owned(),
-                    value: Some("".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "discovery.seed_hosts".to_owned(),
-                    value: Some("my-opensearch-cluster-manager".to_owned()),
-                    value_from: None
-                },
-                EnvVar {
-                    name: "node.name".to_owned(),
-                    value: None,
-                    value_from: Some(EnvVarSource {
-                        config_map_key_ref: None,
-                        field_ref: Some(ObjectFieldSelector {
-                            api_version: None,
-                            field_path: "metadata.name".to_owned()
-                        }),
-                        resource_field_ref: None,
-                        secret_key_ref: None
-                    })
-                },
-                EnvVar {
-                    name: "node.roles".to_owned(),
-                    value: Some("".to_owned()),
-                    value_from: None
-                }
-            ],
-            <EnvVarSet as Into<Vec<EnvVar>>>::into(env_vars)
+            concat!(
+                "cluster.name: \"my-opensearch-cluster\"\n",
+                "discovery.type: \"zen\"\n",
+                "network.host: \"0.0.0.0\"\n",
+                "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
+                "test: \"value\""
+            )
+            .to_owned(),
+            node_config.opensearch_config_file_content()
+        );
+    }
+
+    #[test]
+    pub fn test_tls_on_http_port_enabled() {
+        let node_config_tls_undefined = node_config(TestConfig::default());
+
+        let node_config_tls_enabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "true")],
+            ..TestConfig::default()
+        });
+
+        let node_config_tls_disabled = node_config(TestConfig {
+            config_settings: &[("plugins.security.ssl.http.enabled", "false")],
+            ..TestConfig::default()
+        });
+
+        assert!(!node_config_tls_undefined.tls_on_http_port_enabled());
+        assert!(node_config_tls_enabled.tls_on_http_port_enabled());
+        assert!(!node_config_tls_disabled.tls_on_http_port_enabled());
+    }
+
+    #[test]
+    pub fn test_value_as_bool() {
+        // boolean
+        assert_eq!(Some(true), NodeConfig::value_as_bool(&Value::Bool(true)));
+        assert_eq!(Some(false), NodeConfig::value_as_bool(&Value::Bool(false)));
+
+        // valid strings
+        assert_eq!(
+            Some(true),
+            NodeConfig::value_as_bool(&Value::String("true".to_owned()))
+        );
+        assert_eq!(
+            Some(false),
+            NodeConfig::value_as_bool(&Value::String("false".to_owned()))
+        );
+
+        // invalid strings
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::String("True".to_owned()))
+        );
+
+        // invalid types
+        assert_eq!(None, NodeConfig::value_as_bool(&Value::Null));
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::Number(
+                serde_json::Number::from_i128(1).expect("should be a valid number")
+            ))
+        );
+        assert_eq!(None, NodeConfig::value_as_bool(&Value::Array(vec![])));
+        assert_eq!(
+            None,
+            NodeConfig::value_as_bool(&Value::Object(serde_json::Map::new()))
+        );
+    }
+
+    #[test]
+    pub fn test_environment_variables() {
+        let node_config = node_config(TestConfig {
+            replicas: 2,
+            env_vars: &[("TEST", "value")],
+            ..TestConfig::default()
+        });
+
+        assert_eq!(
+            EnvVarSet::new()
+                .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
+                .with_value(
+                    &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
+                    "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1",
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("discovery.seed_hosts"),
+                    "my-opensearch-cluster-manager",
+                )
+                .with_field_path(
+                    &EnvVarName::from_str_unsafe("node.name"),
+                    FieldPathEnvVar::Name
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("node.roles"),
+                    "cluster_manager,data,ingest,remote_cluster_client"
+                ),
+            node_config.environment_variables()
+        );
+    }
+
+    #[test]
+    pub fn test_discovery_type() {
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 2,
+            ..TestConfig::default()
+        });
+
+        assert_eq!(
+            "single-node".to_owned(),
+            node_config_single_node.discovery_type()
+        );
+        assert_eq!(
+            "zen".to_owned(),
+            node_config_multiple_nodes.discovery_type()
+        );
+    }
+
+    #[test]
+    pub fn test_initial_cluster_manager_nodes() {
+        let node_config_single_node = node_config(TestConfig {
+            replicas: 1,
+            ..TestConfig::default()
+        });
+
+        let node_config_multiple_nodes = node_config(TestConfig {
+            replicas: 3,
+            ..TestConfig::default()
+        });
+
+        assert_eq!(
+            "".to_owned(),
+            node_config_single_node.initial_cluster_manager_nodes()
+        );
+        assert_eq!(
+            "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned(),
+            node_config_multiple_nodes.initial_cluster_manager_nodes()
         );
     }
 }
