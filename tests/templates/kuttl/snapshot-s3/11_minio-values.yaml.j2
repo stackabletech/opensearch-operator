@@ -1,0 +1,60 @@
+---
+global:
+  security:
+    allowInsecureImages: true
+
+image:
+  repository: bitnamilegacy/minio
+
+defaultInitContainers:
+  volumePermissions:
+    image:
+      repository: bitnamilegacy/os-shell
+
+console:
+  image:
+    repository: bitnamilegacy/minio-object-browser
+
+persistence:
+  enabled: false # "false" means, that an emptyDir is used instead of a persistentVolumeClaim
+  size: 64Mi
+
+provisioning:
+  enabled: true
+  buckets:
+    - name: opensearch
+  users:
+    - username: integrationtest
+      password: integrationtest
+      policies:
+        - readwrite
+        - consoleAdmin
+        - diagnostics
+  extraCommands:
+    - >-
+      mc admin user svcacct add
+      --access-key "$(cat /tmp/s3-credentials/s3.client.default.access_key)"
+      --secret-key "$(cat /tmp/s3-credentials/s3.client.default.secret_key)"
+      provisioning integrationtest
+  extraVolumeMounts:
+    - name: s3-credentials
+      mountPath: /tmp/s3-credentials
+  extraVolumes:
+    - name: s3-credentials
+      secret:
+        secretName: s3-credentials
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 512m
+    limits:
+      memory: 1Gi
+      cpu: "1"
+
+resources:
+  requests:
+    memory: 1Gi
+    cpu: 512m
+  limits:
+    memory: 1Gi
+    cpu: "1"
