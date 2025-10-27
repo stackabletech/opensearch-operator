@@ -215,7 +215,10 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
-        let service_scopes = vec![self.resource_names.headless_service_name()];
+        let service_scopes = vec![
+            self.resource_names.cluster_name.to_string(),
+            self.resource_names.headless_service_name().to_string(),
+        ];
 
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
@@ -261,8 +264,6 @@ impl<'a> RoleGroupBuilder<'a> {
                 self.resource_names.role_group_config_map()
             };
 
-        let requested_secret_lifetime = self.role_group_config.config.requested_secret_lifetime;
-
         let mut volumes = vec![
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
@@ -300,7 +301,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 tls_secret_class_name,
                 service_scopes,
                 SecretFormat::TlsPem,
-                &requested_secret_lifetime,
+                &self.role_group_config.config.requested_secret_lifetime,
                 Some(&LISTENER_VOLUME_NAME.to_string()),
             ))
         };

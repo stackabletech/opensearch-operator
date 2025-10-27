@@ -656,13 +656,13 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/tls/ca.crt"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -691,13 +691,13 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "/stackable/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "/stackable/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "/stackable/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "/stackable/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "/stackable/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "/stackable/tls/ca.crt"
 ---
 apiVersion: v1
 kind: Service
