@@ -68,6 +68,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use uuid::uuid;
 
@@ -77,7 +78,10 @@ mod tests {
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchClusterConfig},
+        },
         framework::{
             ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
             ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
@@ -168,6 +172,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
+            OpenSearchClusterConfig::default(),
             GenericRoleConfig::default(),
             [
                 (
@@ -210,6 +215,8 @@ mod tests {
                     vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
+                requested_secret_lifetime: Duration::from_str("15d")
+                    .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },

@@ -169,11 +169,10 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-          name: security-config
-          readOnly: true
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
+          name: security-config
           readOnly: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
@@ -256,16 +255,12 @@ spec:
       - emptyDir:
           sizeLimit: 30Mi
         name: log
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
+                secrets.stackable.tech/scope: service=opensearch,service=opensearch-nodes-cluster-manager-headless,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -275,6 +270,10 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
+      - name: security-config
+        secret:
+          defaultMode: 0o660
+          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -481,11 +480,10 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-          name: security-config
-          readOnly: true
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
           name: tls
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
+          name: security-config
           readOnly: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
@@ -568,16 +566,12 @@ spec:
       - emptyDir:
           sizeLimit: 30Mi
         name: log
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
+                secrets.stackable.tech/scope: service=opensearch,service=opensearch-nodes-data-headless,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -587,6 +581,10 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
+      - name: security-config
+        secret:
+          defaultMode: 0o660
+          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -656,13 +654,13 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "${OPENSEARCH_HOME}/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "${OPENSEARCH_HOME}/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "${OPENSEARCH_HOME}/config/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "${OPENSEARCH_HOME}/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "${OPENSEARCH_HOME}/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "${OPENSEARCH_HOME}/config/tls/ca.crt"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -691,13 +689,13 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "${OPENSEARCH_HOME}/config/tls/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "${OPENSEARCH_HOME}/config/tls/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "${OPENSEARCH_HOME}/config/tls/ca.crt"
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "${OPENSEARCH_HOME}/config/tls/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "${OPENSEARCH_HOME}/config/tls/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "${OPENSEARCH_HOME}/config/tls/ca.crt"
 ---
 apiVersion: v1
 kind: Service

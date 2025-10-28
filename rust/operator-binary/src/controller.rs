@@ -30,7 +30,7 @@ use validate::validate;
 use crate::{
     crd::{
         NodeRoles,
-        v1alpha1::{self},
+        v1alpha1::{self, OpenSearchClusterConfig},
     },
     framework::{
         ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
@@ -131,6 +131,7 @@ pub struct ValidatedOpenSearchConfig {
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
     pub node_roles: NodeRoles,
+    pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
 }
@@ -164,17 +165,20 @@ pub struct ValidatedCluster {
     pub name: ClusterName,
     pub namespace: NamespaceName,
     pub uid: Uid,
+    pub cluster_config: OpenSearchClusterConfig,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
 }
 
 impl ValidatedCluster {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         image: ResolvedProductImage,
         product_version: ProductVersion,
         name: ClusterName,
         namespace: NamespaceName,
         uid: impl Into<Uid>,
+        cluster_config: OpenSearchClusterConfig,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
     ) -> Self {
@@ -191,6 +195,7 @@ impl ValidatedCluster {
             name,
             namespace,
             uid,
+            cluster_config,
             role_config,
             role_group_configs,
         }
@@ -372,13 +377,17 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use uuid::uuid;
 
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchClusterConfig},
+        },
         framework::{
             ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
             RoleGroupName, builder::pod::container::EnvVarSet,
@@ -460,6 +469,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
+            OpenSearchClusterConfig::default(),
             GenericRoleConfig::default(),
             [
                 (
@@ -513,6 +523,8 @@ mod tests {
                     vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
+                requested_secret_lifetime: Duration::from_str("15d")
+                    .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },

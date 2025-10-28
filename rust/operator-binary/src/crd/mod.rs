@@ -30,7 +30,7 @@ use crate::{
     constant,
     framework::{
         ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
-        ProductName, RoleName, role_utils::GenericProductSpecificCommonConfig,
+        ProductName, RoleName, TlsSecretClassName, role_utils::GenericProductSpecificCommonConfig,
     },
 };
 
@@ -80,12 +80,23 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
+        pub tls: OpenSearchTls,
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchTls {
+        /// Affects client connections and internal transport connections.
+        /// This setting controls:
+        /// - If TLS encryption is used at all
+        /// - Which cert the servers should use to authenticate themselves against the client
+        pub secret_class: Option<TlsSecretClassName>,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -167,6 +178,13 @@ pub mod versioned {
         /// Consult the [node roles
         /// documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/usage-guide/node-roles) for details.
         pub node_roles: NodeRoles,
+
+        /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+        /// This can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+        ///
+        /// Defaults to 1d.
+        #[fragment_attrs(serde(default))]
+        pub requested_secret_lifetime: Duration,
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
@@ -270,6 +288,9 @@ impl v1alpha1::OpenSearchConfig {
                 v1alpha1::NodeRole::Data,
                 v1alpha1::NodeRole::RemoteClusterClient,
             ])),
+            requested_secret_lifetime: Some(
+                Duration::from_str("15d").expect("should be a valid duration"),
+            ),
             resources: ResourcesFragment {
                 memory: MemoryLimitsFragment {
                     // An idle node already requires 2 Gi.

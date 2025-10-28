@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
+    builder::{meta::ObjectMetaBuilder, pod::volume::SecretFormat},
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -49,6 +49,7 @@ use crate::{
                 container::{EnvVarName, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
+            volume::build_tls_volume,
         },
         kvp::label::{recommended_labels, role_group_selector, role_selector},
         product_logging::framework::{
@@ -70,6 +71,8 @@ constant!(DATA_VOLUME_NAME: VolumeName = "data");
 
 constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+
+constant!(TLS_VOLUME_NAME: VolumeName = "tls");
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
@@ -126,7 +129,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         data.insert(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config.static_opensearch_config_file_content(),
+            self.node_config.opensearch_config_file_content(),
         );
 
         if let ValidatedContainerLogConfigChoice::Automatic(log_config) =
@@ -212,6 +215,11 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
+        let service_scopes = vec![
+            self.resource_names.cluster_name.to_string(),
+            self.resource_names.headless_service_name().to_string(),
+        ];
+
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
         }
@@ -256,7 +264,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 self.resource_names.role_group_config_map()
             };
 
-        let volumes = vec![
+        let mut volumes = vec![
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
                 config_map: Some(ConfigMapVolumeSource {
@@ -286,6 +294,17 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..Volume::default()
             },
         ];
+
+        if let Some(tls_secret_class_name) = &self.cluster.cluster_config.tls.secret_class {
+            volumes.push(build_tls_volume(
+                &TLS_VOLUME_NAME.to_string(),
+                tls_secret_class_name,
+                service_scopes,
+                SecretFormat::TlsPem,
+                &self.role_group_config.config.requested_secret_lifetime,
+                Some(&LISTENER_VOLUME_NAME.to_string()),
+            ))
+        };
 
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
@@ -406,7 +425,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"));
 
-        let volume_mounts = [
+        let mut volume_mounts = vec![
             VolumeMount {
                 mount_path: format!("{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"),
                 name: CONFIG_VOLUME_NAME.to_string(),
@@ -439,6 +458,14 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..VolumeMount::default()
             },
         ];
+
+        if self.cluster.cluster_config.tls.secret_class.is_some() {
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls"),
+                name: TLS_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            })
+        }
 
         new_container_builder(&v1alpha1::Container::OpenSearch.to_container_name())
             .image_from_product_image(&self.cluster.image)
@@ -647,6 +674,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use strum::IntoEnumIterator;
     use uuid::uuid;
@@ -660,7 +688,10 @@ mod tests {
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchClusterConfig},
+        },
         framework::{
             ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
             OperatorName, ProductName, ProductVersion, RoleGroupName, ServiceAccountName,
@@ -722,6 +753,8 @@ mod tests {
                     v1alpha1::NodeRole::Ingest,
                     v1alpha1::NodeRole::RemoteClusterClient,
                 ]),
+                requested_secret_lifetime: Duration::from_str("15d")
+                    .expect("should be a valid duration"),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
@@ -738,6 +771,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
+            OpenSearchClusterConfig::default(),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
