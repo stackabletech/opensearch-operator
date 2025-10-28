@@ -43,8 +43,8 @@ spec:
         plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
         plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
         plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
-        s3.client.default.endpoint: http://minio:9000/
-        s3.client.default.protocol: http
+        s3.client.default.endpoint: https://minio:9000/
+        s3.client.default.protocol: https
         s3.client.default.region: unused # but required
         s3.client.default.path_style_access: "true"
     podOverrides:
@@ -74,11 +74,31 @@ spec:
               - name: keystore-secrets
                 mountPath: /stackable/opensearch/keystore-secrets
                 readOnly: true
+          - name: init-system-keystore
+            image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+            command:
+              - update-ca-trust
+            args:
+              - extract
+              - --output
+              - /stackable/ca-trust
+            volumeMounts:
+              - name: system-trust-store
+                mountPath: /stackable/ca-trust
+                readOnly: false
+              - name: s3-ca-crt
+                mountPath: /etc/pki/ca-trust/source/anchors/s3-ca.crt
+                subPath: tls.crt
+                readOnly: true
         containers:
           - name: opensearch
             volumeMounts:
               - name: security-config
                 mountPath: /stackable/opensearch/config/opensearch-security
+                readOnly: true
+              - name: system-trust-store
+                mountPath: /etc/pki/java/cacerts
+                subPath: java/cacerts
                 readOnly: true
               - name: tls
                 mountPath: /stackable/opensearch/config/tls
@@ -95,10 +115,17 @@ spec:
             secret:
               secretName: s3-credentials
               defaultMode: 0o660
+          - name: s3-ca-crt
+            secret:
+              secretName: minio-ca-crt
+              defaultMode: 0o660
           - name: security-config
             secret:
               secretName: opensearch-security-config
               defaultMode: 0o660
+          - name: system-trust-store
+            emptyDir:
+              sizeLimit: 10Mi
           - name: tls
             ephemeral:
               volumeClaimTemplate:
