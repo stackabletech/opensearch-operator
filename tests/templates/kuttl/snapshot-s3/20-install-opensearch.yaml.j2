@@ -90,8 +90,9 @@ spec:
               - name: security-config
                 mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
-              - name: tls
-                mountPath: /stackable/opensearch/config/tls
+              - name: system-trust-store
+                mountPath: /etc/pki/java/cacerts
+                subPath: java/cacerts
                 readOnly: true
               - name: keystore
                 mountPath: /stackable/opensearch/config/opensearch.keystore
@@ -113,20 +114,9 @@ spec:
             secret:
               secretName: opensearch-security-config
               defaultMode: 0o660
-          - name: tls
-            ephemeral:
-              volumeClaimTemplate:
-                metadata:
-                  annotations:
-                    secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-default-headless
-                    secrets.stackable.tech/class: tls
-                spec:
-                  storageClassName: secrets.stackable.tech
-                  accessModes:
-                    - ReadWriteOnce
-                  resources:
-                    requests:
-                      storage: "1"
+          - name: system-trust-store
+            emptyDir:
+              sizeLimit: 10Mi
 ---
 apiVersion: v1
 kind: Secret
