@@ -71,8 +71,8 @@ constant!(DATA_VOLUME_NAME: VolumeName = "data");
 
 constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+
 constant!(TLS_VOLUME_NAME: VolumeName = "tls");
-const TLS_VOLUME_DIR: &str = "/stackable/tls";
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
@@ -461,7 +461,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         if self.cluster.cluster_config.tls.secret_class.is_some() {
             volume_mounts.push(VolumeMount {
-                mount_path: TLS_VOLUME_DIR.to_owned(),
+                mount_path: format!("{opensearch_home}/config/tls"),
                 name: TLS_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             })
