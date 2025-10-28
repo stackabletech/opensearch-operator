@@ -183,15 +183,15 @@ impl NodeConfig {
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/tls.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/tls.crt".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/tls.key".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/tls.key".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/ca.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/ca.crt".to_string()),
         );
         // TLS config for TRANSPORT port
         config.insert(
@@ -200,15 +200,15 @@ impl NodeConfig {
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/tls.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/tls.crt".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/tls.key".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/tls.key".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_HOME}/config/tls/ca.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/ca.crt".to_string()),
         );
 
         config

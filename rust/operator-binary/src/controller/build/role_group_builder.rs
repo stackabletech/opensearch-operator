@@ -461,7 +461,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         if self.cluster.cluster_config.tls.secret_class.is_some() {
             volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_home}/config/tls"),
+                mount_path: format!("{opensearch_path_conf}/tls"),
                 name: TLS_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             })
