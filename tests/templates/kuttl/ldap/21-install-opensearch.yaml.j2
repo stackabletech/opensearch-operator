@@ -20,6 +20,16 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+        containers:
+          opensearch:
+            console:
+              level: DEBUG
+            file:
+              level: DEBUG
+            loggers:
+              # Successful authorizations are logged at the DEBUG level.
+              org.opensearch.security:
+                level: DEBUG
     roleGroups:
       default:
         replicas: 3
