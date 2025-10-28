@@ -169,11 +169,10 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
+        - mountPath: /stackable/tls
+          name: tls
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
-          readOnly: true
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
-          name: tls
           readOnly: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
@@ -256,16 +255,12 @@ spec:
       - emptyDir:
           sizeLimit: 30Mi
         name: log
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
+                secrets.stackable.tech/scope: service=opensearch,service=opensearch-nodes-cluster-manager-headless,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -275,6 +270,10 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
+      - name: security-config
+        secret:
+          defaultMode: 0o660
+          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -481,11 +480,10 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
+        - mountPath: /stackable/tls
+          name: tls
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
-          readOnly: true
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
-          name: tls
           readOnly: true
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
@@ -568,16 +566,12 @@ spec:
       - emptyDir:
           sizeLimit: 30Mi
         name: log
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
       - ephemeral:
           volumeClaimTemplate:
             metadata:
               annotations:
                 secrets.stackable.tech/class: tls
-                secrets.stackable.tech/scope: node,pod,service=opensearch-nodes-data-headless
+                secrets.stackable.tech/scope: service=opensearch,service=opensearch-nodes-data-headless,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -587,6 +581,10 @@ spec:
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
         name: tls
+      - name: security-config
+        secret:
+          defaultMode: 0o660
+          secretName: opensearch-security-config
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
