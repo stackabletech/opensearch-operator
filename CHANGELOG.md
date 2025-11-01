@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Helm: Allow Pod `priorityClassName` to be configured ([#34]).
 - Support log configuration and log aggregation ([#40]).
 - Ensure that the permissions of the configuration files are correct ([#47]).
+- Add the role-group as a node attribute ([#63]).
 
 ### Changed
 
@@ -41,3 +42,4 @@ All notable changes to this project will be documented in this file.
 [#40]: https://github.com/stackabletech/opensearch-operator/pull/40
 [#47]: https://github.com/stackabletech/opensearch-operator/pull/47
 [#58]: https://github.com/stackabletech/opensearch-operator/pull/58
+[#63]: https://github.com/stackabletech/opensearch-operator/pull/63
