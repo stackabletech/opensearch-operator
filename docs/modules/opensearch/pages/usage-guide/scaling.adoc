@@ -1,0 +1,255 @@
+= Scaling OpenSearch clusters
+:description: OpenSearch clusters can be scaled after provisioning but manual steps are required.
+
+OpenSearch clusters can be scaled after provisioning.
+CPU and memory settings can be easily adapted as described in xref:opensearch:usage-guide/storage-resource-configuration.adoc#_resource_requests[Resource Requests].
+But for changing the number of nodes or resizing the volumes, the following points must be noted.
+
+Horizontal scaling, i.e. changing the replica count of role-groups, can be easily done for non-data nodes by adapting the OpenSearchCluster specification.
+The number of data nodes can also be increased.
+But decreasing the number of data nodes requires manual steps because if a pod which manages data is just shut down then its data is not reachable anymore.
+Manual steps are required to drain the data from the nodes before removing them.
+
+Vertical scaling, i.e. changing the volume size of nodes, is not supported by the operator.
+If the size of a volume can be changed depends on its CSI driver.
+OpenSearch supports multiple data paths in one data node, but adding volumes in additional data paths usually does not solve the problem of low disk space because the data is not rebalanced across multiple data paths.
+
+[NOTE]
+====
+The OpenSearch operator is still in an early stage and as development progresses, smart scaling (adapting resources without data loss) and auto scaling (scaling the cluster according to the load) will be eventually supported by the operator.
+====
+
+== Manually scaling
+
+As mentioned above, scaling is quite a demanding task but there exists an easy workaround which will be presented here.
+
+For instance, the following OpenSearchCluster with three custer-manager nodes and five small data nodes is already deployed:
+
+[source,yaml]
+----
+spec:
+  nodes:
+    roleGroups:
+      cluster-manager:
+        config:
+          nodeRoles:
+          - cluster_manager
+        replicas: 3
+      data-small:
+        config:
+          nodeRoles:
+          - data
+          - ingest
+          - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 10Gi
+        replicas: 5
+----
+
+Now, you decide that instead of five small data nodes, three large data nodes are better suited.
+To achieve this, you can replace the role-group `data-small` with a desired one.
+
+First, add the new role-group `data-large` with three replicas and a capacity of 100Gi per node:
+
+[source,yaml]
+----
+spec:
+  nodes:
+    roleGroups:
+      cluster-manager:
+        config:
+          nodeRoles:
+          - cluster_manager
+        replicas: 3
+      data-small:
+        config:
+          nodeRoles:
+          - data
+          - ingest
+          - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 10Gi
+        replicas: 5
+      data-large:
+        config:
+          nodeRoles:
+          - data
+          - ingest
+          - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 100Gi
+        replicas: 3
+----
+
+The data must now be moved from `data-small` to `data-large`.
+With the cluster setting `cluster.routing.allocation.exclude`, nodes can be excluded from shard allocation.
+If you did not disable the rebalancing, then existing data will be moved from the specified nodes to the allowed ones, in the example case from `data-small` to `data-large`.
+
+[TIP]
+====
+The OpenSearch operator adds a role-group attribute to every OpenSearch node, so that it is easier to reference all nodes belonging to a role-group.
+====
+
+The following REST call excludes the role-group `data-small` from the shard allocation:
+
+[source,http]
+----
+PUT _cluster/settings
+{
+  "persistent": {
+    "cluster": {
+      "routing": {
+        "allocation.exclude": {
+          "role-group": "data-small"
+        }
+      }
+    }
+  }
+}
+----
+
+You have to wait now until all the data has been moved from `data-small` to `data-large`.
+The current shard allocation can be requested at the `_cat/shards` endpoint, e.g.:
+
+[source,http]
+----
+GET _cat/shards?v
+index shard prirep state      docs    store ip          node
+logs  0     r      STARTED    14074   6.9mb 10.244.0.60 opensearch-nodes-data-large-2
+logs  0     p      RELOCATING 14074   8.5mb 10.244.0.52 opensearch-nodes-data-small-4
+    -> 10.244.0.59 NFjQBBmWSm-pijXcxrXnvQ opensearch-nodes-data-large-1
+...
+
+GET _cat/shards?v
+index shard prirep state   docs    store ip          node
+logs  0     r      STARTED 14074   6.9mb 10.244.0.60 opensearch-nodes-data-large-2
+logs  0     p      STARTED 14074   6.9mb 10.244.0.59 opensearch-nodes-data-large-1
+...
+----
+
+The statistics, especially the document count, can be retrieved at the `_nodes/role-group:data-small/stats` endpoint, e.g.:
+
+[source,http]
+----
+GET _nodes/role-group:data-small/stats/indices/docs
+{
+  "_nodes": {
+    "total": 5,
+    "successful": 5,
+    "failed": 0
+  },
+  "cluster_name": "opensearch",
+  "nodes": {
+    "wjaeQJUXQX6eNWYUeiScgQ": {
+      "timestamp": 1761992580239,
+      "name": "opensearch-nodes-data-small-4",
+      "transport_address": "10.244.0.52:9300",
+      "host": "10.244.0.52",
+      "ip": "10.244.0.52:9300",
+      "roles": [
+        "data",
+        "ingest",
+        "remote_cluster_client"
+      ],
+      "attributes": {
+        "role-group": "data-small",
+        "shard_indexing_pressure_enabled": "true"
+      },
+      "indices": {
+        "docs": {
+          "count": 14686,
+          "deleted": 0
+        }
+      }
+    },
+    ...
+  }
+}
+
+GET _nodes/role-group:data-small/stats/indices/docs
+{
+  "_nodes": {
+    "total": 5,
+    "successful": 5,
+    "failed": 0
+  },
+  "cluster_name": "opensearch",
+  "nodes": {
+    "wjaeQJUXQX6eNWYUeiScgQ": {
+      "timestamp": 1761992817422,
+      "name": "opensearch-nodes-data-small-4",
+      "transport_address": "10.244.0.52:9300",
+      "host": "10.244.0.52",
+      "ip": "10.244.0.52:9300",
+      "roles": [
+        "data",
+        "ingest",
+        "remote_cluster_client"
+      ],
+      "attributes": {
+        "role-group": "data-small",
+        "shard_indexing_pressure_enabled": "true"
+      },
+      "indices": {
+        "docs": {
+          "count": 0,
+          "deleted": 0
+        }
+      }
+    },
+    ...
+  }
+}
+
+----
+
+When all shards were transferred, the role-group `data-small` can just be removed from the OpenSearchCluster specification:
+
+[source,yaml]
+----
+spec:
+  nodes:
+    roleGroups:
+      cluster-manager:
+        config:
+          nodeRoles:
+          - cluster_manager
+        replicas: 3
+      data-large:
+        config:
+          nodeRoles:
+          - data
+          - ingest
+          - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 100Gi
+        replicas: 3
+----
+
+Finally, the shard exclusion should be removed again from the cluster settings:
+
+[source,http]
+----
+PUT _cluster/settings
+{
+  "persistent": {
+    "cluster": {
+      "routing": {
+        "allocation.exclude": {
+          "role-group": null
+        }
+      }
+    }
+  }
+}
+----
+
+If your OpenSearch clients only used the service of the cluster-manager nodes to connect to the cluster, the switch from one to another data role-group should have been transparent for them.
