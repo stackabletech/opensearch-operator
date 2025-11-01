@@ -13,7 +13,7 @@ nodes:
       config:
         resources:
           storage:
-            logDirs:
+            data:
               capacity: 50Gi
 ----
 
