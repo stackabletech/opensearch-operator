@@ -28,6 +28,10 @@ All notable changes to this project will be documented in this file.
 - Support log configuration and log aggregation ([#40]).
 - Ensure that the permissions of the configuration files are correct ([#47]).
 
+### Changed
+
+- Bump stackable-operator to `0.100.1` ([#58]).
+
 [#10]: https://github.com/stackabletech/opensearch-operator/pull/10
 [#17]: https://github.com/stackabletech/opensearch-operator/pull/17
 [#18]: https://github.com/stackabletech/opensearch-operator/pull/18
@@ -36,3 +40,4 @@ All notable changes to this project will be documented in this file.
 [#38]: https://github.com/stackabletech/opensearch-operator/pull/38
 [#40]: https://github.com/stackabletech/opensearch-operator/pull/40
 [#47]: https://github.com/stackabletech/opensearch-operator/pull/47
+[#58]: https://github.com/stackabletech/opensearch-operator/pull/58
