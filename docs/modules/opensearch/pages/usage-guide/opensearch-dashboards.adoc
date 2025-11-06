@@ -13,7 +13,7 @@ A basic `values.yaml` file to deploy OpenSearch Dashboards with this chart might
 opensearchHosts: https://opensearch.<opensearch-namespace>.svc.cluster.local:9200 # <1>
 image:
   repository: oci.stackable.tech/sdp/opensearch-dashboards # <2>
-  tag: 3.1.0-stackable0.0.0-dev
+  tag: 3.1.0-stackable25.11.0-rc1
 serviceAccount: # <3>
   create: false
   name: opensearch-serviceaccount
