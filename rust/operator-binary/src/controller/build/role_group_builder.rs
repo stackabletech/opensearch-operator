@@ -72,7 +72,8 @@ constant!(DATA_VOLUME_NAME: VolumeName = "data");
 constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
-constant!(TLS_VOLUME_NAME: VolumeName = "tls");
+constant!(TLS_REST_VOLUME_NAME: VolumeName = "tls-rest");
+constant!(TLS_TRANSPORT_VOLUME_NAME: VolumeName = "tls-transport");
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
@@ -215,10 +216,7 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
-        let service_scopes = vec![
-            self.resource_names.cluster_name.to_string(),
-            self.resource_names.headless_service_name().to_string(),
-        ];
+        let service_scopes = vec![self.node_config.discovery_service_name.clone()];
 
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
@@ -293,12 +291,21 @@ impl<'a> RoleGroupBuilder<'a> {
                 }),
                 ..Volume::default()
             },
+            build_tls_volume(
+                &TLS_TRANSPORT_VOLUME_NAME.to_string(),
+                &self.cluster.cluster_config.tls.transport_secret_class,
+                service_scopes.clone(),
+                SecretFormat::TlsPem,
+                &self.role_group_config.config.requested_secret_lifetime,
+                Some(&LISTENER_VOLUME_NAME.to_string()),
+            ),
         ];
 
-        if let Some(tls_secret_class_name) = &self.cluster.cluster_config.tls.secret_class {
+        if let Some(tls_rest_secret_class_name) = &self.cluster.cluster_config.tls.rest_secret_class
+        {
             volumes.push(build_tls_volume(
-                &TLS_VOLUME_NAME.to_string(),
-                tls_secret_class_name,
+                &TLS_REST_VOLUME_NAME.to_string(),
+                tls_rest_secret_class_name,
                 service_scopes,
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
@@ -457,12 +464,17 @@ impl<'a> RoleGroupBuilder<'a> {
                 name: LOG_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/transport"),
+                name: TLS_TRANSPORT_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            },
         ];
 
-        if self.cluster.cluster_config.tls.secret_class.is_some() {
+        if self.cluster.cluster_config.tls.rest_secret_class.is_some() {
             volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls"),
-                name: TLS_VOLUME_NAME.to_string(),
+                mount_path: format!("{opensearch_path_conf}/tls/rest"),
+                name: TLS_REST_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             })
         }

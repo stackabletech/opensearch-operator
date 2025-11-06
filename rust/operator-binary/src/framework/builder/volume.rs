@@ -4,12 +4,12 @@ use stackable_operator::{
     shared::time::Duration,
 };
 
-use crate::framework::TlsSecretClassName;
+use crate::framework::{SecretClassName, ServiceName};
 
 pub fn build_tls_volume(
     volume_name: &String,
-    tls_secret_class_name: &TlsSecretClassName,
-    service_scopes: impl IntoIterator<Item = impl AsRef<str>>,
+    tls_secret_class_name: &SecretClassName,
+    service_scopes: Vec<ServiceName>,
     secret_format: SecretFormat,
     requested_secret_lifetime: &Duration,
     listener_scope: Option<&str>,
@@ -18,7 +18,7 @@ pub fn build_tls_volume(
         SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
 
     for scope in service_scopes {
-        secret_volume_source_builder.with_service_scope(scope.as_ref());
+        secret_volume_source_builder.with_service_scope(scope);
     }
     if let Some(listener_scope) = listener_scope {
         secret_volume_source_builder.with_listener_volume_scope(listener_scope);

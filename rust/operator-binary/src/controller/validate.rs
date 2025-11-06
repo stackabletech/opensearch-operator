@@ -74,9 +74,6 @@ pub enum Error {
         source: crate::framework::product_logging::framework::Error,
     },
 
-    #[snafu(display("failed to set tls secret class"))]
-    ParseTlsSecretClassName { source: crate::framework::Error },
-
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
@@ -282,7 +279,7 @@ mod tests {
         },
         framework::{
             ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
-            OperatorName, ProductName, ProductVersion, RoleGroupName, TlsSecretClassName,
+            OperatorName, ProductName, ProductVersion, RoleGroupName, SecretClassName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
@@ -311,7 +308,8 @@ mod tests {
                 uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
                 OpenSearchClusterConfig {
                     tls: OpenSearchTls {
-                        secret_class: Some(TlsSecretClassName::from_str_unsafe("tls"))
+                        rest_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                        transport_secret_class: SecretClassName::from_str_unsafe("tls")
                     },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator"
@@ -678,7 +676,8 @@ mod tests {
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
                     tls: OpenSearchTls {
-                        secret_class: Some(TlsSecretClassName::from_str_unsafe("tls")),
+                        rest_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                        transport_secret_class: SecretClassName::from_str_unsafe("tls"),
                     },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",

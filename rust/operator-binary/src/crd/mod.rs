@@ -30,11 +30,12 @@ use crate::{
     constant,
     framework::{
         ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
-        ProductName, RoleName, TlsSecretClassName, role_utils::GenericProductSpecificCommonConfig,
+        ProductName, RoleName, SecretClassName, role_utils::GenericProductSpecificCommonConfig,
     },
 };
 
 constant!(DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
+constant!(TLS_DEFAULT_SECRET_CLASS: SecretClassName = "tls");
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -80,6 +81,8 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
+        /// TLS configuration options for the REST API and internal communication (transport).
+        #[serde(default)]
         pub tls: OpenSearchTls,
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
@@ -89,14 +92,24 @@ pub mod versioned {
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchTls {
-        /// Affects client connections and internal transport connections.
+        /// Only affects client connections to the REST API.
         /// This setting controls:
         /// - If TLS encryption is used at all
         /// - Which cert the servers should use to authenticate themselves against the client
-        pub secret_class: Option<TlsSecretClassName>,
+        #[serde(
+            default = "rest_secret_class_default",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub rest_secret_class: Option<SecretClassName>,
+        /// Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
+        /// This setting controls:
+        /// - Which cert the servers should use to authenticate themselves against other servers
+        /// - Which ca.crt to use when validating the other server
+        #[serde(default = "transport_secret_class_default")]
+        pub transport_secret_class: SecretClassName,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -318,6 +331,23 @@ impl v1alpha1::OpenSearchConfig {
             },
         }
     }
+}
+
+impl Default for v1alpha1::OpenSearchTls {
+    fn default() -> Self {
+        v1alpha1::OpenSearchTls {
+            rest_secret_class: rest_secret_class_default(),
+            transport_secret_class: transport_secret_class_default(),
+        }
+    }
+}
+
+fn rest_secret_class_default() -> Option<SecretClassName> {
+    Some(TLS_DEFAULT_SECRET_CLASS.to_owned())
+}
+
+fn transport_secret_class_default() -> SecretClassName {
+    TLS_DEFAULT_SECRET_CLASS.to_owned()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]

@@ -97,7 +97,7 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &
 pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_config: OpenSearchRoleGroupConfig,
-    discovery_service_name: ServiceName,
+    pub discovery_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -123,9 +123,7 @@ impl NodeConfig {
     pub fn opensearch_config(&self) -> serde_json::Map<String, Value> {
         let mut config = self.static_opensearch_config();
 
-        if self.cluster.cluster_config.tls.secret_class.is_some() {
-            config.append(&mut self.tls_config());
-        }
+        config.append(&mut self.tls_config());
 
         for (setting, value) in self
             .role_group_config
@@ -176,40 +174,48 @@ impl NodeConfig {
     pub fn tls_config(&self) -> serde_json::Map<String, Value> {
         let mut config = serde_json::Map::new();
 
-        // TLS config for HTTP port
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
-            json!("true".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/tls.crt".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/tls.key".to_string()),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/ca.crt".to_string()),
-        );
-        // TLS config for TRANSPORT port
+        // TLS config for TRANSPORT port which is always enabled.
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
             json!("true".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/tls.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/transport/tls.crt".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/tls.key".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/transport/tls.key".to_string()),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!("${OPENSEARCH_PATH_CONF}/tls/ca.crt".to_string()),
+            json!("${OPENSEARCH_PATH_CONF}/tls/transport/ca.crt".to_string()),
         );
+
+        // TLS config for HTTP port which is optional.
+        if self.cluster.cluster_config.tls.rest_secret_class.is_some() {
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
+                json!("true".to_string()),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
+                json!("${OPENSEARCH_PATH_CONF}/tls/rest/tls.crt".to_string()),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
+                json!("${OPENSEARCH_PATH_CONF}/tls/rest/tls.key".to_string()),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+                json!("${OPENSEARCH_PATH_CONF}/tls/rest/ca.crt".to_string()),
+            );
+        } else {
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
+                json!("false".to_string()),
+            );
+        }
 
         config
     }

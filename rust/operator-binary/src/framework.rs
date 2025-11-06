@@ -79,9 +79,6 @@ pub enum Error {
 /// Duplicates the private constant [`stackable-operator::kvp::label::value::LABEL_VALUE_MAX_LEN`]
 pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 
-/// Maximum length of annotation values
-pub const MAX_ANNOTATION_LENGTH: usize = 253;
-
 /// Has a non-empty name
 ///
 /// Useful as an object reference; Should not be used to create an object because the name could
@@ -516,11 +513,12 @@ attributed_string_type! {
     is_valid_label_value
 }
 attributed_string_type! {
-    TlsSecretClassName,
+    SecretClassName,
     "The TLS SecretClass name",
     "tls",
-    // The secret class name is used in an annotation on the tls volume. To make sure the
-    (max_length = MAX_ANNOTATION_LENGTH - 30)
+    // The secret class name is used in an annotation on the tls volume.
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    is_rfc_1123_dns_subdomain_name
 }
 #[cfg(test)]
 mod tests {

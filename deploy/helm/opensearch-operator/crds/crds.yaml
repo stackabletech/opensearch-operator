@@ -31,20 +31,36 @@ spec:
                 clusterConfig:
                   default:
                     tls:
-                      secretClass: null
+                      restSecretClass: tls
+                      transportSecretClass: tls
                   description: Configuration that applies to all roles and role groups
                   properties:
                     tls:
+                      default:
+                        restSecretClass: tls
+                        transportSecretClass: tls
+                      description: TLS configuration options for the REST API and internal communication (transport).
                       properties:
-                        secretClass:
+                        restSecretClass:
+                          default: tls
                           description: |-
-                            Affects client connections and internal transport connections.
+                            Only affects client connections to the REST API.
                             This setting controls:
                             - If TLS encryption is used at all
                             - Which cert the servers should use to authenticate themselves against the client
-                          maxLength: 223
+                          maxLength: 253
                           minLength: 1
                           nullable: true
+                          type: string
+                        transportSecretClass:
+                          default: tls
+                          description: |-
+                            Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
+                            This setting controls:
+                            - Which cert the servers should use to authenticate themselves against other servers
+                            - Which ca.crt to use when validating the other server
+                          maxLength: 253
+                          minLength: 1
                           type: string
                       type: object
                     vectorAggregatorConfigMapName:
@@ -57,8 +73,6 @@ spec:
                       minLength: 1
                       nullable: true
                       type: string
-                  required:
-                    - tls
                   type: object
                 clusterOperation:
                   default:
