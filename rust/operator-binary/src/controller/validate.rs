@@ -272,6 +272,7 @@ mod tests {
 
     use super::{ErrorDiscriminants, validate};
     use crate::{
+        built_info,
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
         crd::{
             NodeRoles,
@@ -296,9 +297,15 @@ mod tests {
             Some(ValidatedCluster::new(
                 ResolvedProductImage {
                     product_version: "3.1.0".to_owned(),
-                    app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
-                        .expect("should be a valid label value"),
-                    image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                    app_version_label_value: LabelValue::from_str(&format!(
+                        "3.1.0-stackable{pkg_version}",
+                        pkg_version = built_info::PKG_VERSION
+                    ))
+                    .expect("should be a valid label value"),
+                    image: format!(
+                        "oci.stackable.tech/sdp/opensearch:3.1.0-stackable{pkg_version}",
+                        pkg_version = built_info::PKG_VERSION
+                    ),
                     image_pull_policy: "Always".to_owned(),
                     pull_secrets: None,
                 },
