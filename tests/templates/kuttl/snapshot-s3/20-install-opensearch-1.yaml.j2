@@ -2,7 +2,7 @@
 apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
 metadata:
-  name: opensearch
+  name: opensearch-1
 spec:
   image:
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
@@ -33,6 +33,9 @@ spec:
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.allow_default_init_securityindex: "true"
+        # TODO This is insecure. Use a proper certificate!
+        plugins.security.authcz.admin_dn: CN=generated certificate for pod
+        plugins.security.restapi.roles_enabled: all_access
         plugins.security.ssl.transport.enabled: "true"
         plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
         plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
@@ -127,7 +130,7 @@ spec:
               defaultMode: 0o660
           - name: security-config
             secret:
-              secretName: opensearch-security-config
+              secretName: opensearch-1-security-config
               defaultMode: 0o660
           - name: system-trust-store
             emptyDir:
@@ -137,7 +140,7 @@ spec:
               volumeClaimTemplate:
                 metadata:
                   annotations:
-                    secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-default-headless
+                    secrets.stackable.tech/scope: node,pod,service=opensearch-1,service=opensearch-1-nodes-default,service=opensearch-1-nodes-default-headless,listener-volume=listener
                     secrets.stackable.tech/class: tls
                 spec:
                   storageClassName: secrets.stackable.tech
@@ -150,7 +153,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: opensearch-security-config
+  name: opensearch-1-security-config
 stringData:
   action_groups.yml: |
     ---

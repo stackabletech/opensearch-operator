@@ -6,6 +6,6 @@ timeout: 600
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: create-snapshot
+  name: restore-snapshot
 status:
   succeeded: 1

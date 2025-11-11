@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: test-snapshot
+  name: create-snapshot
 spec:
   template:
     spec:
       containers:
-        - name: test-snapshot
+        - name: create-snapshot
           image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
           command:
             - /bin/bash
@@ -17,7 +17,7 @@ spec:
           args:
             - |
               pip install opensearch-py==3.0.0
-              python scripts/test.py
+              python scripts/create-snapshot.py
           env:
             # required for pip install
             - name: HOME
@@ -47,7 +47,7 @@ spec:
       volumes:
         - name: script
           configMap:
-            name: test-opensearch
+            name: create-snapshot-script
         - name: tls
           ephemeral:
             volumeClaimTemplate:
@@ -69,51 +69,26 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-opensearch
+  name: create-snapshot-script
 data:
-  test.py: |
+  create-snapshot.py: |
     import os
     from opensearchpy import OpenSearch
     from opensearchpy.exceptions import RequestError
 
     namespace = os.environ['NAMESPACE']
 
-    host = f'opensearch.{namespace}.svc.cluster.local'
-    port = 9200
-    auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
-    ca_certs_path = '/stackable/tls/ca.crt'
-
     client = OpenSearch(
-        hosts = [{'host': host, 'port': port}],
-        http_compress = True,
-        http_auth = auth,
-        use_ssl = True,
-        verify_certs = True,
-        ca_certs = ca_certs_path
+      hosts=[{
+        'host': f'opensearch-1-nodes-default.{namespace}.svc.cluster.local',
+        'port': 9200
+      }],
+      http_auth=('admin', 'AJVFsGJBbpT6mChn'),
+      http_compress=True,
+      use_ssl=True,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
     )
-
-    # Create an index
-    index_name = 'test-index'
-
-    try:
-      response = client.indices.create(index=index_name)
-      print(f'Creating index; {response=}')
-    except RequestError as err:
-      if err.error == 'resource_already_exists_exception':
-        print(f'The index was already created in a prior test run; {index_name=}')
-      else:
-        raise
-
-    # Add a document to the index
-    response = client.index(
-      index = index_name,
-      body = {
-        'name': 'Stackable'
-      },
-      id = 1,
-    )
-
-    print(f'Adding document; {response=}')
 
     # Create snapshot repository
     snapshot_repository = "snapshot_repository"
@@ -123,7 +98,7 @@ data:
       body={
         "type": "s3",
         "settings": {
-          "bucket": "opensearch"
+          "bucket": "opensearch-data"
         }
       }
     )
@@ -136,10 +111,7 @@ data:
     try:
       response = client.snapshot.create(
         repository=snapshot_repository,
-        snapshot=snapshot,
-        body={
-          "indices": index_name
-        }
+        snapshot=snapshot
       )
       print(f'Creating snapshot; {response=}')
     except RequestError as err:
@@ -147,8 +119,3 @@ data:
         print(f'The snapshot was already created in a prior test run; {snapshot=}')
       else:
         raise
-
-    # Delete the index.
-    response = client.indices.delete(index=index_name)
-
-    print(f'Deleting index; {response=}')

@@ -6,6 +6,6 @@ timeout: 600
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: create-snapshot
+  name: test-opensearch-2
 status:
   succeeded: 1

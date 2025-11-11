@@ -1,0 +1,115 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-data
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-data
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/create-data.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: create-data-script
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: create-data-script
+data:
+  create-data.py: |
+    import os
+    from opensearchpy import OpenSearch
+    from opensearchpy.exceptions import RequestError
+
+    namespace = os.environ['NAMESPACE']
+
+    # Login as test user
+    client = OpenSearch(
+      http_auth=('testuser', 'L9hUHtLVVEsrcLzZ'),
+      hosts=[{
+        'host': f'opensearch-1-nodes-default.{namespace}.svc.cluster.local',
+        'port': 9200
+      }],
+      http_compress=True,
+      use_ssl=True,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
+    )
+
+    # Create an index
+    index_name = 'test-index'
+
+    try:
+      response = client.indices.create(index=index_name)
+      print(f'Creating index; {response=}')
+    except RequestError as err:
+      if err.error == 'resource_already_exists_exception':
+        print(f'The index was already created in a prior test run; {index_name=}')
+      else:
+        raise
+
+    # Add a document to the index
+    response = client.index(
+      index=index_name,
+      body={
+        'name': 'Stackable'
+      },
+      id=1,
+    )
+
+    print(f'Adding document; {response=}')

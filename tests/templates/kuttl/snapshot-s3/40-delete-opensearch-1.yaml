@@ -1,0 +1,7 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    kind: OpenSearchCluster
+    name: opensearch-1
