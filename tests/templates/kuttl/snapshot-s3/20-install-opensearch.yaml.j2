@@ -7,10 +7,8 @@ spec:
   image:
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
     custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
-{% else %}
-    productVersion: "{{ test_scenario['values']['opensearch'] }}"
 {% endif %}
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
   clusterConfig:
@@ -51,7 +49,11 @@ spec:
       spec:
         initContainers:
           - name: init-keystore
-            image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
             command:
               - /bin/bash
               - -euxo
@@ -75,7 +77,11 @@ spec:
                 mountPath: /stackable/opensearch/keystore-secrets
                 readOnly: true
           - name: init-system-keystore
-            image: oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
             command:
               - update-ca-trust
             args:
