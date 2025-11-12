@@ -9,6 +9,10 @@ dimensions:
   - name: opensearch_home
     values:
       - /stackable/opensearch
+  # The release must sometimes be known in podOverrides or Helm values
+  - name: release
+    values:
+      - 25.11.0
 tests:
   - name: smoke
     dimensions:
@@ -34,10 +38,12 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
+      - release
   # requires the repository-s3 plugin
   - name: snapshot-s3
     dimensions:
       - opensearch
+      - release
 suites:
   - name: nightly
     patch:
