@@ -18,7 +18,7 @@ OpenSearch allows for multiple data paths within a single data node, but adding 
 [NOTE]
 ====
 The OpenSearch operator is currently in the early stages of development.
-As progress continues, smart scaling (adapting resources without data loss) and auto scaling (scaling the cluster based on load) will eventually be supported.
+Smart scaling (adapting resources without data loss) and auto scaling (scaling the cluster based on load) are not supported.
 ====
 
 == Manually scaling
