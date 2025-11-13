@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add the role group as a node attribute ([#63]).
+
+[#63]: https://github.com/stackabletech/opensearch-operator/pull/63
+
 ## [25.11.0] - 2025-11-07
 
 ## [25.11.0-rc1] - 2025-11-06
