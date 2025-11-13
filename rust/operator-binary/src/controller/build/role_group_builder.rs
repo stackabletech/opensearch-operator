@@ -107,6 +107,7 @@ impl<'a> RoleGroupBuilder<'a> {
             cluster: cluster.clone(),
             node_config: NodeConfig::new(
                 cluster.clone(),
+                role_group_name.clone(),
                 role_group_config.clone(),
                 discovery_service_name,
             ),

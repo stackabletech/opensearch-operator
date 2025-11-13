@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add the role group as a node attribute ([#63]).
+
+[#63]: https://github.com/stackabletech/opensearch-operator/pull/63
+
+## [25.11.0] - 2025-11-07
+
+## [25.11.0-rc1] - 2025-11-06
+
+### Added
+
 - Add end-of-support checker which can be controlled with environment variables and CLI arguments ([#38]).
   - `EOS_CHECK_MODE` (`--eos-check-mode`) to set the EoS check mode. Currently, only "offline" is supported.
   - `EOS_INTERVAL` (`--eos-interval`) to set the interval in which the operator checks if it is EoS.

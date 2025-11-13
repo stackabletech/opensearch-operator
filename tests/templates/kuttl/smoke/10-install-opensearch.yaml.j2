@@ -7,10 +7,8 @@ spec:
   image:
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
     custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
-    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
-{% else %}
-    productVersion: "{{ test_scenario['values']['opensearch'] }}"
 {% endif %}
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
 {% if test_scenario['values']['http-use-tls'] == 'false' %}

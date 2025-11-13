@@ -10,7 +10,7 @@ use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{
-        ServiceName,
+        RoleGroupName, ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
     },
@@ -40,6 +40,10 @@ pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
 /// Binds an OpenSearch node to an address.
 /// Type: string
 pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
+
+/// The custom node attribute "role-group"
+/// Type: string
+pub const CONFIG_OPTION_NODE_ATTR_ROLE_GROUP: &str = "node.attr.role-group";
 
 /// A descriptive name for the node.
 /// Type: string
@@ -98,6 +102,7 @@ const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
     cluster: ValidatedCluster,
+    role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
     pub discovery_service_name: ServiceName,
 }
@@ -107,11 +112,13 @@ pub struct NodeConfig {
 impl NodeConfig {
     pub fn new(
         cluster: ValidatedCluster,
+        role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
         discovery_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
+            role_group_name,
             role_group_config,
             discovery_service_name,
         }
@@ -169,6 +176,10 @@ impl NodeConfig {
                  CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN.to_owned(),
                  json!(["CN=generated certificate for pod".to_owned()]),
              );
+        config.insert(
+            CONFIG_OPTION_NODE_ATTR_ROLE_GROUP.to_owned(),
+            json!(self.role_group_name),
+        );
 
         config
     }
@@ -424,6 +435,8 @@ mod tests {
         let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
             .expect("should be a valid ProductImage");
 
+        let role_group_name = RoleGroupName::from_str_unsafe("data");
+
         let role_group_config = OpenSearchRoleGroupConfig {
             replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
@@ -490,6 +503,7 @@ mod tests {
 
         NodeConfig::new(
             cluster,
+            role_group_name,
             role_group_config,
             ServiceName::from_str_unsafe("my-opensearch-cluster-manager"),
         )
@@ -507,6 +521,7 @@ mod tests {
                 "cluster.name: \"my-opensearch-cluster\"\n",
                 "discovery.type: \"zen\"\n",
                 "network.host: \"0.0.0.0\"\n",
+                "node.attr.role-group: \"data\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: \"true\"\n",
                 "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/http/tls.crt\"\n",
