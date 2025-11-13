@@ -100,10 +100,10 @@ pub mod versioned {
         /// - If TLS encryption is used at all
         /// - Which cert the servers should use to authenticate themselves against the client
         #[serde(
-            default = "rest_secret_class_default",
+            default = "http_secret_class_default",
             skip_serializing_if = "Option::is_none"
         )]
-        pub rest_secret_class: Option<SecretClassName>,
+        pub http_secret_class: Option<SecretClassName>,
         /// Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
         /// This setting controls:
         /// - Which cert the servers should use to authenticate themselves against other servers
@@ -302,7 +302,7 @@ impl v1alpha1::OpenSearchConfig {
                 v1alpha1::NodeRole::RemoteClusterClient,
             ])),
             requested_secret_lifetime: Some(
-                Duration::from_str("15d").expect("should be a valid duration"),
+                Duration::from_str("1d").expect("should be a valid duration"),
             ),
             resources: ResourcesFragment {
                 memory: MemoryLimitsFragment {
@@ -336,13 +336,13 @@ impl v1alpha1::OpenSearchConfig {
 impl Default for v1alpha1::OpenSearchTls {
     fn default() -> Self {
         v1alpha1::OpenSearchTls {
-            rest_secret_class: rest_secret_class_default(),
+            http_secret_class: http_secret_class_default(),
             transport_secret_class: transport_secret_class_default(),
         }
     }
 }
 
-fn rest_secret_class_default() -> Option<SecretClassName> {
+fn http_secret_class_default() -> Option<SecretClassName> {
     Some(TLS_DEFAULT_SECRET_CLASS.to_owned())
 }
 

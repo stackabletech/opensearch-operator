@@ -31,17 +31,17 @@ spec:
                 clusterConfig:
                   default:
                     tls:
-                      restSecretClass: tls
+                      httpSecretClass: tls
                       transportSecretClass: tls
                   description: Configuration that applies to all roles and role groups
                   properties:
                     tls:
                       default:
-                        restSecretClass: tls
+                        httpSecretClass: tls
                         transportSecretClass: tls
                       description: TLS configuration options for the REST API and internal communication (transport).
                       properties:
-                        restSecretClass:
+                        httpSecretClass:
                           default: tls
                           description: |-
                             Only affects client connections to the REST API.

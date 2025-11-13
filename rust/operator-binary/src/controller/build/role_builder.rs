@@ -242,7 +242,7 @@ mod tests {
         },
         crd::{
             NodeRoles,
-            v1alpha1::{self, OpenSearchClusterConfig},
+            v1alpha1::{self, OpenSearchTls},
         },
         framework::{
             ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
@@ -280,7 +280,7 @@ mod tests {
                     v1alpha1::NodeRole::Ingest,
                     v1alpha1::NodeRole::RemoteClusterClient,
                 ]),
-                requested_secret_lifetime: Duration::from_str("15d")
+                requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
@@ -305,13 +305,13 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
-            OpenSearchClusterConfig::default(),
             GenericRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
                 role_group_config.clone(),
             )]
             .into(),
+            OpenSearchTls::default(),
         );
 
         RoleBuilder::new(cluster, context_names)

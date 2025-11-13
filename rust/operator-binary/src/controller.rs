@@ -30,7 +30,7 @@ use validate::validate;
 use crate::{
     crd::{
         NodeRoles,
-        v1alpha1::{self, OpenSearchClusterConfig},
+        v1alpha1::{self, OpenSearchTls},
     },
     framework::{
         ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
@@ -165,9 +165,9 @@ pub struct ValidatedCluster {
     pub name: ClusterName,
     pub namespace: NamespaceName,
     pub uid: Uid,
-    pub cluster_config: OpenSearchClusterConfig,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+    pub tls_config: OpenSearchTls,
 }
 
 impl ValidatedCluster {
@@ -178,9 +178,9 @@ impl ValidatedCluster {
         name: ClusterName,
         namespace: NamespaceName,
         uid: impl Into<Uid>,
-        cluster_config: OpenSearchClusterConfig,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+        tls_config: OpenSearchTls,
     ) -> Self {
         let uid = uid.into();
         ValidatedCluster {
@@ -195,9 +195,9 @@ impl ValidatedCluster {
             name,
             namespace,
             uid,
-            cluster_config,
             role_config,
             role_group_configs,
+            tls_config,
         }
     }
 
@@ -386,7 +386,7 @@ mod tests {
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
         crd::{
             NodeRoles,
-            v1alpha1::{self, OpenSearchClusterConfig},
+            v1alpha1::{self, OpenSearchTls},
         },
         framework::{
             ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
@@ -469,7 +469,6 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
-            OpenSearchClusterConfig::default(),
             GenericRoleConfig::default(),
             [
                 (
@@ -504,6 +503,7 @@ mod tests {
                 ),
             ]
             .into(),
+            OpenSearchTls::default(),
         )
     }
 
@@ -523,7 +523,7 @@ mod tests {
                     vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
-                requested_secret_lifetime: Duration::from_str("15d")
+                requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,

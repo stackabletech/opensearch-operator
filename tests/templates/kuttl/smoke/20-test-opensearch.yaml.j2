@@ -22,6 +22,8 @@ spec:
             # required for pip install
             - name: HOME
               value: /stackable
+            - name: HTTP_USE_TLS
+              value: "{{ test_scenario['values']['http-use-tls'] }}"
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
@@ -78,6 +80,7 @@ data:
     from opensearchpy import OpenSearch
 
     namespace = os.environ['NAMESPACE']
+    http_use_tls = os.environ['HTTP_USE_TLS'] == 'true'
 
     host = f'opensearch.{namespace}.svc.cluster.local'
     port = 9200
@@ -89,8 +92,8 @@ data:
         hosts = [{'host': host, 'port': port}],
         http_compress = True, # enables gzip compression for request bodies
         http_auth = auth,
-        use_ssl = True,
-        verify_certs = True,
+        use_ssl = http_use_tls,
+        verify_certs = http_use_tls,
         ca_certs = ca_certs_path
     )
 
