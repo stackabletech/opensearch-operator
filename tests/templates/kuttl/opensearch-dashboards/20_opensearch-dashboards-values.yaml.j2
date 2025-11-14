@@ -21,15 +21,18 @@ config:
       requestHeadersWhitelist:
         - authorization
         - securitytenant
+{% if test_scenario['values']['http-use-tls'] == 'true' %}
       ssl:
         verificationMode: full
         certificateAuthorities: [/stackable/opensearch-dashboards/config/tls/ca.crt]
+{% endif %}
     opensearch_security:
       multitenancy:
         enabled: true
         tenants.preferred: [Private, Global]
       readonly_mode.roles: [kibana_read_only]
       cookie.secure: false
+{% if test_scenario['values']['http-use-tls'] == 'true' %}
 extraVolumes:
   - name: tls
     ephemeral:
@@ -44,9 +47,12 @@ extraVolumes:
           resources:
             requests:
               storage: "1"
+{% endif %}
 extraVolumeMounts:
+{% if test_scenario['values']['http-use-tls'] == 'true' %}
   - name: tls
     mountPath: /stackable/opensearch-dashboards/config/tls
+{% endif %}
   # The Helm chart only adds a volume mount at /usr/share/opensearch-dashboards
   - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
     name: config

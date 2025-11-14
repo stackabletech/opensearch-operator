@@ -140,6 +140,7 @@ pub fn validate(
         uid,
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
+        cluster.spec.cluster_config.tls.clone(),
     ))
 }
 
@@ -183,6 +184,7 @@ fn validate_role_group_config(
         listener_class: merged_role_group.config.config.listener_class,
         logging,
         node_roles: merged_role_group.config.config.node_roles,
+        requested_secret_lifetime: merged_role_group.config.config.requested_secret_lifetime,
         resources: merged_role_group.config.config.resources,
         termination_grace_period_seconds,
     };
@@ -274,11 +276,11 @@ mod tests {
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
         crd::{
             NodeRoles,
-            v1alpha1::{self},
+            v1alpha1::{self, OpenSearchTls},
         },
         framework::{
             ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
-            OperatorName, ProductName, ProductVersion, RoleGroupName,
+            OperatorName, ProductName, ProductVersion, RoleGroupName, SecretClassName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
@@ -407,6 +409,8 @@ mod tests {
                                 ]
                                 .into()
                             ),
+                            requested_secret_lifetime: Duration::from_str("1d")
+                                .expect("should be a valid duration"),
                             resources: Resources {
                                 memory: MemoryLimits {
                                     limit: Some(Quantity("2Gi".to_owned())),
@@ -492,6 +496,10 @@ mod tests {
                     }
                 )]
                 .into(),
+                OpenSearchTls {
+                    http_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                    transport_secret_class: SecretClassName::from_str_unsafe("tls")
+                },
             )),
             result.ok()
         );
@@ -669,6 +677,7 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
+                    tls: OpenSearchTls::default(),
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),
