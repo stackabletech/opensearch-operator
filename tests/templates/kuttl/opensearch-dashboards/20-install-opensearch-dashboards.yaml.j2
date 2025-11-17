@@ -7,7 +7,7 @@ commands:
       --repo https://opensearch-project.github.io/helm-charts
       --version "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
       --values 20_opensearch-dashboards-values.yaml
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
       --set opensearchHosts=https://opensearch.$NAMESPACE.svc.cluster.local:9200
 {% else %}
       --set opensearchHosts=http://opensearch.$NAMESPACE.svc.cluster.local:9200

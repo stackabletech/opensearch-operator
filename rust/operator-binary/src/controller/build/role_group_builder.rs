@@ -76,8 +76,8 @@ constant!(DATA_VOLUME_NAME: VolumeName = "data");
 constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
-constant!(TLS_HTTP_VOLUME_NAME: VolumeName = "tls-http");
-constant!(TLS_TRANSPORT_VOLUME_NAME: VolumeName = "tls-transport");
+constant!(TLS_SERVER_VOLUME_NAME: VolumeName = "tls-server");
+constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
@@ -295,8 +295,8 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..Volume::default()
             },
             self.build_tls_volume(
-                &TLS_TRANSPORT_VOLUME_NAME.to_string(),
-                &self.cluster.tls_config.transport_secret_class,
+                &TLS_INTERNAL_VOLUME_NAME.to_string(),
+                &self.cluster.tls_config.internal_secret_class,
                 vec![],
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
@@ -304,9 +304,9 @@ impl<'a> RoleGroupBuilder<'a> {
             ),
         ];
 
-        if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.http_secret_class {
+        if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
             volumes.push(self.build_tls_volume(
-                &TLS_HTTP_VOLUME_NAME.to_string(),
+                &TLS_SERVER_VOLUME_NAME.to_string(),
                 tls_http_secret_class_name,
                 service_scopes,
                 SecretFormat::TlsPem,
@@ -456,16 +456,16 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..VolumeMount::default()
             },
             VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/transport"),
-                name: TLS_TRANSPORT_VOLUME_NAME.to_string(),
+                mount_path: format!("{opensearch_path_conf}/tls/internal"),
+                name: TLS_INTERNAL_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
         ];
 
-        if self.cluster.tls_config.http_secret_class.is_some() {
+        if self.cluster.tls_config.server_secret_class.is_some() {
             volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/http"),
-                name: TLS_HTTP_VOLUME_NAME.to_string(),
+                mount_path: format!("{opensearch_path_conf}/tls/server"),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             })
         }
@@ -1088,12 +1088,12 @@ mod tests {
                                             "name": "log"
                                         },
                                                                                 {
-                                            "mountPath": "/stackable/opensearch/config/tls/transport",
-                                            "name": "tls-transport"
+                                            "mountPath": "/stackable/opensearch/config/tls/internal",
+                                            "name": "tls-internal"
                                         },
                                         {
-                                            "mountPath": "/stackable/opensearch/config/tls/http",
-                                            "name": "tls-http",
+                                            "mountPath": "/stackable/opensearch/config/tls/server",
+                                            "name": "tls-server",
                                         }
                                     ]
                                 },
@@ -1245,7 +1245,7 @@ mod tests {
                                             }
                                         }
                                     },
-                                "name": "tls-transport"
+                                "name": "tls-internal"
                                 },
                                 {
                                     "ephemeral": {
@@ -1271,7 +1271,7 @@ mod tests {
                                                 }
                                             }
                                         },
-                                    "name": "tls-http"
+                                    "name": "tls-server"
                                 },
                             ]
                         }

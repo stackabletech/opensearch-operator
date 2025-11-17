@@ -9,7 +9,7 @@ dimensions:
   - name: opensearch_home
     values:
       - /stackable/opensearch
-  - name: http-use-tls
+  - name: server-use-tls
     values:
       - "true"
       - "false"
@@ -22,7 +22,7 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
-      - http-use-tls
+      - server-use-tls
   - name: external-access
     dimensions:
       - opensearch
@@ -43,7 +43,7 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
-      - http-use-tls
+      - server-use-tls
       - release
   # requires the repository-s3 plugin
   - name: snapshot-s3

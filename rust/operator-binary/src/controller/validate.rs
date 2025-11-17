@@ -497,8 +497,8 @@ mod tests {
                 )]
                 .into(),
                 OpenSearchTls {
-                    http_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
-                    transport_secret_class: SecretClassName::from_str_unsafe("tls")
+                    server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                    internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
             )),
             result.ok()

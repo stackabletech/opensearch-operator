@@ -195,34 +195,34 @@ impl NodeConfig {
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/transport/tls.crt")),
+            json!(format!("{opensearch_path_conf}/tls/internal/tls.crt")),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/transport/tls.key")),
+            json!(format!("{opensearch_path_conf}/tls/internal/tls.key")),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/transport/ca.crt")),
+            json!(format!("{opensearch_path_conf}/tls/internal/ca.crt")),
         );
 
-        // TLS config for HTTP port which is optional.
-        if self.cluster.tls_config.http_secret_class.is_some() {
+        // TLS config for HTTP port (REST API) (optional).
+        if self.cluster.tls_config.server_secret_class.is_some() {
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
                 json!("true".to_string()),
             );
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
-                json!(format!("{opensearch_path_conf}/tls/http/tls.crt")),
+                json!(format!("{opensearch_path_conf}/tls/server/tls.crt")),
             );
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
-                json!(format!("{opensearch_path_conf}/tls/http/tls.key")),
+                json!(format!("{opensearch_path_conf}/tls/server/tls.key")),
             );
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-                json!(format!("{opensearch_path_conf}/tls/http/ca.crt")),
+                json!(format!("{opensearch_path_conf}/tls/server/ca.crt")),
             );
         } else {
             config.insert(
@@ -524,13 +524,13 @@ mod tests {
                 "node.attr.role-group: \"data\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: \"true\"\n",
-                "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/http/tls.crt\"\n",
-                "plugins.security.ssl.http.pemkey_filepath: \"/stackable/opensearch/config/tls/http/tls.key\"\n",
-                "plugins.security.ssl.http.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/http/ca.crt\"\n",
+                "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
+                "plugins.security.ssl.http.pemkey_filepath: \"/stackable/opensearch/config/tls/server/tls.key\"\n",
+                "plugins.security.ssl.http.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/server/ca.crt\"\n",
                 "plugins.security.ssl.transport.enabled: \"true\"\n",
-                "plugins.security.ssl.transport.pemcert_filepath: \"/stackable/opensearch/config/tls/transport/tls.crt\"\n",
-                "plugins.security.ssl.transport.pemkey_filepath: \"/stackable/opensearch/config/tls/transport/tls.key\"\n",
-                "plugins.security.ssl.transport.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/transport/ca.crt\"\n",
+                "plugins.security.ssl.transport.pemcert_filepath: \"/stackable/opensearch/config/tls/internal/tls.crt\"\n",
+                "plugins.security.ssl.transport.pemkey_filepath: \"/stackable/opensearch/config/tls/internal/tls.key\"\n",
+                "plugins.security.ssl.transport.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/internal/ca.crt\"\n",
                 "test: \"value\"",
             )
             .to_owned(),

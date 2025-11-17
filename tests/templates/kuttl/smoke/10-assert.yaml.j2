@@ -169,11 +169,11 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/transport
-          name: tls-transport
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/http
-          name: tls-http
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
+          name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+          name: tls-server
 {% endif %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
@@ -272,8 +272,8 @@ spec:
                   storage: "1"
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
-        name: tls-transport
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+        name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
       - ephemeral:
           volumeClaimTemplate:
             metadata:
@@ -290,7 +290,7 @@ spec:
                   storage: "1"
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
-        name: tls-http
+        name: tls-server
 {% endif %}
       - name: security-config
         secret:
@@ -502,11 +502,11 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/transport
-          name: tls-transport
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/http
-          name: tls-http
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
+          name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+          name: tls-server
 {% endif %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
           name: security-config
@@ -605,8 +605,8 @@ spec:
                   storage: "1"
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
-        name: tls-transport
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+        name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
       - ephemeral:
           volumeClaimTemplate:
             metadata:
@@ -623,7 +623,7 @@ spec:
                   storage: "1"
               storageClassName: secrets.stackable.tech
               volumeMode: Filesystem
-        name: tls-http
+        name: tls-server
 {% endif %}
       - name: security-config
         secret:
@@ -698,18 +698,18 @@ data:
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
 {% else %}
     plugins.security.ssl.http.enabled: "false"
 {% endif %}
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -738,18 +738,18 @@ data:
     node.store.allow_mmap: "false"
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: "true"
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/http/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
+    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
+    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
 {% else %}
     plugins.security.ssl.http.enabled: "false"
 {% endif %}
     plugins.security.ssl.transport.enabled: "true"
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/transport/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
+    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
+    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
 ---
 apiVersion: v1
 kind: Service

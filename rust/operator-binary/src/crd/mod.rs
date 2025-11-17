@@ -81,7 +81,7 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
-        /// TLS configuration options for the REST API and internal communication (transport).
+        /// TLS configuration options for the server (REST API) and internal communication (transport).
         #[serde(default)]
         pub tls: OpenSearchTls,
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
@@ -100,16 +100,16 @@ pub mod versioned {
         /// - If TLS encryption is used at all
         /// - Which cert the servers should use to authenticate themselves against the client
         #[serde(
-            default = "http_secret_class_default",
+            default = "server_secret_class_default",
             skip_serializing_if = "Option::is_none"
         )]
-        pub http_secret_class: Option<SecretClassName>,
+        pub server_secret_class: Option<SecretClassName>,
         /// Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
         /// This setting controls:
         /// - Which cert the servers should use to authenticate themselves against other servers
         /// - Which ca.crt to use when validating the other server
-        #[serde(default = "transport_secret_class_default")]
-        pub transport_secret_class: SecretClassName,
+        #[serde(default = "internal_secret_class_default")]
+        pub internal_secret_class: SecretClassName,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -336,17 +336,17 @@ impl v1alpha1::OpenSearchConfig {
 impl Default for v1alpha1::OpenSearchTls {
     fn default() -> Self {
         v1alpha1::OpenSearchTls {
-            http_secret_class: http_secret_class_default(),
-            transport_secret_class: transport_secret_class_default(),
+            server_secret_class: server_secret_class_default(),
+            internal_secret_class: internal_secret_class_default(),
         }
     }
 }
 
-fn http_secret_class_default() -> Option<SecretClassName> {
+fn server_secret_class_default() -> Option<SecretClassName> {
     Some(TLS_DEFAULT_SECRET_CLASS.to_owned())
 }
 
-fn transport_secret_class_default() -> SecretClassName {
+fn internal_secret_class_default() -> SecretClassName {
     TLS_DEFAULT_SECRET_CLASS.to_owned()
 }
 

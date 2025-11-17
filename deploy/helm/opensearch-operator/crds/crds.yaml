@@ -31,17 +31,27 @@ spec:
                 clusterConfig:
                   default:
                     tls:
-                      httpSecretClass: tls
-                      transportSecretClass: tls
+                      internalSecretClass: tls
+                      serverSecretClass: tls
                   description: Configuration that applies to all roles and role groups
                   properties:
                     tls:
                       default:
-                        httpSecretClass: tls
-                        transportSecretClass: tls
-                      description: TLS configuration options for the REST API and internal communication (transport).
+                        internalSecretClass: tls
+                        serverSecretClass: tls
+                      description: TLS configuration options for the server (REST API) and internal communication (transport).
                       properties:
-                        httpSecretClass:
+                        internalSecretClass:
+                          default: tls
+                          description: |-
+                            Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
+                            This setting controls:
+                            - Which cert the servers should use to authenticate themselves against other servers
+                            - Which ca.crt to use when validating the other server
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        serverSecretClass:
                           default: tls
                           description: |-
                             Only affects client connections to the REST API.
@@ -51,16 +61,6 @@ spec:
                           maxLength: 253
                           minLength: 1
                           nullable: true
-                          type: string
-                        transportSecretClass:
-                          default: tls
-                          description: |-
-                            Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
-                            This setting controls:
-                            - Which cert the servers should use to authenticate themselves against other servers
-                            - Which ca.crt to use when validating the other server
-                          maxLength: 253
-                          minLength: 1
                           type: string
                       type: object
                     vectorAggregatorConfigMapName:

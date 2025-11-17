@@ -21,7 +21,7 @@ config:
       requestHeadersWhitelist:
         - authorization
         - securitytenant
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
       ssl:
         verificationMode: full
         certificateAuthorities: [/stackable/opensearch-dashboards/config/tls/ca.crt]
@@ -32,7 +32,7 @@ config:
         tenants.preferred: [Private, Global]
       readonly_mode.roles: [kibana_read_only]
       cookie.secure: false
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
 extraVolumes:
   - name: tls
     ephemeral:
@@ -49,7 +49,7 @@ extraVolumes:
               storage: "1"
 {% endif %}
 extraVolumeMounts:
-{% if test_scenario['values']['http-use-tls'] == 'true' %}
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
   - name: tls
     mountPath: /stackable/opensearch-dashboards/config/tls
 {% endif %}
