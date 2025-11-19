@@ -1,0 +1,133 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-analyzer-data
+data:
+  performance_analyzer_enabled.conf: "true"
+  rca_enabled.conf: "false"
+  logging_enabled.conf: "false" # otherwise the metrics flood the log
+  batch_metrics_enabled.conf: "false"
+  thread_contention_monitoring_enabled.conf: "false"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-analyzer-config
+data:
+  agent-stats-metadata: |
+    # All the meta data to be emitted in the agent stats; an example below
+    Program=PerformanceAnalyzerAgent
+  log4j2.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Configuration status="INFO">
+        <Appenders>
+            <Console name="Console" target="SYSTEM_OUT">
+                <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n" />
+            </Console>
+            <File name="PerformanceAnalyzerAgentLog" fileName="/tmp/performance_analyzer_agent.log" immediateFlush="true" append="true">
+                <PatternLayout pattern="%d{yyy-MM-dd HH:mm:ss.SSS} [PA:Reader] [%t] %-5level %logger{36} - %msg%n"/>
+            </File>
+            <File name="StatsLog" fileName="/tmp/performance_analyzer_agent_stats.log" immediateFlush="true" append="true">
+            </File>
+        </Appenders>
+        <Loggers>
+            <Logger name="stats_log" level="info" additivity="false">
+                <AppenderRef ref="StatsLog"/>
+            </Logger>
+            <Root level="error">
+                <AppenderRef ref="Console" />
+                <AppenderRef ref="PerformanceAnalyzerAgentLog"/>
+            </Root>
+        </Loggers>
+    </Configuration>
+  opensearch_security.policy: |
+    grant {
+        permission java.lang.management.ManagementPermission "control";
+    };
+
+    grant codebase "file:${java.home}/../lib/tools.jar" {
+      permission java.security.AllPermission;
+    };
+
+    grant codeBase "jrt:/jdk.attach" {
+        permission java.security.AllPermission;
+    };
+
+    grant codeBase "jrt:/jdk.internal.jvmstat" {
+        permission java.security.AllPermission;
+    };
+  performance-analyzer.properties: |
+    # ======================== OpenSearch performance analyzer plugin config =========================
+
+    # NOTE: this is an example for Linux. Please modify the config accordingly if you are using it under other OS.
+
+    # Metrics data location
+    metrics-location = /dev/shm/performanceanalyzer/
+
+    # Metrics deletion interval (minutes) for metrics data.
+    # Interval should be between 1 to 60.
+    metrics-deletion-interval = 1
+
+    # If set to true, the system cleans up the files behind it. So at any point, we should expect only 2
+    # metrics-db-file-prefix-path files. If set to false, no files are cleaned up. This can be useful, if you are archiving
+    # the files and wouldn't like for them to be cleaned up.
+    cleanup-metrics-db-files = true
+
+    # WebService exposed by App's port
+    webservice-listener-port = 9600
+
+    # Metric DB File Prefix Path location
+    metrics-db-file-prefix-path = /tmp/metricsdb_
+
+    https-enabled = false
+
+    #Setup the correct path for certificates
+    certificate-file-path = specify_path
+
+    private-key-file-path = specify_path
+
+    # WebService bind host; default to all interfaces
+    webservice-bind-host = 0.0.0.0
+
+    # Plugin Stats Metadata file name, expected to be in the same location
+    plugin-stats-metadata = plugin-stats-metadata
+
+    # Agent Stats Metadata file name, expected to be in the same location
+    agent-stats-metadata = agent-stats-metadata
+  plugin-stats-metadata: |
+    # All the meta data to be emitted in the plugin stats; an example below
+    Program=PerformanceAnalyzerPlugin
+  supervisord.conf: |
+     ; supervisor config file
+
+     [unix_http_server]
+     file=/usr/share/supervisor/performance_analyzer/supervisord.sock
+     chmod=0770
+
+     [supervisord]
+     logfile=/usr/share/supervisor/performance_analyzer/supervisord.log ; (main log file;default $CWD/supervisord.log)
+     pidfile=/usr/share/supervisor/performance_analyzer/supervisord.pid ; (supervisord pidfile;default supervisord.pid)
+     childlogdir=/usr/share/supervisor/performance_analyzer            ; ('AUTO' child log dir, default $TEMP)
+
+     ; the below section must remain in the config file for RPC
+     ; (supervisorctl/web interface) to work, additional interfaces may be
+     ; added by defining them in separate rpcinterface: sections
+     [rpcinterface:supervisor]
+     supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+     [supervisorctl]
+     serverurl=/usr/share/supervisord.sock
+
+     ; The [include] section can just contain the "files" setting.  This
+     ; setting can list multiple files (separated by whitespace or
+     ; newlines).  It can also contain wildcards.  The filenames are
+     ; interpreted as relative to this file.  Included files *cannot*
+     ; include files themselves.
+
+     [include]
+     files = /etc/supervisor/conf.d/*.conf
+
+     [program:performance_analyzer]
+     command=/usr/share/opensearch/bin/opensearch-performance-analyzer/performance-analyzer-agent /usr/share/opensearch
+     user=1000

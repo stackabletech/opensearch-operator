@@ -28,6 +28,8 @@ spec:
               # Successful authorizations are logged at the DEBUG level.
               org.opensearch.security:
                 level: DEBUG
+              org.opensearch.performanceanalyzer:
+                level: TRACE
     roleGroups:
       default:
         replicas: 3
@@ -37,6 +39,7 @@ spec:
       # installs a demo configuration if not disabled explicitly.
       DISABLE_INSTALL_DEMO_CONFIG: "true"
       OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
+      OPENSEARCH_JAVA_OPTS: "-Dclk.tck=100 -Djdk.attach.allowAttachSelf=true -Djava.security.policy=file://stackable/opensearch/config/opensearch-performance-analyzer/opensearch_security.policy"
     configOverrides:
       opensearch.yml:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
@@ -60,10 +63,31 @@ spec:
       spec:
         containers:
           - name: opensearch
+            ports:
+              - containerPort: 9600
+                name: performance
+                protocol: TCP
             volumeMounts:
               - name: security-config
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
                 readOnly: true
+              - name: performance-analyzer-config
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-performance-analyzer
+              - name: performance-analyzer-data
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/data/performance_analyzer_enabled.conf
+                subPath: performance_analyzer_enabled.conf
+              - name: performance-analyzer-data
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/data/rca_enabled.conf
+                subPath: rca_enabled.conf
+              - name: performance-analyzer-data
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/data/logging_enabled.conf
+                subPath: logging_enabled.conf
+              - name: performance-analyzer-data
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/data/batch_metrics_enabled.conf
+                subPath: batch_metrics_enabled.conf
+              - name: performance-analyzer-data
+                mountPath: {{ test_scenario['values']['opensearch_home'] }}/data/thread_contention_monitoring_enabled.conf
+                subPath: thread_contention_monitoring_enabled.conf
               - name: tls
                 mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls
                 readOnly: true
@@ -71,6 +95,14 @@ spec:
           - name: security-config
             secret:
               secretName: opensearch-security-config
+              defaultMode: 0o660
+          - name: performance-analyzer-config
+            configMap:
+              name: performance-analyzer-config
+              defaultMode: 0o660
+          - name: performance-analyzer-data
+            configMap:
+              name: performance-analyzer-data
               defaultMode: 0o660
           - name: tls
             ephemeral:
