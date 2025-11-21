@@ -1,3 +1,4 @@
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -24,9 +25,13 @@ spec:
                 secretKeyRef:
                   name: opensearch-credentials
                   key: admin
+            - name: REQUESTS_CA_BUNDLE
+              value: /stackable/tls/ca.crt
           volumeMounts:
             - name: script
               mountPath: /stackable/scripts
+            - name: truststore
+              mountPath: /stackable/tls
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -44,10 +49,21 @@ spec:
         - name: script
           configMap:
             name: test-opensearch-dashboards
+        - name: truststore
+          configMap:
+            name: truststore
       serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore
+spec:
+  secretClassName: tls
+  format: tls-pem
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -67,7 +83,7 @@ data:
     namespace = os.environ["NAMESPACE"]
     opensearch_user = os.environ["OPENSEARCH_USER"]
     opensearch_password = os.environ["OPENSEARCH_PASSWORD"]
-    opensearch_dashboards_service = "http://opensearch-dashboards:5601"
+    opensearch_dashboards_service = f"https://opensearch-dashboards.{namespace}.svc.cluster.local:5601"
 
     session = requests.Session()
     session.headers.update({"osd-xsrf": "true"})
