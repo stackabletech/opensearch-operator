@@ -62,6 +62,8 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.node
 pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
     "plugins.security.ssl.http.enabled";
 
+const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
+
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
     cluster: ValidatedCluster,
@@ -272,6 +274,23 @@ impl NodeConfig {
             String::new()
         }
     }
+
+    /// Return content of the `OPENSEARCH_HOME` environment variable from envOverrides or default to `DEFAULT_OPENSEARCH_HOME`
+    pub fn opensearch_home(&self) -> String {
+        self.environment_variables()
+            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
+            .and_then(|env_var| env_var.value.clone())
+            .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned())
+    }
+
+    /// Return content of the `OPENSEARCH_PATH_CONF` environment variable from envOverrides or default to `OPENSEARCH_HOME/config`
+    pub fn opensearch_path_conf(&self) -> String {
+        let opensearch_home = self.opensearch_home();
+        self.environment_variables()
+            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
+            .and_then(|env_var| env_var.value.clone())
+            .unwrap_or(format!("{opensearch_home}/config"))
+    }
 }
 
 #[cfg(test)]
@@ -383,6 +402,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
+            vec![],
         );
 
         NodeConfig::new(

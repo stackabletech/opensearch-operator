@@ -305,6 +305,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
+            vec![],
         );
 
         RoleBuilder::new(cluster, context_names)

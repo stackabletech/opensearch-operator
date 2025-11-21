@@ -29,9 +29,40 @@ spec:
                 generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
               properties:
                 clusterConfig:
-                  default: {}
+                  default:
+                    keystore: []
                   description: Configuration that applies to all roles and role groups
                   properties:
+                    keystore:
+                      default: []
+                      description: Entries to add to the OpenSearch keystore.
+                      items:
+                        properties:
+                          key:
+                            description: Key in the OpenSearch keystore
+                            type: string
+                          secretKeyRef:
+                            description: Reference to the Secret containing the value which will be stored in the OpenSearch keystore
+                            properties:
+                              key:
+                                description: Key in the Secret that contains the value
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              name:
+                                description: Name of the Secret
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                            required:
+                              - key
+                              - name
+                            type: object
+                        required:
+                          - key
+                          - secretKeyRef
+                        type: object
+                      type: array
                     vectorAggregatorConfigMapName:
                       description: |-
                         Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).

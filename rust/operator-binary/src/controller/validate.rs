@@ -140,6 +140,7 @@ pub fn validate(
         uid,
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
+        cluster.spec.cluster_config.keystore.clone(),
     ))
 }
 
@@ -274,11 +275,11 @@ mod tests {
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
         crd::{
             NodeRoles,
-            v1alpha1::{self},
+            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
         },
         framework::{
             ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
-            OperatorName, ProductName, ProductVersion, RoleGroupName,
+            OperatorName, ProductName, ProductVersion, RoleGroupName, SecretKey, SecretName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
@@ -492,6 +493,13 @@ mod tests {
                     }
                 )]
                 .into(),
+                vec![OpenSearchKeystore {
+                    key: "Keystore1".to_string(),
+                    secret_key_ref: SecretKeyRef {
+                        name: SecretName::from_str_unsafe("my-keystore-secret"),
+                        key: SecretKey::from_str_unsafe("my-keystore-file")
+                    }
+                }]
             )),
             result.ok()
         );
@@ -669,6 +677,13 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
+                    keystore: vec![OpenSearchKeystore {
+                        key: "Keystore1".to_string(),
+                        secret_key_ref: SecretKeyRef {
+                            name: SecretName::from_str_unsafe("my-keystore-secret"),
+                            key: SecretKey::from_str_unsafe("my-keystore-file"),
+                        },
+                    }],
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

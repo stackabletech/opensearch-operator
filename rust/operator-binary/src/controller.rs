@@ -30,7 +30,7 @@ use validate::validate;
 use crate::{
     crd::{
         NodeRoles,
-        v1alpha1::{self},
+        v1alpha1::{self, OpenSearchKeystore},
     },
     framework::{
         ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
@@ -166,9 +166,11 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+    pub keystores: Vec<OpenSearchKeystore>,
 }
 
 impl ValidatedCluster {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         image: ResolvedProductImage,
         product_version: ProductVersion,
@@ -177,6 +179,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+        keystores: Vec<OpenSearchKeystore>,
     ) -> Self {
         let uid = uid.into();
         ValidatedCluster {
@@ -193,6 +196,7 @@ impl ValidatedCluster {
             uid,
             role_config,
             role_group_configs,
+            keystores,
         }
     }
 
@@ -378,10 +382,13 @@ mod tests {
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
+        },
         framework::{
             ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            RoleGroupName, SecretKey, SecretName, builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
         },
@@ -494,6 +501,13 @@ mod tests {
                 ),
             ]
             .into(),
+            vec![OpenSearchKeystore {
+                key: "Keystore1".to_string(),
+                secret_key_ref: SecretKeyRef {
+                    name: SecretName::from_str_unsafe("my-keystore-secret"),
+                    key: SecretKey::from_str_unsafe("my-keystore-file"),
+                },
+            }],
         )
     }
 

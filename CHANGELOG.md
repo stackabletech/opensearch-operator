@@ -7,8 +7,10 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Add the role group as a node attribute ([#63]).
+- Allow adding entries to the OpenSearch keystore ([#76]).
 
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
+[#76]: https://github.com/stackabletech/opensearch-operator/pull/76
 
 ## [25.11.0] - 2025-11-07
 
