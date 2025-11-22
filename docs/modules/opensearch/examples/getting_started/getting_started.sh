@@ -76,9 +76,9 @@ kubectl rollout status --watch statefulset/simple-opensearch-nodes-default --tim
 sleep 10
 
 echo "Starting port-forwarding of port 9200"
-# tag::port-forwarding[]
+# tag::opensearch-port-forwarding[]
 kubectl port-forward services/simple-opensearch 9200 > /dev/null 2>&1 &
-# end::port-forwarding[]
+# end::opensearch-port-forwarding[]
 PORT_FORWARD_PID=$!
 # shellcheck disable=2064 # we want the PID evaluated now, not at the time the trap is
 trap "kill $PORT_FORWARD_PID" EXIT
@@ -107,3 +107,25 @@ curl \
 # Output:
 # {"_index":"sample_index","_id":"1","_version":1,"_seq_no":0,"_primary_term":1,"found":true,"_source":{"name": "Stackable"}}
 # end::rest-api[]
+
+echo
+echo "Using OpenSearch Dashboards"
+# tag::opensearch-dashboards[]
+kubectl create secret generic opensearch-credentials \
+    --from-literal kibanaserver=E4kENuEmkqH3jyHC
+
+helm install opensearch-dashboards opensearch-dashboards \
+    --repo https://opensearch-project.github.io/helm-charts \
+    --version 3.1.0 \
+    --values opensearch-dashboards-values.yaml \
+    --wait
+# end::opensearch-dashboards[]
+
+echo "Starting port-forwarding of port 5601"
+# tag::opensearch-dashboards-port-forwarding[]
+kubectl port-forward services/opensearch-dashboards 5601 > /dev/null 2>&1 &
+# end::opensearch-dashboards-port-forwarding[]
+PORT_FORWARD_PID=$!
+# shellcheck disable=2064 # we want the PID evaluated now, not at the time the trap is
+trap "kill $PORT_FORWARD_PID" EXIT
+sleep 600
