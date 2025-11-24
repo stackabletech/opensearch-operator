@@ -1,13 +1,11 @@
+---
+opensearchHosts: https://simple-opensearch-nodes-default.default.svc.cluster.local:9200
 image:
   repository: oci.stackable.tech/sdp/opensearch-dashboards
-  tag: {{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
-service:
-  type: NodePort
+  tag: 3.1.0-stackable{{ versions.opensearch }}
 serviceAccount:
   create: false
-  # Use the ServiceAccount of OpenSearch because its permissions are already configured to work on
-  # OpenShift.
-  name: opensearch-serviceaccount
+  name: simple-opensearch-serviceaccount
 config:
   opensearch_dashboards.yml:
     server:
@@ -48,9 +46,6 @@ extraVolumes:
 extraVolumeMounts:
   - mountPath: /stackable/opensearch-dashboards/config/tls
     name: tls
-  # The Helm chart sets the volume "config" and adds a volume mount at
-  # /usr/share/opensearch-dashboards/config. But in the Stackable image, the configuration directory
-  # is located in /stackable/opensearch-dashboards/config.
   - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
     name: config
     subPath: opensearch_dashboards.yml
