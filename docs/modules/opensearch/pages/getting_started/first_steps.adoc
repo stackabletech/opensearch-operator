@@ -23,8 +23,11 @@ Such a hash can be e.g. generated with `htpasswd`:
 
 [source,bash]
 ----
-$ htpasswd -nbBC 10 admin AJVFsGJBbpT6mChnq
+$ htpasswd -nbBC 10 admin AJVFsGJBbpT6mChn
 admin:$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+
+$ htpasswd -nbBC 10 kibanaserver E4kENuEmkqH3jyHC
+kibanaserver:$2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
 ----
 
 == Creation of OpenSearch nodes
@@ -63,7 +66,7 @@ To forward the HTTP port (`9200`) to localhost, run:
 
 [source,bash]
 ----
-include::example$getting_started/getting_started.sh[tag=port-forwarding]
+include::example$getting_started/getting_started.sh[tag=opensearch-port-forwarding]
 ----
 
 == Using the REST API
@@ -77,6 +80,32 @@ include::example$getting_started/getting_started.sh[tag=rest-api]
 
 Great!
 Now you can create your own indexes, populate them with data and search for it.
+
+== Using OpenSearch Dashboards
+
+OpenSearch Dashboards is currently not managed by the operator, but the Stackable Data Platform provides a supported OCI image.
+First, create the Helm values file `opensearch-dashboards-values.yaml`:
+
+[source,yaml]
+----
+include::example$getting_started/opensearch-dashboards-values.yaml[]
+----
+
+Then, create the Secret with the credentials for the `kibanaserver` user and deploy the OpenSearch Dashboards Helm chart:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=opensearch-dashboards]
+----
+
+Forward the OpenSearch Dashboards port 5601 to localhost, open `https://localhost:5601` in your browser and log in with username `admin` and password `AJVFsGJBbpT6mChn`:
+
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=opensearch-dashboards-port-forwarding]
+----
+
+image::getting_started/opensearch-dashboards.png[Browser showing OpenSearch Dashboards after logging in]
 
 == What's next
 
