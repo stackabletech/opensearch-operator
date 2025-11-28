@@ -13,6 +13,11 @@
 * {feature-tracker}[Feature Tracker{external-link-icon}^]
 * {crd}[CRD documentation{external-link-icon}^]
 
+[WARNING]
+====
+This operator is experimental, and subject to change.
+====
+
 The Stackable operator for {opensearch}[OpenSearch{external-link-icon}^] deploys and manages OpenSearch clusters on Kubernetes.
 OpenSearch is a powerful search and analytics engine built on Apache Lucene.
 This operator helps you manage your OpenSearch instances on Kubernetes efficiently.
