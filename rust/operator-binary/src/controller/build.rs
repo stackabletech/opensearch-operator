@@ -77,11 +77,14 @@ mod tests {
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
+        },
         framework::{
             ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
-            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
-            role_utils::GenericProductSpecificCommonConfig,
+            ProductName, ProductVersion, RoleGroupName, SecretKey, SecretName,
+            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
         },
     };
 
@@ -191,6 +194,13 @@ mod tests {
                 ),
             ]
             .into(),
+            vec![OpenSearchKeystore {
+                key: "Keystore1".to_string(),
+                secret_key_ref: SecretKeyRef {
+                    name: SecretName::from_str_unsafe("my-keystore-secret"),
+                    key: SecretKey::from_str_unsafe("my-keystore-file"),
+                },
+            }],
         )
     }
 

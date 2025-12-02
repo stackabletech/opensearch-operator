@@ -338,7 +338,7 @@ attributed_string_type! {
 }
 attributed_string_type! {
     ConfigMapKey,
-    "The key for a ConfigMap or Secret",
+    "The key for a ConfigMap",
     "log4j2.properties",
     // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
@@ -401,6 +401,21 @@ attributed_string_type! {
     // problems on other Kubernetes providers, the length is restricted here.
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
+}
+attributed_string_type! {
+    SecretName,
+    "The name of a Secret",
+    "opensearch-security-config",
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    is_rfc_1123_dns_subdomain_name
+}
+attributed_string_type! {
+    SecretKey,
+    "The key for a Secret",
+    "opensearch.yml",
+    // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    is_config_map_key
 }
 attributed_string_type! {
     ServiceAccountName,

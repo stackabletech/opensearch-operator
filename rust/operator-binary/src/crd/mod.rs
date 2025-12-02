@@ -30,7 +30,8 @@ use crate::{
     constant,
     framework::{
         ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
-        ProductName, RoleName, role_utils::GenericProductSpecificCommonConfig,
+        ProductName, RoleName, SecretKey, SecretName,
+        role_utils::GenericProductSpecificCommonConfig,
     },
 };
 
@@ -80,12 +81,33 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
+        /// Entries to add to the OpenSearch keystore.
+        #[serde(default)]
+        pub keystore: Vec<OpenSearchKeystore>,
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchKeystore {
+        /// Key in the OpenSearch keystore
+        pub key: String,
+
+        /// Reference to the Secret containing the value which will be stored in the OpenSearch keystore
+        pub secret_key_ref: SecretKeyRef,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    pub struct SecretKeyRef {
+        /// Name of the Secret
+        pub name: SecretName,
+        /// Key in the Secret that contains the value
+        pub key: SecretKey,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -191,6 +213,9 @@ pub mod versioned {
 
         #[serde(rename = "vector")]
         Vector,
+
+        #[serde(rename = "init-keystore")]
+        InitKeystore,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -323,6 +348,7 @@ impl v1alpha1::Container {
         ContainerName::from_str(match self {
             v1alpha1::Container::OpenSearch => "opensearch",
             v1alpha1::Container::Vector => "vector",
+            v1alpha1::Container::InitKeystore => "init-keystore",
         })
         .expect("should be a valid container name")
     }
