@@ -5,3 +5,9 @@ delete:
   - apiVersion: opensearch.stackable.tech/v1alpha1
     kind: OpenSearchCluster
     name: opensearch-1
+  - apiVersion: v1
+    kind: Secret
+    name: opensearch-1-security-config
+  - apiVersion: v1
+    kind: Secret
+    name: opensearch-1-admin-certificate

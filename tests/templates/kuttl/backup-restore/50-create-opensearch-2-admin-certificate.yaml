@@ -1,0 +1,72 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-opensearch-2-admin-certificate
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-opensearch-2-admin-certificate
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /stackable/scripts/create-opensearch-2-admin-certificate.sh
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: create-opensearch-2-admin-certificate-script
+            defaultMode: 0o770
+        - name: tls
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                annotations:
+                  secrets.stackable.tech/class: tls
+              spec:
+                storageClassName: secrets.stackable.tech
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: "1"
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: create-opensearch-2-admin-certificate-script
+data:
+  create-opensearch-2-admin-certificate.sh: |
+    #!/usr/bin/env sh
+
+    openssl req \
+      -x509 \
+      -nodes \
+      -subj=/CN=opensearch-2-admin-certificate \
+      -out=tls.crt \
+      -keyout=tls.key
+
+    kubectl create secret generic opensearch-2-admin-certificate \
+        --from-file=tls.crt \
+        --from-file=tls.key

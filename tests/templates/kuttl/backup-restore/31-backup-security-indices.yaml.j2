@@ -19,6 +19,10 @@ spec:
           volumeMounts:
             - name: scripts
               mountPath: /stackable/scripts
+            - name: tls
+              # The Java policy allows reading from /stackable/opensearch/config.
+              mountPath: /stackable/opensearch/config/tls
+              readOnly: true
             - name: tls-client
               # The Java policy allows reading from /stackable/opensearch/config.
               mountPath: /stackable/opensearch/config/tls-client
@@ -81,21 +85,13 @@ spec:
           configMap:
             name: backup-security-indices-scripts
             defaultMode: 0o770
-        # Create a client TLS certificate to run securityadmin.sh
+        - name: tls
+          configMap:
+            name: truststore-pem
         - name: tls-client
-          ephemeral:
-            volumeClaimTemplate:
-              metadata:
-                annotations:
-                  secrets.stackable.tech/class: tls
-                  secrets.stackable.tech/scope: pod
-              spec:
-                storageClassName: secrets.stackable.tech
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: "1"
+          secret:
+            secretName: opensearch-1-admin-certificate
+            defaultMode: 0o660
         - name: s3-ca-crt
           secret:
             secretName: minio-ca-crt
@@ -117,7 +113,7 @@ data:
     #!/usr/bin/env sh
 
     plugins/opensearch-security/tools/securityadmin.sh \
-        -cacert config/tls-client/ca.crt \
+        -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \
         --hostname opensearch-1-nodes-default.$NAMESPACE.svc.cluster.local \
