@@ -58,7 +58,7 @@ stringData:
                 enable_ssl: true
                 hosts:
                   - openldap.$NAMESPACE.svc.cluster.local:1636
-                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
                 userbase: ou=users,dc=stackable,dc=tech
                 username_attribute: uid
                 usersearch: (cn={0})
@@ -73,7 +73,7 @@ stringData:
                 enable_ssl: true
                 hosts:
                   - openldap.$NAMESPACE.svc.cluster.local:1636
-                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
                 userbase: ou=users,dc=stackable,dc=tech
                 username_attribute: uid
                 usersearch: (cn={0})

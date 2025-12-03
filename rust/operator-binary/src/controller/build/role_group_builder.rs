@@ -3,7 +3,10 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
-    builder::meta::ObjectMetaBuilder,
+    builder::{
+        meta::ObjectMetaBuilder,
+        pod::volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+    },
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -23,6 +26,7 @@ use stackable_operator::{
         VECTOR_CONFIG_FILE, calculate_log_volume_size_limit, create_vector_shutdown_file_command,
         remove_vector_shutdown_file_command,
     },
+    shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 
@@ -42,11 +46,12 @@ use crate::{
     },
     crd::v1alpha1,
     framework::{
-        PersistentVolumeClaimName, RoleGroupName, ServiceAccountName, ServiceName, VolumeName,
+        PersistentVolumeClaimName, RoleGroupName, SecretClassName, ServiceAccountName, ServiceName,
+        VolumeName,
         builder::{
             meta::ownerreference_from_resource,
             pod::{
-                container::{EnvVarName, new_container_builder},
+                container::new_container_builder,
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
         },
@@ -71,10 +76,11 @@ constant!(DATA_VOLUME_NAME: VolumeName = "data");
 constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
 const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
 
+constant!(TLS_SERVER_VOLUME_NAME: VolumeName = "tls-server");
+constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
+
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
-
-const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 /// Builder for role-group resources
 pub struct RoleGroupBuilder<'a> {
@@ -127,7 +133,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
         data.insert(
             CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-            self.node_config.static_opensearch_config_file_content(),
+            self.node_config.opensearch_config_file_content(),
         );
 
         if let ValidatedContainerLogConfigChoice::Automatic(log_config) =
@@ -213,6 +219,8 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
+        let service_scopes = vec![self.node_config.discovery_service_name.clone()];
+
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
         }
@@ -257,7 +265,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 self.resource_names.role_group_config_map()
             };
 
-        let volumes = vec![
+        let mut volumes = vec![
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
                 config_map: Some(ConfigMapVolumeSource {
@@ -286,7 +294,26 @@ impl<'a> RoleGroupBuilder<'a> {
                 }),
                 ..Volume::default()
             },
+            self.build_tls_volume(
+                &TLS_INTERNAL_VOLUME_NAME.to_string(),
+                &self.cluster.tls_config.internal_secret_class,
+                vec![],
+                SecretFormat::TlsPem,
+                &self.role_group_config.config.requested_secret_lifetime,
+                Some(&LISTENER_VOLUME_NAME.to_string()),
+            ),
         ];
+
+        if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
+            volumes.push(self.build_tls_volume(
+                &TLS_SERVER_VOLUME_NAME.to_string(),
+                tls_http_secret_class_name,
+                service_scopes,
+                SecretFormat::TlsPem,
+                &self.role_group_config.config.requested_secret_lifetime,
+                Some(&LISTENER_VOLUME_NAME.to_string()),
+            ))
+        };
 
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
@@ -393,21 +420,10 @@ impl<'a> RoleGroupBuilder<'a> {
             ..Probe::default()
         };
 
-        let env_vars = self.node_config.environment_variables();
+        let opensearch_home = self.node_config.opensearch_home();
+        let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
-        // Use `OPENSEARCH_HOME` from envOverrides or default to `DEFAULT_OPENSEARCH_HOME`.
-        let opensearch_home = env_vars
-            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
-            .and_then(|env_var| env_var.value.clone())
-            .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned());
-        // Use `OPENSEARCH_PATH_CONF` from envOverrides or default to `OPENSEARCH_HOME/config`,
-        // i.e. depend on `OPENSEARCH_HOME`.
-        let opensearch_path_conf = env_vars
-            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
-            .and_then(|env_var| env_var.value.clone())
-            .unwrap_or(format!("{opensearch_home}/config"));
-
-        let volume_mounts = [
+        let mut volume_mounts = vec![
             VolumeMount {
                 mount_path: format!("{opensearch_path_conf}/{CONFIGURATION_FILE_OPENSEARCH_YML}"),
                 name: CONFIG_VOLUME_NAME.to_string(),
@@ -439,7 +455,20 @@ impl<'a> RoleGroupBuilder<'a> {
                 name: LOG_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/internal"),
+                name: TLS_INTERNAL_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            },
         ];
+
+        if self.cluster.tls_config.server_secret_class.is_some() {
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server"),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            })
+        }
 
         new_container_builder(&v1alpha1::Container::OpenSearch.to_container_name())
             .image_from_product_image(&self.cluster.image)
@@ -468,7 +497,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 create_vector_shutdown_file_command =
                     create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             )])
-            .add_env_vars(env_vars.into())
+            .add_env_vars(self.node_config.environment_variables().into())
             .add_volume_mounts(volume_mounts)
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .add_container_ports(vec![
@@ -628,6 +657,37 @@ impl<'a> RoleGroupBuilder<'a> {
             &self.role_group_name,
         )
     }
+
+    fn build_tls_volume(
+        &self,
+        volume_name: &String,
+        tls_secret_class_name: &SecretClassName,
+        service_scopes: Vec<ServiceName>,
+        secret_format: SecretFormat,
+        requested_secret_lifetime: &Duration,
+        listener_scope: Option<&str>,
+    ) -> Volume {
+        let mut secret_volume_source_builder =
+            SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
+
+        for scope in service_scopes {
+            secret_volume_source_builder.with_service_scope(scope);
+        }
+        if let Some(listener_scope) = listener_scope {
+            secret_volume_source_builder.with_listener_volume_scope(listener_scope);
+        }
+
+        VolumeBuilder::new(volume_name)
+            .ephemeral(
+                secret_volume_source_builder
+                    .with_pod_scope()
+                    .with_format(secret_format)
+                    .with_auto_tls_cert_lifetime(*requested_secret_lifetime)
+                    .build()
+                    .expect("volume should be built without parse errors"),
+            )
+            .build()
+    }
 }
 
 #[cfg(test)]
@@ -648,6 +708,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use strum::IntoEnumIterator;
     use uuid::uuid;
@@ -661,7 +722,10 @@ mod tests {
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::{
+            NodeRoles,
+            v1alpha1::{self, OpenSearchTls},
+        },
         framework::{
             ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
             OperatorName, ProductName, ProductVersion, RoleGroupName, ServiceAccountName,
@@ -723,6 +787,8 @@ mod tests {
                     v1alpha1::NodeRole::Ingest,
                     v1alpha1::NodeRole::RemoteClusterClient,
                 ]),
+                requested_secret_lifetime: Duration::from_str("1d")
+                    .expect("should be a valid duration"),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
@@ -745,6 +811,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
+            OpenSearchTls::default(),
         )
     }
 
@@ -1019,6 +1086,14 @@ mod tests {
                                         {
                                             "mountPath": "/stackable/log",
                                             "name": "log"
+                                        },
+                                                                                {
+                                            "mountPath": "/stackable/opensearch/config/tls/internal",
+                                            "name": "tls-internal"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/tls/server",
+                                            "name": "tls-server",
                                         }
                                     ]
                                 },
@@ -1145,7 +1220,59 @@ mod tests {
                                         "sizeLimit": "30Mi"
                                     },
                                     "name": "log"
-                               }
+                               },
+                               {
+                                "ephemeral": {
+                                    "volumeClaimTemplate": {
+                                        "metadata": {
+                                            "annotations": {
+                                                "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                                "secrets.stackable.tech/class": "tls",
+                                                "secrets.stackable.tech/format": "tls-pem",
+                                                "secrets.stackable.tech/scope": "listener-volume=listener,pod"
+                                            }
+                                        },
+                                        "spec": {
+                                            "accessModes": [
+                                                "ReadWriteOnce"
+                                            ],
+                                            "resources": {
+                                                "requests": {
+                                                    "storage": "1"
+                                                }
+                                            },
+                                            "storageClassName": "secrets.stackable.tech"
+                                            }
+                                        }
+                                    },
+                                "name": "tls-internal"
+                                },
+                                {
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "metadata": {
+                                                "annotations": {
+                                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                                    "secrets.stackable.tech/class": "tls",
+                                                    "secrets.stackable.tech/format": "tls-pem",
+                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster,listener-volume=listener,pod"
+                                                }
+                                            },
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1"
+                                                    }
+                                                },
+                                                "storageClassName": "secrets.stackable.tech"
+                                                }
+                                            }
+                                        },
+                                    "name": "tls-server"
+                                },
                             ]
                         }
                     },
@@ -1237,7 +1364,7 @@ mod tests {
                     "annotations": {
                         "prometheus.io/path": "/_prometheus/metrics",
                         "prometheus.io/port": "9200",
-                        "prometheus.io/scheme": "http",
+                        "prometheus.io/scheme": "https",
                         "prometheus.io/scrape": "true"
                     },
                     "labels": {

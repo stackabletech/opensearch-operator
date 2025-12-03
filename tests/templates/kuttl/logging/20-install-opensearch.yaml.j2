@@ -50,15 +50,6 @@ spec:
                   ROOT:
                     level: INFO
         replicas: 1
-        podOverrides:
-          spec:
-            volumes:
-              - name: tls
-                ephemeral:
-                  volumeClaimTemplate:
-                    metadata:
-                      annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-automatic-headless
       custom:
         config:
           logging:
@@ -68,15 +59,6 @@ spec:
                 custom:
                   configMap: custom-log-config
         replicas: 1
-        podOverrides:
-          spec:
-            volumes:
-              - name: tls
-                ephemeral:
-                  volumeClaimTemplate:
-                    metadata:
-                      annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-custom-headless
     configOverrides:
       opensearch.yml:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
@@ -88,14 +70,6 @@ spec:
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.allow_default_init_securityindex: "true"
-        plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
-        plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
     podOverrides:
       spec:
         containers:
@@ -104,26 +78,10 @@ spec:
               - name: security-config
                 mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
-              - name: tls
-                mountPath: /stackable/opensearch/config/tls
-                readOnly: true
         volumes:
           - name: security-config
             secret:
               secretName: opensearch-security-config
-          - name: tls
-            ephemeral:
-              volumeClaimTemplate:
-                metadata:
-                  annotations:
-                    secrets.stackable.tech/class: tls
-                spec:
-                  storageClassName: secrets.stackable.tech
-                  accessModes:
-                    - ReadWriteOnce
-                  resources:
-                    requests:
-                      storage: "1"
 ---
 apiVersion: v1
 kind: Secret

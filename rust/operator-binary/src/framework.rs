@@ -512,7 +512,14 @@ attributed_string_type! {
     is_rfc_1123_label_name,
     is_valid_label_value
 }
-
+attributed_string_type! {
+    SecretClassName,
+    "The TLS SecretClass name",
+    "tls",
+    // The secret class name is used in an annotation on the tls volume.
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    is_rfc_1123_dns_subdomain_name
+}
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
