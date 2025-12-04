@@ -49,18 +49,8 @@ spec:
           configMap:
             name: test-opensearch-2
         - name: tls
-          ephemeral:
-            volumeClaimTemplate:
-              metadata:
-                annotations:
-                  secrets.stackable.tech/class: tls
-              spec:
-                storageClassName: secrets.stackable.tech
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: "1"
+          configMap:
+            name: truststore-pem
       serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000

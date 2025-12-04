@@ -14,8 +14,6 @@ spec:
           volumeMounts:
             - name: script
               mountPath: /stackable/scripts
-            - name: tls
-              mountPath: /stackable/tls
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -34,19 +32,6 @@ spec:
           configMap:
             name: create-opensearch-2-admin-certificate-script
             defaultMode: 0o770
-        - name: tls
-          ephemeral:
-            volumeClaimTemplate:
-              metadata:
-                annotations:
-                  secrets.stackable.tech/class: tls
-              spec:
-                storageClassName: secrets.stackable.tech
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: "1"
       serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000
