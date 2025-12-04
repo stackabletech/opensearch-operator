@@ -2,7 +2,7 @@
 apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
 metadata:
-  name: opensearch
+  name: opensearch-2
 spec:
   image:
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
@@ -33,6 +33,8 @@ spec:
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.allow_default_init_securityindex: "true"
+        plugins.security.authcz.admin_dn: CN=opensearch-2-admin-certificate
+        plugins.security.restapi.roles_enabled: all_access
         plugins.security.ssl.transport.enabled: "true"
         plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
         plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
@@ -96,6 +98,34 @@ spec:
                 mountPath: /etc/pki/ca-trust/source/anchors/s3-ca.crt
                 subPath: tls.crt
                 readOnly: true
+          - name: init-tls
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+            command:
+              - /bin/bash
+              - -euxo
+              - pipefail
+              - -c
+            args:
+              - |
+                cp /stackable/opensearch/config/tls/tls.* /stackable/opensearch/config/tls-concatenated
+                cat \
+                    /stackable/opensearch/config/tls/ca.crt \
+                    /stackable/opensearch/config/tls-admin/tls.crt > \
+                    /stackable/opensearch/config/tls-concatenated/ca.crt
+            volumeMounts:
+              - name: tls
+                mountPath: /stackable/opensearch/config/tls
+                readOnly: true
+              - name: admin-certificate
+                mountPath: /stackable/opensearch/config/tls-admin
+                readOnly: true
+              - name: tls-concatenated
+                mountPath: /stackable/opensearch/config/tls-concatenated
+                readOnly: false
         containers:
           - name: opensearch
             volumeMounts:
@@ -106,7 +136,7 @@ spec:
                 mountPath: /etc/pki/java/cacerts
                 subPath: java/cacerts
                 readOnly: true
-              - name: tls
+              - name: tls-concatenated
                 mountPath: /stackable/opensearch/config/tls
                 readOnly: true
               - name: keystore
@@ -125,9 +155,13 @@ spec:
             secret:
               secretName: minio-ca-crt
               defaultMode: 0o660
+          - name: admin-certificate
+            secret:
+              secretName: opensearch-2-admin-certificate
+              defaultMode: 0o660
           - name: security-config
             secret:
-              secretName: opensearch-security-config
+              secretName: opensearch-2-security-config
               defaultMode: 0o660
           - name: system-trust-store
             emptyDir:
@@ -137,7 +171,7 @@ spec:
               volumeClaimTemplate:
                 metadata:
                   annotations:
-                    secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-default-headless
+                    secrets.stackable.tech/scope: node,pod,service=opensearch-2,service=opensearch-2-nodes-default,service=opensearch-2-nodes-default-headless,listener-volume=listener
                     secrets.stackable.tech/class: tls
                 spec:
                   storageClassName: secrets.stackable.tech
@@ -146,11 +180,14 @@ spec:
                   resources:
                     requests:
                       storage: "1"
+          - name: tls-concatenated
+            emptyDir:
+              sizeLimit: 1Mi
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: opensearch-security-config
+  name: opensearch-2-security-config
 stringData:
   action_groups.yml: |
     ---

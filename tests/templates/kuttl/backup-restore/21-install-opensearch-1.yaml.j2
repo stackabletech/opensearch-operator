@@ -1,0 +1,281 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch-1
+spec:
+  image:
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% endif %}
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+    pullPolicy: IfNotPresent
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+  clusterConfig:
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+      listenerClass: external-unstable
+    roleGroups:
+      default:
+        replicas: 1
+    configOverrides:
+      opensearch.yml:
+        # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
+        # vm.max_map_count would have to be increased to 262144 on the node.
+        node.store.allow_mmap: "false"
+        # Disable the disk allocation decider in this test; Otherwise the test depends on the disk
+        # usage of the node and if the relative watermark set in
+        # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
+        # not be created even if enough disk space would be available.
+        cluster.routing.allocation.disk.threshold_enabled: "false"
+        plugins.security.allow_default_init_securityindex: "true"
+        plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
+        plugins.security.restapi.roles_enabled: all_access
+        plugins.security.ssl.transport.enabled: "true"
+        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        plugins.security.ssl.http.enabled: "true"
+        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
+        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
+        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        s3.client.default.endpoint: https://minio:9000/
+        s3.client.default.protocol: https
+        s3.client.default.region: unused # but required
+        s3.client.default.path_style_access: "true"
+    podOverrides:
+      spec:
+        initContainers:
+          - name: init-keystore
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+            command:
+              - /bin/bash
+              - -euxo
+              - pipefail
+              - -c
+            args:
+              - |
+                bin/opensearch-keystore create
+
+                for i in keystore-secrets/*; do
+                  key=$(basename $i)
+                  bin/opensearch-keystore add-file "$key" "$i"
+                done
+
+                cp --archive config/opensearch.keystore initialized-keystore
+            volumeMounts:
+              - name: keystore
+                mountPath: /stackable/opensearch/initialized-keystore
+                readOnly: false
+              - name: keystore-secrets
+                mountPath: /stackable/opensearch/keystore-secrets
+                readOnly: true
+          - name: init-system-keystore
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+            command:
+              - update-ca-trust
+            args:
+              - extract
+              - --output
+              - /stackable/ca-trust
+            volumeMounts:
+              - name: system-trust-store
+                mountPath: /stackable/ca-trust
+                readOnly: false
+              - name: s3-ca-crt
+                mountPath: /etc/pki/ca-trust/source/anchors/s3-ca.crt
+                subPath: tls.crt
+                readOnly: true
+          - name: init-tls
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+            command:
+              - /bin/bash
+              - -euxo
+              - pipefail
+              - -c
+            args:
+              - |
+                cp /stackable/opensearch/config/tls/tls.* /stackable/opensearch/config/tls-concatenated
+                cat \
+                    /stackable/opensearch/config/tls/ca.crt \
+                    /stackable/opensearch/config/tls-admin/tls.crt > \
+                    /stackable/opensearch/config/tls-concatenated/ca.crt
+            volumeMounts:
+              - name: tls
+                mountPath: /stackable/opensearch/config/tls
+                readOnly: true
+              - name: admin-certificate
+                mountPath: /stackable/opensearch/config/tls-admin
+                readOnly: true
+              - name: tls-concatenated
+                mountPath: /stackable/opensearch/config/tls-concatenated
+                readOnly: false
+        containers:
+          - name: opensearch
+            volumeMounts:
+              - name: security-config
+                mountPath: /stackable/opensearch/config/opensearch-security
+                readOnly: true
+              - name: system-trust-store
+                mountPath: /etc/pki/java/cacerts
+                subPath: java/cacerts
+                readOnly: true
+              - name: tls-concatenated
+                mountPath: /stackable/opensearch/config/tls
+                readOnly: true
+              - name: keystore
+                mountPath: /stackable/opensearch/config/opensearch.keystore
+                subPath: opensearch.keystore
+                readOnly: true
+        volumes:
+          - name: keystore
+            emptyDir:
+              sizeLimit: 1Mi
+          - name: keystore-secrets
+            secret:
+              secretName: s3-credentials
+              defaultMode: 0o660
+          - name: s3-ca-crt
+            secret:
+              secretName: minio-ca-crt
+              defaultMode: 0o660
+          - name: admin-certificate
+            secret:
+              secretName: opensearch-1-admin-certificate
+              defaultMode: 0o660
+          - name: security-config
+            secret:
+              secretName: opensearch-1-security-config
+              defaultMode: 0o660
+          - name: system-trust-store
+            emptyDir:
+              sizeLimit: 10Mi
+          - name: tls
+            ephemeral:
+              volumeClaimTemplate:
+                metadata:
+                  annotations:
+                    secrets.stackable.tech/scope: node,pod,service=opensearch-1,service=opensearch-1-nodes-default,service=opensearch-1-nodes-default-headless,listener-volume=listener
+                    secrets.stackable.tech/class: tls
+                spec:
+                  storageClassName: secrets.stackable.tech
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: "1"
+          - name: tls-concatenated
+            emptyDir:
+              sizeLimit: 1Mi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-1-security-config
+stringData:
+  action_groups.yml: |
+    ---
+    _meta:
+      type: actiongroups
+      config_version: 2
+  allowlist.yml: |
+    ---
+    _meta:
+      type: allowlist
+      config_version: 2
+
+    config:
+      enabled: false
+  audit.yml: |
+    ---
+    _meta:
+      type: audit
+      config_version: 2
+
+    config:
+      enabled: false
+  config.yml: |
+    ---
+    _meta:
+      type: config
+      config_version: 2
+
+    config:
+      dynamic:
+        authc:
+          basic_internal_auth_domain:
+            description: Authenticate via HTTP Basic against internal users database
+            http_enabled: true
+            transport_enabled: true
+            order: 1
+            http_authenticator:
+              type: basic
+              challenge: true
+            authentication_backend:
+              type: intern
+        authz: {}
+  internal_users.yml: |
+    ---
+    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
+
+    _meta:
+      type: internalusers
+      config_version: 2
+
+    admin:
+      hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+      reserved: true
+      backend_roles:
+        - admin
+      description: OpenSearch admin user
+
+    kibanaserver:
+      hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
+      reserved: true
+      description: OpenSearch Dashboards user
+  nodes_dn.yml: |
+    ---
+    _meta:
+      type: nodesdn
+      config_version: 2
+  roles.yml: |
+    ---
+    _meta:
+      type: roles
+      config_version: 2
+  roles_mapping.yml: |
+    ---
+    _meta:
+      type: rolesmapping
+      config_version: 2
+
+    all_access:
+      reserved: false
+      backend_roles:
+        - admin
+
+    kibana_server:
+      reserved: true
+      users:
+        - kibanaserver
+  tenants.yml: |
+    ---
+    _meta:
+      type: tenants
+      config_version: 2

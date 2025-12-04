@@ -1,0 +1,118 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restore-snapshot
+spec:
+  template:
+    spec:
+      containers:
+        - name: restore-snapshot
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/restore-snapshot.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: restore-snapshot-script
+        - name: tls
+          configMap:
+            name: truststore-pem
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: restore-snapshot-script
+data:
+  restore-snapshot.py: |
+    import os
+    from opensearchpy import OpenSearch
+    from opensearchpy.exceptions import RequestError
+
+    namespace = os.environ['NAMESPACE']
+
+    client = OpenSearch(
+      hosts=[{
+        'host': f'opensearch-2-nodes-default.{namespace}.svc.cluster.local',
+        'port': 9200
+      }],
+      http_auth=('admin', 'AJVFsGJBbpT6mChn'),
+      http_compress=True,
+      use_ssl=True,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
+    )
+
+    # Create snapshot repository
+    snapshot_repository = "snapshot_repository"
+
+    response = client.snapshot.create_repository(
+      repository=snapshot_repository,
+      body={
+        "type": "s3",
+        "settings": {
+          "bucket": "opensearch-data"
+        }
+      }
+    )
+
+    print(f'Creating snapshot repository; {response=}')
+
+    # Restore snapshot
+    snapshot = "test_snapshot"
+
+    response = client.snapshot.restore(
+      repository='snapshot_repository',
+      snapshot=snapshot,
+      # Do not restore the following indices:
+      # - .opensearch_security will be restored with securityadmin.sh
+      # - .plugins-ml-config already was created by the plugin
+      # - .opensearch-sap-log-types-config already was created by the plugin
+      #
+      # see also https://github.com/opensearch-project/security-analytics/issues/1352
+      body={
+        'indices': ','.join([
+          '-.opendistro_security',
+          '-.plugins-ml-config',
+          '-.opensearch-sap-log-types-config'
+        ])
+      }
+    )
+    print(f'Restoring snapshot; {response=}')

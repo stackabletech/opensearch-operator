@@ -1,0 +1,93 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-testuser
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-testuser
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/create-testuser.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: create-testuser-script
+        - name: tls
+          configMap:
+            name: truststore-pem
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: create-testuser-script
+data:
+  create-testuser.py: |
+    import os
+    from opensearchpy import OpenSearch
+    from opensearchpy.exceptions import RequestError
+
+    namespace = os.environ['NAMESPACE']
+
+    # Login as admin
+    client = OpenSearch(
+      http_auth=('admin', 'AJVFsGJBbpT6mChn'),
+      hosts=[{
+        'host': f'opensearch-1-nodes-default.{namespace}.svc.cluster.local',
+        'port': 9200
+      }],
+      http_compress=True,
+      use_ssl=True,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
+    )
+
+    # Create a test user and grant all access
+    response = client.security.create_user(
+      username='testuser',
+      body={
+        'password': 'L9hUHtLVVEsrcLzZ',
+        'opendistro_security_roles': ['all_access']
+      }
+    )
+
+    print(f'Creating test user; {response=}')

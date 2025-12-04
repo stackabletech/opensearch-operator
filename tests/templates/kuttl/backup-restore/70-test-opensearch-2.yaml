@@ -1,0 +1,92 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-opensearch-2
+spec:
+  template:
+    spec:
+      containers:
+        - name: test-opensearch-2
+          image: oci.stackable.tech/sdp/testing-tools:0.2.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.0.0
+              python scripts/test-opensearch-2.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: test-opensearch-2
+        - name: tls
+          configMap:
+            name: truststore-pem
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-opensearch-2
+data:
+  test-opensearch-2.py: |
+    import os
+    from opensearchpy import OpenSearch
+    from opensearchpy.exceptions import RequestError
+
+    namespace = os.environ['NAMESPACE']
+
+    # Login as test user
+    client = OpenSearch(
+      http_auth=('testuser', 'L9hUHtLVVEsrcLzZ'),
+      hosts=[{
+        'host': f'opensearch-2-nodes-default.{namespace}.svc.cluster.local',
+        'port': 9200
+      }],
+      http_compress=True,
+      use_ssl=True,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
+    )
+
+    # Fetch a document from the index
+    response = client.get(
+      index='test-index',
+      id=1,
+    )
+
+    print(f'Fetching document; {response=}')
+
+    assert response['_source'] == {'name': 'Stackable'}

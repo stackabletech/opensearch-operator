@@ -40,7 +40,7 @@ tests:
       - opensearch_home
       - release
   # requires the repository-s3 plugin
-  - name: snapshot-s3
+  - name: backup-restore
     dimensions:
       - opensearch
       - release
