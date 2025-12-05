@@ -10,9 +10,9 @@ use crate::{
     controller::OpenSearchRoleGroupConfig,
     crd::v1alpha1,
     framework::{
-        RoleGroupName, ServiceName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
+        types::{kubernetes::ServiceName, operator::RoleGroupName},
     },
 };
 
@@ -296,9 +296,12 @@ mod tests {
         controller::{ValidatedLogging, ValidatedOpenSearchConfig},
         crd::NodeRoles,
         framework::{
-            ClusterName, ListenerClassName, NamespaceName, ProductVersion, RoleGroupName,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName},
+                operator::{ClusterName, ProductVersion, RoleGroupName},
+            },
         },
     };
 

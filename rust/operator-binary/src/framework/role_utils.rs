@@ -15,10 +15,12 @@ use stackable_operator::{
 };
 
 use super::{
-    ProductName, RoleBindingName, ServiceAccountName, ServiceName,
     builder::pod::container::EnvVarSet,
+    types::{
+        kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+        operator::{ClusterName, ProductName},
+    },
 };
-use crate::framework::{ClusterName, ClusterRoleName};
 
 /// Variant of [`stackable_operator::role_utils::GenericProductSpecificCommonConfig`] that
 /// implements [`Merge`]
@@ -248,8 +250,11 @@ mod tests {
 
     use super::ResourceNames;
     use crate::framework::{
-        ClusterName, ClusterRoleName, ProductName, RoleBindingName, ServiceAccountName,
-        ServiceName, role_utils::with_validated_config,
+        role_utils::with_validated_config,
+        types::{
+            kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+            operator::{ClusterName, ProductName},
+        },
     };
 
     #[derive(Debug, Fragment, PartialEq)]

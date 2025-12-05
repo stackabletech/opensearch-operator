@@ -10,7 +10,13 @@ use stackable_operator::{
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, KubernetesResources, Prepared};
-use crate::framework::{ClusterName, NamespaceName, Uid, cluster_resources::cluster_resources_new};
+use crate::framework::{
+    cluster_resources::cluster_resources_new,
+    types::{
+        kubernetes::{NamespaceName, Uid},
+        operator::ClusterName,
+    },
+};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
