@@ -10,9 +10,6 @@ pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 #[snafu(visibility(pub))]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
-    #[snafu(display("empty strings are not allowed"))]
-    EmptyString {},
-
     #[snafu(display("minimum length not met"))]
     MinimumLengthNotMet { length: usize, min_length: usize },
 
@@ -49,23 +46,30 @@ pub enum Error {
     InvalidUid { source: uuid::Error },
 }
 
-#[derive(Clone, Copy, Debug)]
+/// Helper data type to determine combined regular expressions
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Regex {
-    /// There is a regular expression but it is unknown (or too complicated).
+    /// There is a regular expression but it is unknown (because it was too complicated to
+    /// calculate it).
     Unknown,
 
-    /// `MatchAll` equals Expression(".*") but can be matched in a const context.
+    /// `MatchAll` equals `Expression(".*")`, but `MatchAll` can be pattern matched in a const
+    /// context, whereas `Expression(...)` cannot.
     MatchAll,
 
-    /// There is a regular expression.
+    /// A regular expression
     Expression(&'static str),
 }
 
 impl Regex {
+    /// Combine this regular expression with the given one.
     pub const fn combine(self, other: Regex) -> Regex {
         match (self, other) {
             (_, Regex::MatchAll) => self,
             (Regex::MatchAll, _) => other,
+            // It is hard to combine two regular expressions and nearly impossible to do this in a
+            // const context. Fortunately, for most of the data types, only one regular expression
+            // is set.
             _ => Regex::Unknown,
         }
     }
@@ -91,6 +95,21 @@ macro_rules! attributed_string_type {
         #[doc = std::concat!($description, ", e.g. \"", $example, "\"")]
         #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
         pub struct $name(String);
+
+        impl $name {
+            /// The minimum length
+            pub const MIN_LENGTH: usize = attributed_string_type!(@min_length $($attribute)*);
+
+            /// The maximum length
+            pub const MAX_LENGTH: usize = attributed_string_type!(@max_length $($attribute)*);
+
+            /// The regular expression
+            ///
+            /// This field is not meant to be used outside of this macro.
+            pub const REGEX: $crate::framework::macros::attributed_string_type::Regex = attributed_string_type!(@regex $($attribute)*);
+        }
+
+        impl stackable_operator::config::merge::Atomic for $name {}
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -124,11 +143,6 @@ macro_rules! attributed_string_type {
                 #[allow(unused_imports)]
                 use snafu::ResultExt;
 
-                snafu::ensure!(
-                    !s.is_empty(),
-                    $crate::framework::macros::attributed_string_type::EmptyStringSnafu {}
-                );
-
                 $(attributed_string_type!(@from_str $name, s, $attribute);)*
 
                 Ok(Self(s.to_owned()))
@@ -152,16 +166,6 @@ macro_rules! attributed_string_type {
             {
                 self.0.serialize(serializer)
             }
-        }
-
-        impl stackable_operator::config::merge::Atomic for $name {}
-
-        impl $name {
-            pub const MIN_LENGTH: usize = attributed_string_type!(@min_length $($attribute)*);
-            pub const MAX_LENGTH: usize = attributed_string_type!(@max_length $($attribute)*);
-
-            /// None if there are restrictions but the regular expression could not be calculated.
-            pub const REGEX: $crate::framework::macros::attributed_string_type::Regex = attributed_string_type!(@regex $($attribute)*);
         }
 
         // The JsonSchema implementation requires `max_length`.
@@ -420,6 +424,17 @@ macro_rules! attributed_string_type {
             pub const IS_RFC_1123_SUBDOMAIN_NAME: bool = true;
         }
     };
+    (@trait_impl $name:ident, is_valid_label_value) => {
+        impl $name {
+            pub const IS_VALID_LABEL_VALUE: bool = true;
+        }
+
+        impl $crate::framework::NameIsValidLabelValue for $name {
+            fn to_label_value(&self) -> String {
+                self.0.clone()
+            }
+        }
+    };
     (@trait_impl $name:ident, is_uid) => {
         impl From<uuid::Uuid> for $name {
             fn from(value: uuid::Uuid) -> Self {
@@ -430,17 +445,6 @@ macro_rules! attributed_string_type {
         impl From<&uuid::Uuid> for $name {
             fn from(value: &uuid::Uuid) -> Self {
                 Self(value.to_string())
-            }
-        }
-    };
-    (@trait_impl $name:ident, is_valid_label_value) => {
-        impl $name {
-            pub const IS_VALID_LABEL_VALUE: bool = true;
-        }
-
-        impl $crate::framework::NameIsValidLabelValue for $name {
-            fn to_label_value(&self) -> String {
-                self.0.clone()
             }
         }
     };
@@ -477,6 +481,8 @@ pub const fn max(x: usize, y: usize) -> usize {
 }
 
 #[cfg(test)]
+// `InvalidRegexTest` intentionally contains an invalid regular expression.
+#[allow(clippy::invalid_regex)]
 mod tests {
     use std::str::FromStr;
 
@@ -484,8 +490,160 @@ mod tests {
     use serde_json::{Number, Value, json};
     use uuid::uuid;
 
-    use super::ErrorDiscriminants;
+    use super::{ErrorDiscriminants, Regex};
     use crate::framework::NameIsValidLabelValue;
+
+    attributed_string_type! {
+        MinLengthWithoutConstraintsTest,
+        "min_length test without constraints",
+        ""
+    }
+
+    #[test]
+    fn test_attributed_string_type_min_length_without_constraints() {
+        type T = MinLengthWithoutConstraintsTest;
+
+        T::test_example();
+        assert_eq!(0, T::MIN_LENGTH);
+    }
+
+    attributed_string_type! {
+        MinLengthWithConstraintsTest,
+        "min_length test with constraints",
+        "test",
+        (min_length = 2), // should set the minimum length to 2
+        (max_length = 8), // should not affect the minimum length
+        (regex = ".{4}"), // should not affect the minimum length
+        is_rfc_1035_label_name, // should be overruled by the greater min_length
+        is_valid_label_value // should be overruled by the greater min_length
+    }
+
+    #[test]
+    fn test_attributed_string_type_min_length_with_constraints() {
+        type T = MinLengthWithConstraintsTest;
+
+        T::test_example();
+        assert_eq!(2, T::MIN_LENGTH);
+        assert_eq!(
+            Err(ErrorDiscriminants::MinimumLengthNotMet),
+            T::from_str("a").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
+        MaxLengthWithoutConstraintsTest,
+        "max_length test without constraints",
+        ""
+    }
+
+    #[test]
+    fn test_attributed_string_type_max_length_without_constraints() {
+        type T = MaxLengthWithoutConstraintsTest;
+
+        T::test_example();
+        assert_eq!(usize::MAX, T::MAX_LENGTH);
+    }
+
+    attributed_string_type! {
+        MaxLengthWithConstraintsTest,
+        "max_length test with constraints",
+        "test",
+        (min_length = 2), // should not affect the maximum length
+        (max_length = 8), // should set the maximum length to 8
+        (regex = ".{4}"), // should not affect the maximum length
+        is_rfc_1035_label_name, // should be overruled by the lower max_length
+        is_valid_label_value // should be overruled by the lower max_length
+    }
+
+    #[test]
+    fn test_attributed_string_type_max_length_with_constraints() {
+        type T = MaxLengthWithConstraintsTest;
+
+        T::test_example();
+        assert_eq!(8, T::MAX_LENGTH);
+        assert_eq!(
+            Err(ErrorDiscriminants::LengthExceeded),
+            T::from_str("test-12345").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
+        RegexWithoutConstraintsTest,
+        "regex test without constraints",
+        ""
+    }
+
+    #[test]
+    fn test_attributed_string_type_regex_without_constraints() {
+        type T = RegexWithoutConstraintsTest;
+
+        T::test_example();
+        assert_eq!(Regex::MatchAll, T::REGEX);
+    }
+
+    attributed_string_type! {
+        RegexWithOneConstraintTest,
+        "regex test with one constraint",
+        "test",
+        (min_length = 2), // should not affect the regular expression
+        (max_length = 8), // should not affect the regular expression
+        (regex = "[est]{4}") // should set the regular expression to "[est]{4}"
+    }
+
+    #[test]
+    fn test_attributed_string_type_regex_with_one_constraint() {
+        type T = RegexWithOneConstraintTest;
+
+        T::test_example();
+        assert_eq!(Regex::Expression("[est]{4}"), T::REGEX);
+        assert_eq!(
+            Err(ErrorDiscriminants::RegexNotMatched),
+            T::from_str("t-st").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
+        RegexWithMultipleConstraintsTest,
+        "regex test with multiple constraints",
+        "test",
+        (min_length = 2), // should not affect the regular expression
+        (max_length = 8), // should not affect the regular expression
+        (regex = "[est]{4}"), // should not be combinable with is_rfc_1123_dns_subdomain_name
+        is_rfc_1123_dns_subdomain_name // should not be combinable with regex
+    }
+
+    #[test]
+    fn test_attributed_string_type_regex_with_multiple_constraints() {
+        type T = RegexWithMultipleConstraintsTest;
+
+        T::test_example();
+        assert_eq!(Regex::Unknown, T::REGEX);
+        assert_eq!(
+            Err(ErrorDiscriminants::RegexNotMatched),
+            T::from_str("t-st").map_err(ErrorDiscriminants::from)
+        );
+    }
+
+    attributed_string_type! {
+        InvalidRegexTest,
+        "regex test with invalid expression",
+        "test",
+        (min_length = 2), // should not affect the regular expression
+        (max_length = 8), // should not affect the regular expression
+        (regex = "{") // should throw an error at runtime
+    }
+
+    #[test]
+    fn test_attributed_string_type_regex_with_invalid_expression() {
+        type T = InvalidRegexTest;
+
+        // It is not known yet at compile-time that this expression is invalid.
+        assert_eq!(Regex::Expression("{"), T::REGEX);
+        assert_eq!(
+            Err(ErrorDiscriminants::InvalidRegex),
+            T::from_str("test").map_err(ErrorDiscriminants::from)
+        );
+    }
 
     attributed_string_type! {
         DisplayFmtTest,
@@ -516,77 +674,13 @@ mod tests {
     }
 
     attributed_string_type! {
-        LengthTest,
-        "empty string and max_length test",
-        "test",
-        (max_length = 4)
-    }
-
-    #[test]
-    fn test_attributed_string_type_length() {
-        type T = LengthTest;
-
-        T::test_example();
-        assert_eq!(4, T::MAX_LENGTH);
-        assert_eq!(
-            Err(ErrorDiscriminants::EmptyString),
-            T::from_str("").map_err(ErrorDiscriminants::from)
-        );
-        assert_eq!(
-            Err(ErrorDiscriminants::LengthExceeded),
-            T::from_str("testX").map_err(ErrorDiscriminants::from)
-        );
-    }
-
-    attributed_string_type! {
-        JsonSchemaTest,
-        "JsonSchemaTest test",
-        "test",
-        (min_length = 4),
-        (max_length = 8),
-        (regex = "[est]+")
-    }
-
-    #[test]
-    fn test_attributed_string_type_json_schema() {
-        type T = JsonSchemaTest;
-
-        T::test_example();
-        assert_eq!("JsonSchemaTest", JsonSchemaTest::schema_name());
-        assert_eq!(
-            json!({
-                "type": "string",
-                "minLength": 4,
-                "maxLength": 8,
-                "pattern": "^[est]+$",
-            }),
-            JsonSchemaTest::json_schema(&mut SchemaGenerator::default())
-        );
-    }
-
-    attributed_string_type! {
-        SerializeTest,
-        "serde::Serialize test",
-        "test"
-    }
-
-    #[test]
-    fn test_attributed_string_type_serialize() {
-        type T = SerializeTest;
-
-        T::test_example();
-        assert_eq!(
-            "\"test\"".to_owned(),
-            serde_json::to_string(&T::from_str_unsafe("test")).expect("should be serializable")
-        );
-    }
-
-    attributed_string_type! {
         DeserializeTest,
         "serde::Deserialize test",
         "test",
+        (min_length = 2),
         (max_length = 4),
-        is_rfc_1123_label_name
+        (regex = "[est-]+"),
+        is_rfc_1035_label_name
     }
 
     #[test]
@@ -600,18 +694,23 @@ mod tests {
                 .expect("should be deserializable")
         );
         assert_eq!(
-            Err("empty strings are not allowed".to_owned()),
-            serde_json::from_value::<T>(Value::String("".to_owned()))
+            Err("minimum length not met".to_owned()),
+            serde_json::from_value::<T>(Value::String("e".to_owned()))
                 .map_err(|err| err.to_string())
         );
         assert_eq!(
             Err("maximum length exceeded".to_owned()),
-            serde_json::from_value::<T>(Value::String("testx".to_owned()))
+            serde_json::from_value::<T>(Value::String("testt".to_owned()))
                 .map_err(|err| err.to_string())
         );
         assert_eq!(
-            Err("not a valid label name as defined in RFC 1123".to_owned()),
-            serde_json::from_value::<T>(Value::String("-".to_owned()))
+            Err("regular expression not matched".to_owned()),
+            serde_json::from_value::<T>(Value::String("abc".to_owned()))
+                .map_err(|err| err.to_string())
+        );
+        assert_eq!(
+            Err("not a valid label name as defined in RFC 1035".to_owned()),
+            serde_json::from_value::<T>(Value::String("-tst".to_owned()))
                 .map_err(|err| err.to_string())
         );
         assert_eq!(
@@ -637,6 +736,72 @@ mod tests {
             Err("invalid type: map, expected a string".to_owned()),
             serde_json::from_value::<T>(Value::Object(serde_json::Map::new()))
                 .map_err(|err| err.to_string())
+        );
+    }
+
+    attributed_string_type! {
+        SerializeTest,
+        "serde::Serialize test",
+        "test"
+    }
+
+    #[test]
+    fn test_attributed_string_type_serialize() {
+        type T = SerializeTest;
+
+        T::test_example();
+        assert_eq!(
+            "\"test\"".to_owned(),
+            serde_json::to_string(&T::from_str_unsafe("test")).expect("should be serializable")
+        );
+    }
+
+    attributed_string_type! {
+        JsonSchemaWithoutConstraintsTest,
+        "JsonSchema test with constraints",
+        "test"
+    }
+
+    #[test]
+    fn test_attributed_string_type_json_schema_without_constaints() {
+        type T = JsonSchemaWithoutConstraintsTest;
+
+        T::test_example();
+        assert_eq!("JsonSchemaWithoutConstraintsTest", T::schema_name());
+        assert_eq!(
+            json!({
+                "type": "string",
+                "minLength": 0,
+                "maxLength": None::<usize>,
+                "pattern": None::<String>
+            }),
+            T::json_schema(&mut SchemaGenerator::default())
+        );
+    }
+
+    attributed_string_type! {
+        JsonSchemaWithConstraintsTest,
+        "JsonSchema test with constraints",
+        "test",
+        (min_length = 4),
+        (max_length = 8),
+        (regex = "[est]+")
+    }
+
+    #[test]
+    fn test_attributed_string_type_json_schema_with_constraints() {
+        type T = JsonSchemaWithConstraintsTest;
+
+        T::test_example();
+        assert_eq!("JsonSchemaWithConstraintsTest", T::schema_name());
+        assert_eq!(
+            json!({
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 8,
+                "pattern": "^[est]+$"
+            }),
+            T::json_schema(&mut SchemaGenerator::default())
         );
     }
 
