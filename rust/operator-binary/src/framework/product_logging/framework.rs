@@ -18,9 +18,9 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 use crate::{
     constant,
     framework::{
-        ConfigMapKey, ConfigMapName, ContainerName, VolumeName,
         builder::pod::container::{EnvVarName, EnvVarSet, new_container_builder},
         role_group_utils,
+        types::kubernetes::{ConfigMapKey, ConfigMapName, ContainerName, VolumeName},
     },
 };
 
@@ -50,7 +50,9 @@ pub enum Error {
     GetContainerLogConfiguration { container: String },
 
     #[snafu(display("failed to parse the container name"))]
-    ParseContainerName { source: crate::framework::Error },
+    ParseContainerName {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -241,9 +243,12 @@ mod tests {
         validate_logging_configuration_for_container, vector_container,
     };
     use crate::framework::{
-        ClusterName, ConfigMapName, ContainerName, RoleGroupName, RoleName, VolumeName,
         builder::pod::container::{EnvVarName, EnvVarSet},
         role_group_utils,
+        types::{
+            kubernetes::{ConfigMapName, ContainerName, VolumeName},
+            operator::{ClusterName, RoleGroupName, RoleName},
+        },
     };
 
     #[test]

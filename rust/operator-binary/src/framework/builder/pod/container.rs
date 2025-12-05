@@ -7,7 +7,7 @@ use stackable_operator::{
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
-use crate::framework::{ConfigMapKey, ConfigMapName, ContainerName};
+use crate::framework::types::kubernetes::{ConfigMapKey, ConfigMapName, ContainerName};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -187,7 +187,8 @@ mod tests {
 
     use super::{EnvVarName, EnvVarSet};
     use crate::framework::{
-        ConfigMapKey, ConfigMapName, ContainerName, builder::pod::container::new_container_builder,
+        builder::pod::container::new_container_builder,
+        types::kubernetes::{ConfigMapKey, ConfigMapName, ContainerName},
     };
 
     #[test]

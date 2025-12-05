@@ -4,8 +4,10 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    ControllerName, HasName, NameIsValidLabelValue, OperatorName, ProductName, ProductVersion,
-    RoleGroupName, RoleName,
+    HasName, NameIsValidLabelValue,
+    types::operator::{
+        ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName,
+    },
 };
 
 /// Infallible variant of [`stackable_operator::kvp::Labels::recommended`]
@@ -72,9 +74,11 @@ mod tests {
     };
 
     use crate::framework::{
-        ControllerName, HasName, NameIsValidLabelValue, OperatorName, ProductName, ProductVersion,
-        RoleGroupName, RoleName,
+        HasName, NameIsValidLabelValue,
         kvp::label::{recommended_labels, role_group_selector, role_selector},
+        types::operator::{
+            ControllerName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName,
+        },
     };
 
     struct Cluster {

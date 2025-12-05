@@ -241,9 +241,15 @@ mod tests {
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
-            ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
+            builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName},
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
         },
     };
 
