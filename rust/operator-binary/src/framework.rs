@@ -32,7 +32,6 @@ pub mod kvp;
 pub mod product_logging;
 pub mod role_group_utils;
 pub mod role_utils;
-pub mod validation;
 
 #[derive(Debug, EnumDiscriminants, Snafu)]
 #[strum_discriminants(derive(IntoStaticStr))]
@@ -51,11 +50,6 @@ pub enum Error {
 
     #[snafu(display("regular expression not matched"))]
     RegexNotMatched { value: String, regex: &'static str },
-
-    #[snafu(display("not a valid ConfigMap key"))]
-    InvalidConfigMapKey {
-        source: crate::framework::validation::Error,
-    },
 
     #[snafu(display("not a valid label value"))]
     InvalidLabelValue {
@@ -237,7 +231,7 @@ macro_rules! attributed_string_type {
                         None
                     },
                     "pattern": match $name::REGEX {
-                        $crate::framework::Regex::Expression(regex) => Some(regex),
+                        $crate::framework::Regex::Expression(regex) => Some(std::format!("^{regex}$")),
                         _ => None
                     }
                 })
@@ -292,9 +286,6 @@ macro_rules! attributed_string_type {
             }
         );
     };
-    (@from_str $name:ident, $s:expr, is_config_map_key) => {
-        $crate::framework::validation::is_config_map_key($s).context($crate::framework::InvalidConfigMapKeySnafu)?;
-    };
     (@from_str $name:ident, $s:expr, is_rfc_1035_label_name) => {
         stackable_operator::validation::is_lowercase_rfc_1035_label($s).context($crate::framework::InvalidRfc1035LabelNameSnafu)?;
     };
@@ -330,12 +321,6 @@ macro_rules! attributed_string_type {
     (@min_length (regex = $regex:expr) $($attribute:tt)*) => {
         // regex has no influence on the min_length.
         attributed_string_type!(@min_length $($attribute)*)
-    };
-    (@min_length is_config_map_key $($attribute:tt)*) => {
-        $crate::framework::max(
-            1,
-            attributed_string_type!(@min_length $($attribute)*)
-        )
     };
     (@min_length is_rfc_1035_label_name $($attribute:tt)*) => {
         $crate::framework::max(
@@ -388,12 +373,6 @@ macro_rules! attributed_string_type {
         // regex has no influence on the max_length.
         attributed_string_type!(@max_length $($attribute)*)
     };
-    (@max_length is_config_map_key $($attribute:tt)*) => {
-        $crate::framework::min(
-            stackable_operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH,
-            attributed_string_type!(@max_length $($attribute)*)
-        )
-    };
     (@max_length is_rfc_1035_label_name $($attribute:tt)*) => {
         $crate::framework::min(
             stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH,
@@ -443,10 +422,6 @@ macro_rules! attributed_string_type {
         $crate::framework::Regex::Expression($regex)
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
-    (@regex is_config_map_key $($attribute:tt)*) => {
-        $crate::framework::Regex::Expression($crate::framework::validation::CONFIG_MAP_KEY_FMT)
-            .combine(attributed_string_type!(@regex $($attribute)*))
-    };
     (@regex is_rfc_1035_label_name $($attribute:tt)*) => {
         $crate::framework::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1035_LABEL_FMT)
             .combine(attributed_string_type!(@regex $($attribute)*))
@@ -461,11 +436,11 @@ macro_rules! attributed_string_type {
     };
     (@regex is_valid_label_value $($attribute:tt)*) => {
         // regular expression from stackable_operator::kvp::label::LABEL_VALUE_REGEX
-        $crate::framework::Regex::Expression("^[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?$")
+        $crate::framework::Regex::Expression("[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_uid $($attribute:tt)*) => {
-        $crate::framework::Regex::Expression("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+        $crate::framework::Regex::Expression("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
 
@@ -476,8 +451,6 @@ macro_rules! attributed_string_type {
     (@trait_impl $name:ident, (max_length = $max_length:expr)) => {
     };
     (@trait_impl $name:ident, (regex = $regex:expr)) => {
-    };
-    (@trait_impl $name:ident, is_config_map_key) => {
     };
     (@trait_impl $name:ident, is_rfc_1035_label_name) => {
         impl $name {
@@ -581,11 +554,12 @@ attributed_string_type! {
 }
 attributed_string_type! {
     ConfigMapKey,
-    "The key for a ConfigMap or Secret",
+    "The key for a ConfigMap",
     "log4j2.properties",
+    (min_length = 1),
     // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
-    is_config_map_key
+    (regex = "[-._a-zA-Z0-9]+")
 }
 attributed_string_type! {
     ContainerName,
@@ -637,6 +611,15 @@ attributed_string_type! {
     // on Kind. However, 253 characters are sufficient for the Stackable operators, and to avoid
     // problems on other Kubernetes providers, the length is restricted here.
     is_rfc_1123_dns_subdomain_name
+}
+attributed_string_type! {
+    SecretKey,
+    "The key for a Secret",
+    "accessKey",
+    (min_length = 1),
+    // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
+    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
+    (regex = "[-._a-zA-Z0-9]+")
 }
 attributed_string_type! {
     ServiceAccountName,
@@ -840,7 +823,7 @@ mod tests {
         "test",
         (min_length = 4),
         (max_length = 8),
-        (regex = "^[est]+$")
+        (regex = "[est]+")
     }
 
     #[test]
@@ -854,7 +837,7 @@ mod tests {
                 "type": "string",
                 "minLength": 4,
                 "maxLength": 8,
-                "pattern": "^[tes]+$",
+                "pattern": "^[est]+$",
             }),
             JsonSchemaTest::json_schema(&mut SchemaGenerator::default())
         );
@@ -933,24 +916,6 @@ mod tests {
             Err("invalid type: map, expected a string".to_owned()),
             serde_json::from_value::<T>(Value::Object(serde_json::Map::new()))
                 .map_err(|err| err.to_string())
-        );
-    }
-
-    attributed_string_type! {
-        IsConfigMapKeyTest,
-        "is_config_map_key test",
-        "a_B-c.1",
-        is_config_map_key
-    }
-
-    #[test]
-    fn test_attributed_string_type_is_config_map_key() {
-        type T = IsConfigMapKeyTest;
-
-        T::test_example();
-        assert_eq!(
-            Err(ErrorDiscriminants::InvalidConfigMapKey),
-            T::from_str(" ").map_err(ErrorDiscriminants::from)
         );
     }
 
