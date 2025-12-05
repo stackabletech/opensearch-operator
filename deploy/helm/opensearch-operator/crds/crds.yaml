@@ -41,6 +41,7 @@ spec:
                       maxLength: 253
                       minLength: 1
                       nullable: true
+                      pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
                       type: string
                   type: object
                 clusterOperation:
@@ -191,6 +192,7 @@ spec:
                           maxLength: 253
                           minLength: 1
                           nullable: true
+                          pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
                           type: string
                         logging:
                           default:
@@ -539,6 +541,7 @@ spec:
                                 maxLength: 253
                                 minLength: 1
                                 nullable: true
+                                pattern: '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
                                 type: string
                               logging:
                                 default:
