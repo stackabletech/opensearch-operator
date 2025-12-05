@@ -23,9 +23,7 @@
 use std::str::FromStr;
 
 use snafu::Snafu;
-use stackable_operator::validation::{
-    RFC_1035_LABEL_MAX_LENGTH, RFC_1123_LABEL_MAX_LENGTH, RFC_1123_SUBDOMAIN_MAX_LENGTH,
-};
+use stackable_operator::validation::{RFC_1123_LABEL_MAX_LENGTH, RFC_1123_SUBDOMAIN_MAX_LENGTH};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 pub mod builder;
@@ -42,8 +40,17 @@ pub enum Error {
     #[snafu(display("empty strings are not allowed"))]
     EmptyString {},
 
+    #[snafu(display("minimum length not met"))]
+    MinimumLengthNotMet { length: usize, min_length: usize },
+
     #[snafu(display("maximum length exceeded"))]
     LengthExceeded { length: usize, max_length: usize },
+
+    #[snafu(display("invalid regular expression"))]
+    InvalidRegex { source: regex::Error },
+
+    #[snafu(display("regular expression not matched"))]
+    RegexNotMatched { value: String, regex: &'static str },
 
     #[snafu(display("not a valid ConfigMap key"))]
     InvalidConfigMapKey {
@@ -98,6 +105,28 @@ pub trait NameIsValidLabelValue {
     fn to_label_value(&self) -> String;
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum Regex {
+    /// There is a regular expression but it is unknown (or too complicated).
+    Unknown,
+
+    /// `MatchAll` equals Expression(".*") but can be matched in a const context.
+    MatchAll,
+
+    /// There is a regular expression.
+    Expression(&'static str),
+}
+
+impl Regex {
+    pub const fn combine(self, other: Regex) -> Regex {
+        match (self, other) {
+            (_, Regex::MatchAll) => self,
+            (Regex::MatchAll, _) => other,
+            _ => Regex::Unknown,
+        }
+    }
+}
+
 /// Restricted string type with attributes like maximum length.
 ///
 /// Fully-qualified types are used to ease the import into other modules.
@@ -109,7 +138,6 @@ pub trait NameIsValidLabelValue {
 ///     ConfigMapName,
 ///     "The name of a ConfigMap",
 ///     "opensearch-nodes-default",
-///     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
 ///     is_rfc_1123_dns_subdomain_name
 /// }
 /// ```
@@ -184,6 +212,38 @@ macro_rules! attributed_string_type {
 
         impl stackable_operator::config::merge::Atomic for $name {}
 
+        impl $name {
+            pub const MIN_LENGTH: usize = attributed_string_type!(@min_length $($attribute)*);
+            pub const MAX_LENGTH: usize = attributed_string_type!(@max_length $($attribute)*);
+
+            /// None if there are restrictions but the regular expression could not be calculated.
+            pub const REGEX: $crate::framework::Regex = attributed_string_type!(@regex $($attribute)*);
+        }
+
+        // The JsonSchema implementation requires `max_length`.
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                std::stringify!($name).into()
+            }
+
+            fn json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({
+                    "type": "string",
+                    "minLength": $name::MIN_LENGTH,
+                    "maxLength": if $name::MAX_LENGTH != usize::MAX {
+                        Some($name::MAX_LENGTH)
+                    } else {
+                        // Do not set maxLength if it is usize::MAX.
+                        None
+                    },
+                    "pattern": match $name::REGEX {
+                        $crate::framework::Regex::Expression(regex) => Some(regex),
+                        _ => None
+                    }
+                })
+            }
+        }
+
         #[cfg(test)]
         impl $name {
             #[allow(dead_code)]
@@ -199,6 +259,19 @@ macro_rules! attributed_string_type {
 
         $(attributed_string_type!(@trait_impl $name, $attribute);)*
     };
+
+    // std::str::FromStr
+
+    (@from_str $name:ident, $s:expr, (min_length = $min_length:expr)) => {
+        let length = $s.len() as usize;
+        snafu::ensure!(
+            length >= $name::MIN_LENGTH,
+            $crate::framework::MinimumLengthNotMetSnafu {
+                length,
+                min_length: $name::MIN_LENGTH,
+            }
+        );
+    };
     (@from_str $name:ident, $s:expr, (max_length = $max_length:expr)) => {
         let length = $s.len() as usize;
         snafu::ensure!(
@@ -206,6 +279,16 @@ macro_rules! attributed_string_type {
             $crate::framework::LengthExceededSnafu {
                 length,
                 max_length: $name::MAX_LENGTH,
+            }
+        );
+    };
+    (@from_str $name:ident, $s:expr, (regex = $regex:expr)) => {
+        let regex = regex::Regex::new($regex).context($crate::framework::InvalidRegexSnafu)?;
+        snafu::ensure!(
+            regex.is_match($s),
+            $crate::framework::RegexNotMatchedSnafu {
+                value: $s,
+                regex: $regex
             }
         );
     };
@@ -227,26 +310,172 @@ macro_rules! attributed_string_type {
     (@from_str $name:ident, $s:expr, is_uid) => {
         uuid::Uuid::try_parse($s).context($crate::framework::InvalidUidSnafu)?;
     };
+
+    // MIN_LENGTH
+
+    (@min_length) => {
+        // The minimum String length is 0.
+        0
+    };
+    (@min_length (min_length = $min_length:expr) $($attribute:tt)*) => {
+        $crate::framework::max(
+            $min_length,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length (max_length = $max_length:expr) $($attribute:tt)*) => {
+        // max_length has no opinion on the min_length.
+        attributed_string_type!(@min_length $($attribute)*)
+    };
+    (@min_length (regex = $regex:expr) $($attribute:tt)*) => {
+        // regex has no influence on the min_length.
+        attributed_string_type!(@min_length $($attribute)*)
+    };
+    (@min_length is_config_map_key $($attribute:tt)*) => {
+        $crate::framework::max(
+            1,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length is_rfc_1035_label_name $($attribute:tt)*) => {
+        $crate::framework::max(
+            1,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length is_rfc_1123_dns_subdomain_name $($attribute:tt)*) => {
+        $crate::framework::max(
+            1,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length is_rfc_1123_label_name $($attribute:tt)*) => {
+        $crate::framework::max(
+            1,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length is_valid_label_value $($attribute:tt)*) => {
+        $crate::framework::max(
+            1,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+    (@min_length is_uid $($attribute:tt)*) => {
+        $crate::framework::max(
+            uuid::fmt::Hyphenated::LENGTH,
+            attributed_string_type!(@min_length $($attribute)*)
+        )
+    };
+
+    // MAX_LENGTH
+
+    (@max_length) => {
+        // If there is no other max_length defined, then the upper bound is usize::MAX.
+        usize::MAX
+    };
+    (@max_length (min_length = $min_length:expr) $($attribute:tt)*) => {
+        // min_length has no opinion on the max_length.
+        attributed_string_type!(@max_length $($attribute)*)
+    };
+    (@max_length (max_length = $max_length:expr) $($attribute:tt)*) => {
+        $crate::framework::min(
+            $max_length,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length (regex = $regex:expr) $($attribute:tt)*) => {
+        // regex has no influence on the max_length.
+        attributed_string_type!(@max_length $($attribute)*)
+    };
+    (@max_length is_config_map_key $($attribute:tt)*) => {
+        $crate::framework::min(
+            stackable_operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length is_rfc_1035_label_name $($attribute:tt)*) => {
+        $crate::framework::min(
+            stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length is_rfc_1123_dns_subdomain_name $($attribute:tt)*) => {
+        $crate::framework::min(
+            stackable_operator::validation::RFC_1123_SUBDOMAIN_MAX_LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length is_rfc_1123_label_name $($attribute:tt)*) => {
+        $crate::framework::min(
+            stackable_operator::validation::RFC_1123_LABEL_MAX_LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length is_valid_label_value $($attribute:tt)*) => {
+        $crate::framework::min(
+            $crate::framework::MAX_LABEL_VALUE_LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+    (@max_length is_uid $($attribute:tt)*) => {
+        $crate::framework::min(
+            uuid::fmt::Hyphenated::LENGTH,
+            attributed_string_type!(@max_length $($attribute)*)
+        )
+    };
+
+    // REGEX
+
+    (@regex) => {
+        // Everything is allowed if there is no other regular expression.
+        $crate::framework::Regex::MatchAll
+    };
+    (@regex (min_length = $min_length:expr) $($attribute:tt)*) => {
+        // min_length has no influence on the regular expression.
+        attributed_string_type!(@regex $($attribute)*)
+    };
+    (@regex (max_length = $max_length:expr) $($attribute:tt)*) => {
+        // max_length has no influence on the regular expression.
+        attributed_string_type!(@regex $($attribute)*)
+    };
+    (@regex (regex = $regex:expr) $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression($regex)
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_config_map_key $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression($crate::framework::validation::CONFIG_MAP_KEY_FMT)
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_rfc_1035_label_name $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1035_LABEL_FMT)
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_rfc_1123_dns_subdomain_name $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_SUBDOMAIN_FMT)
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_rfc_1123_label_name $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_LABEL_FMT)
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_valid_label_value $($attribute:tt)*) => {
+        // regular expression from stackable_operator::kvp::label::LABEL_VALUE_REGEX
+        $crate::framework::Regex::Expression("^[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?$")
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+    (@regex is_uid $($attribute:tt)*) => {
+        $crate::framework::Regex::Expression("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+            .combine(attributed_string_type!(@regex $($attribute)*))
+    };
+
+    // additional constants and trait implementations
+
+    (@trait_impl $name:ident, (min_length = $max_length:expr)) => {
+    };
     (@trait_impl $name:ident, (max_length = $max_length:expr)) => {
-        impl $name {
-            // type arithmetic would be better
-            pub const MAX_LENGTH: usize = $max_length;
-        }
-
-        // The JsonSchema implementation requires `max_length`.
-        impl schemars::JsonSchema for $name {
-            fn schema_name() -> std::borrow::Cow<'static, str> {
-                std::stringify!($name).into()
-            }
-
-            fn json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
-                schemars::json_schema!({
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": $name::MAX_LENGTH
-                })
-            }
-        }
+    };
+    (@trait_impl $name:ident, (regex = $regex:expr)) => {
     };
     (@trait_impl $name:ident, is_config_map_key) => {
     };
@@ -327,13 +556,27 @@ pub const fn min(x: usize, y: usize) -> usize {
     if x < y { x } else { y }
 }
 
+/// Returns the maximum of the given values.
+///
+/// As opposed to [`std::cmp::max`], this function can be used at compile-time.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!(3, max(2, 3));
+/// assert_eq!(5, max(5, 4));
+/// assert_eq!(1, max(1, 1));
+/// ```
+pub const fn max(x: usize, y: usize) -> usize {
+    if x < y { y } else { x }
+}
+
 // Kubernetes (resource) names
 
 attributed_string_type! {
     ConfigMapName,
     "The name of a ConfigMap",
     "opensearch-nodes-default",
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
@@ -348,7 +591,6 @@ attributed_string_type! {
     ContainerName,
     "The name of a container in a Pod",
     "opensearch",
-    (max_length = RFC_1123_LABEL_MAX_LENGTH),
     is_rfc_1123_label_name
 }
 attributed_string_type! {
@@ -359,28 +601,24 @@ attributed_string_type! {
     // subdomain names, on the other hand, their length does not seem to be restricted – at least
     // on Kind. However, 253 characters are sufficient for the Stackable operators, and to avoid
     // problems on other Kubernetes providers, the length is restricted here.
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ListenerName,
     "The name of a Listener",
     "opensearch-nodes-default",
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ListenerClassName,
     "The name of a Listener",
     "external-stable",
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     NamespaceName,
     "The name of a Namespace",
     "stackable-operators",
-    (max_length = min(RFC_1123_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -388,7 +626,6 @@ attributed_string_type! {
     PersistentVolumeClaimName,
     "The name of a PersistentVolumeClaim",
     "config",
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
@@ -399,21 +636,18 @@ attributed_string_type! {
     // subdomain names, on the other hand, their length does not seem to be restricted – at least
     // on Kind. However, 253 characters are sufficient for the Stackable operators, and to avoid
     // problems on other Kubernetes providers, the length is restricted here.
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ServiceAccountName,
     "The name of a ServiceAccount",
     "opensearch-serviceaccount",
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 attributed_string_type! {
     ServiceName,
     "The name of a Service",
     "opensearch-nodes-default-headless",
-    (max_length = min(RFC_1035_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1035_label_name,
     is_valid_label_value
 }
@@ -421,12 +655,11 @@ attributed_string_type! {
     StatefulSetName,
     "The name of a StatefulSet",
     "opensearch-nodes-default",
-    (max_length = min(
+    (max_length =
         // see https://github.com/kubernetes/kubernetes/issues/64023
         RFC_1123_LABEL_MAX_LENGTH
             - 1 /* dash */
-            - 10 /* digits for the controller-revision-hash label */,
-        MAX_LABEL_VALUE_LENGTH)),
+            - 10 /* digits for the controller-revision-hash label */),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -434,7 +667,6 @@ attributed_string_type! {
     Uid,
     "A UID",
     "c27b3971-ca72-42c1-80a4-abdfc1db0ddd",
-    (max_length = min(uuid::fmt::Hyphenated::LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_uid,
     is_valid_label_value
 }
@@ -442,7 +674,6 @@ attributed_string_type! {
     VolumeName,
     "The name of a Volume",
     "opensearch-nodes-default",
-    (max_length = min(RFC_1123_LABEL_MAX_LENGTH, MAX_LABEL_VALUE_LENGTH)),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -455,7 +686,7 @@ attributed_string_type! {
     "opensearch",
     // A suffix is added to produce a label value. An according compile-time check ensures that
     // max_length cannot be set higher.
-    (max_length = min(54, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = 54),
     is_rfc_1123_dns_subdomain_name,
     is_valid_label_value
 }
@@ -463,7 +694,6 @@ attributed_string_type! {
     ProductVersion,
     "The version of a product",
     "3.1.0",
-    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
@@ -472,7 +702,7 @@ attributed_string_type! {
     "my-opensearch-cluster",
     // Suffixes are added to produce resource names. According compile-time checks ensure that
     // max_length cannot be set higher.
-    (max_length = min(24, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = 24),
     is_rfc_1035_label_name,
     is_valid_label_value
 }
@@ -480,14 +710,12 @@ attributed_string_type! {
     ControllerName,
     "The name of a controller in an operator",
     "opensearchcluster",
-    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
     OperatorName,
     "The name of an operator",
     "opensearch.stackable.tech",
-    (max_length = MAX_LABEL_VALUE_LENGTH),
     is_valid_label_value
 }
 attributed_string_type! {
@@ -497,7 +725,7 @@ attributed_string_type! {
     // The role-group name is used to produce resource names. To make sure that all resource names
     // are valid, max_length is restricted. Compile-time checks ensure that max_length cannot be
     // set higher if not other names like the RoleName are set lower accordingly.
-    (max_length = min(16, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = 16),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -508,7 +736,7 @@ attributed_string_type! {
     // The role name is used to produce resource names. To make sure that all resource names are
     // valid, max_length is restricted. Compile-time checks ensure that max_length cannot be set
     // higher if not other names like the RoleGroupName are set lower accordingly.
-    (max_length = min(10, MAX_LABEL_VALUE_LENGTH)),
+    (max_length = 10),
     is_rfc_1123_label_name,
     is_valid_label_value
 }
@@ -610,7 +838,9 @@ mod tests {
         JsonSchemaTest,
         "JsonSchemaTest test",
         "test",
-        (max_length = 4)
+        (min_length = 4),
+        (max_length = 8),
+        (regex = "^[est]+$")
     }
 
     #[test]
@@ -622,8 +852,9 @@ mod tests {
         assert_eq!(
             json!({
                 "type": "string",
-                "minLength": 1,
-                "maxLength": 4
+                "minLength": 4,
+                "maxLength": 8,
+                "pattern": "^[tes]+$",
             }),
             JsonSchemaTest::json_schema(&mut SchemaGenerator::default())
         );
