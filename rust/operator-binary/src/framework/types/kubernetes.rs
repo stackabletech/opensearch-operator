@@ -91,6 +91,13 @@ attributed_string_type! {
 }
 
 attributed_string_type! {
+    SecretName,
+    "The name of a Secret",
+    "opensearch-security-config",
+    is_rfc_1123_dns_subdomain_name
+}
+
+attributed_string_type! {
     ServiceAccountName,
     "The name of a ServiceAccount",
     "opensearch-serviceaccount",
@@ -138,8 +145,8 @@ attributed_string_type! {
 mod tests {
     use super::{
         ClusterRoleName, ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName,
-        ListenerName, NamespaceName, PersistentVolumeClaimName, RoleBindingName,
-        ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
+        ListenerName, NamespaceName, PersistentVolumeClaimName, RoleBindingName, SecretKey,
+        SecretName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
     };
 
     #[test]
@@ -153,6 +160,8 @@ mod tests {
         NamespaceName::test_example();
         PersistentVolumeClaimName::test_example();
         RoleBindingName::test_example();
+        SecretKey::test_example();
+        SecretName::test_example();
         ServiceAccountName::test_example();
         ServiceName::test_example();
         StatefulSetName::test_example();
