@@ -17,6 +17,13 @@ rules:
       - privileged
     verbs:
       - use
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      # The jobs creating the admin certificates need the permission to insert them into Secrets.
+      - create
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

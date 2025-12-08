@@ -6,6 +6,11 @@ timeout: 600
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: test-snapshot
+  name: create-opensearch-2-admin-certificate
 status:
   succeeded: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-2-admin-certificate
