@@ -1,11 +1,10 @@
 use std::str::FromStr;
 
-use stackable_operator::validation::RFC_1035_LABEL_MAX_LENGTH;
-
-use super::{
-    ClusterName, ConfigMapName, ListenerName, RoleGroupName, RoleName, StatefulSetName, min,
+use super::types::{
+    kubernetes::{ConfigMapName, ListenerName, ServiceName, StatefulSetName},
+    operator::{ClusterName, RoleGroupName, RoleName},
 };
-use crate::{attributed_string_type, framework::ServiceName};
+use crate::attributed_string_type;
 
 attributed_string_type! {
     QualifiedRoleGroupName,
@@ -13,7 +12,7 @@ attributed_string_type! {
     "opensearch-nodes-default",
     // Suffixes are added to produce resource names. According compile-time checks ensure that
     // max_length cannot be set higher.
-    (max_length = min(52, RFC_1035_LABEL_MAX_LENGTH)),
+    (max_length = 52),
     is_rfc_1035_label_name,
     is_valid_label_value
 }
@@ -116,8 +115,8 @@ impl ResourceNames {
 mod tests {
     use super::{ClusterName, RoleGroupName, RoleName};
     use crate::framework::{
-        ConfigMapName, ListenerName, ServiceName, StatefulSetName,
         role_group_utils::{QualifiedRoleGroupName, ResourceNames},
+        types::kubernetes::{ConfigMapName, ListenerName, ServiceName, StatefulSetName},
     };
 
     #[test]
