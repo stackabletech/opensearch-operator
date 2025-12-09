@@ -10,12 +10,8 @@ spec:
 {% endif %}
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
-  clusterConfig:
-{% if test_scenario['values']['server-use-tls'] == 'false' %}
-    tls:
-      serverSecretClass: null
-{% endif %}
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
+  clusterConfig:
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:

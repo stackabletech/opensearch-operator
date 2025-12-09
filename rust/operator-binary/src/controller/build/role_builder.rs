@@ -240,10 +240,7 @@ mod tests {
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchTls},
-        },
+        crd::{NodeRoles, v1alpha1},
         framework::{
             ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
             ProductName, ProductVersion, RoleGroupName, builder::pod::container::EnvVarSet,
@@ -311,7 +308,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            OpenSearchTls::default(),
+            v1alpha1::OpenSearchTls::default(),
         );
 
         RoleBuilder::new(cluster, context_names)

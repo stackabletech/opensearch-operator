@@ -191,7 +191,7 @@ impl NodeConfig {
         // TLS config for TRANSPORT port which is always enabled.
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
-            json!("true".to_string()),
+            json!(true),
         );
         config.insert(
             CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
@@ -210,7 +210,7 @@ impl NodeConfig {
         if self.cluster.tls_config.server_secret_class.is_some() {
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
-                json!("true".to_string()),
+                json!(true),
             );
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
@@ -227,7 +227,7 @@ impl NodeConfig {
         } else {
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
-                json!("false".to_string()),
+                json!(false),
             );
         }
 
@@ -407,7 +407,7 @@ mod tests {
     use super::*;
     use crate::{
         controller::{ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1::OpenSearchTls},
+        crd::{NodeRoles, v1alpha1},
         framework::{
             ClusterName, ListenerClassName, NamespaceName, ProductVersion, RoleGroupName,
             product_logging::framework::ValidatedContainerLogConfigChoice,
@@ -498,7 +498,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            OpenSearchTls::default(),
+            v1alpha1::OpenSearchTls::default(),
         );
 
         NodeConfig::new(
@@ -523,11 +523,11 @@ mod tests {
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
-                "plugins.security.ssl.http.enabled: \"true\"\n",
+                "plugins.security.ssl.http.enabled: true\n",
                 "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
                 "plugins.security.ssl.http.pemkey_filepath: \"/stackable/opensearch/config/tls/server/tls.key\"\n",
                 "plugins.security.ssl.http.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/server/ca.crt\"\n",
-                "plugins.security.ssl.transport.enabled: \"true\"\n",
+                "plugins.security.ssl.transport.enabled: true\n",
                 "plugins.security.ssl.transport.pemcert_filepath: \"/stackable/opensearch/config/tls/internal/tls.crt\"\n",
                 "plugins.security.ssl.transport.pemkey_filepath: \"/stackable/opensearch/config/tls/internal/tls.key\"\n",
                 "plugins.security.ssl.transport.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/internal/ca.crt\"\n",

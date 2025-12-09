@@ -8,22 +8,6 @@ serviceAccount:
   # Use the ServiceAccount of OpenSearch because its permissions are already configured to work on
   # OpenShift.
   name: opensearch-serviceaccount
-config:
-  opensearch_dashboards.yml:
-    server:
-      ssl:
-        enabled: true
-        certificate: /stackable/opensearch-dashboards/config/tls/tls.crt
-        key: /stackable/opensearch-dashboards/config/tls/tls.key
-    opensearch:
-      username: kibanaserver
-      ssl:
-        verificationMode: full
-        certificateAuthorities:
-          - /stackable/opensearch-dashboards/config/tls/ca.crt
-    opensearch_security:
-      cookie:
-        secure: true
 extraEnvs:
   - name: OPENSEARCH_PASSWORD
     valueFrom:
@@ -32,6 +16,11 @@ extraEnvs:
         key: kibanaserver
 config:
   opensearch_dashboards.yml:
+    server:
+      ssl:
+        enabled: true
+        certificate: /stackable/opensearch-dashboards/config/tls/tls.crt
+        key: /stackable/opensearch-dashboards/config/tls/tls.key
     opensearch:
       username: kibanaserver
       requestHeadersWhitelist:
@@ -47,8 +36,8 @@ config:
         enabled: true
         tenants.preferred: [Private, Global]
       readonly_mode.roles: [kibana_read_only]
-      cookie.secure: false
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
+      cookie:
+        secure: true
 extraVolumes:
   - name: tls
     ephemeral:
@@ -64,16 +53,13 @@ extraVolumes:
           resources:
             requests:
               storage: "1"
-{% endif %}
 # The Helm chart sets the volume "config" and adds a volume mount at
 # /usr/share/opensearch-dashboards/config. But in the Stackable image, the configuration directory
 # is located in /stackable/opensearch-dashboards/config.
 extraVolumeMounts:
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
 # The same is true for the TLS volume.
   - mountPath: /stackable/opensearch-dashboards/config/tls
     name: tls
-{% endif %}
   - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
     name: config
     subPath: opensearch_dashboards.yml

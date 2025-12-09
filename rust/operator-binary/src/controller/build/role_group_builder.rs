@@ -295,23 +295,23 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..Volume::default()
             },
             self.build_tls_volume(
-                &TLS_INTERNAL_VOLUME_NAME.to_string(),
+                &TLS_INTERNAL_VOLUME_NAME,
                 &self.cluster.tls_config.internal_secret_class,
                 vec![],
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
-                Some(&LISTENER_VOLUME_NAME.to_string()),
+                &LISTENER_VOLUME_NAME,
             ),
         ];
 
         if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
             volumes.push(self.build_tls_volume(
-                &TLS_SERVER_VOLUME_NAME.to_string(),
+                &TLS_SERVER_VOLUME_NAME,
                 tls_http_secret_class_name,
                 service_scopes,
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
-                Some(&LISTENER_VOLUME_NAME.to_string()),
+                &LISTENER_VOLUME_NAME,
             ))
         };
 
@@ -660,12 +660,12 @@ impl<'a> RoleGroupBuilder<'a> {
 
     fn build_tls_volume(
         &self,
-        volume_name: &String,
+        volume_name: &VolumeName,
         tls_secret_class_name: &SecretClassName,
         service_scopes: Vec<ServiceName>,
         secret_format: SecretFormat,
         requested_secret_lifetime: &Duration,
-        listener_scope: Option<&str>,
+        listener_scope: &PersistentVolumeClaimName,
     ) -> Volume {
         let mut secret_volume_source_builder =
             SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
@@ -673,13 +673,11 @@ impl<'a> RoleGroupBuilder<'a> {
         for scope in service_scopes {
             secret_volume_source_builder.with_service_scope(scope);
         }
-        if let Some(listener_scope) = listener_scope {
-            secret_volume_source_builder.with_listener_volume_scope(listener_scope);
-        }
 
-        VolumeBuilder::new(volume_name)
+        VolumeBuilder::new(volume_name.to_string())
             .ephemeral(
                 secret_volume_source_builder
+                    .with_listener_volume_scope(listener_scope)
                     .with_pod_scope()
                     .with_format(secret_format)
                     .with_auto_tls_cert_lifetime(*requested_secret_lifetime)
@@ -1214,38 +1212,38 @@ mod tests {
                                         "name": "my-opensearch-cluster-nodes-default"
                                     },
                                     "name": "log-config"
-                               },
-                               {
+                                },
+                                {
                                     "emptyDir": {
                                         "sizeLimit": "30Mi"
                                     },
                                     "name": "log"
-                               },
-                               {
-                                "ephemeral": {
-                                    "volumeClaimTemplate": {
-                                        "metadata": {
-                                            "annotations": {
-                                                "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
-                                                "secrets.stackable.tech/class": "tls",
-                                                "secrets.stackable.tech/format": "tls-pem",
-                                                "secrets.stackable.tech/scope": "listener-volume=listener,pod"
-                                            }
-                                        },
-                                        "spec": {
-                                            "accessModes": [
-                                                "ReadWriteOnce"
-                                            ],
-                                            "resources": {
-                                                "requests": {
-                                                    "storage": "1"
+                                },
+                                {
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "metadata": {
+                                                "annotations": {
+                                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                                    "secrets.stackable.tech/class": "tls",
+                                                    "secrets.stackable.tech/format": "tls-pem",
+                                                    "secrets.stackable.tech/scope": "listener-volume=listener,pod"
                                                 }
                                             },
-                                            "storageClassName": "secrets.stackable.tech"
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1"
+                                                    }
+                                                },
+                                                "storageClassName": "secrets.stackable.tech"
                                             }
                                         }
                                     },
-                                "name": "tls-internal"
+                                    "name": "tls-internal"
                                 },
                                 {
                                     "ephemeral": {
@@ -1268,11 +1266,11 @@ mod tests {
                                                     }
                                                 },
                                                 "storageClassName": "secrets.stackable.tech"
-                                                }
                                             }
-                                        },
+                                        }
+                                    },
                                     "name": "tls-server"
-                                },
+                                }
                             ]
                         }
                     },

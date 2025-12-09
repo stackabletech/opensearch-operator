@@ -84,6 +84,7 @@ pub mod versioned {
         /// TLS configuration options for the server (REST API) and internal communication (transport).
         #[serde(default)]
         pub tls: OpenSearchTls,
+
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
@@ -104,6 +105,7 @@ pub mod versioned {
             skip_serializing_if = "Option::is_none"
         )]
         pub server_secret_class: Option<SecretClassName>,
+
         /// Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
         /// This setting controls:
         /// - Which cert the servers should use to authenticate themselves against other servers

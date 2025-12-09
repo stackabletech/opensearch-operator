@@ -28,10 +28,7 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    crd::{
-        NodeRoles,
-        v1alpha1::{self, OpenSearchTls},
-    },
+    crd::{NodeRoles, v1alpha1},
     framework::{
         ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
         NamespaceName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
@@ -167,7 +164,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-    pub tls_config: OpenSearchTls,
+    pub tls_config: v1alpha1::OpenSearchTls,
 }
 
 impl ValidatedCluster {
@@ -180,7 +177,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-        tls_config: OpenSearchTls,
+        tls_config: v1alpha1::OpenSearchTls,
     ) -> Self {
         let uid = uid.into();
         ValidatedCluster {
@@ -384,10 +381,7 @@ mod tests {
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchTls},
-        },
+        crd::{NodeRoles, v1alpha1},
         framework::{
             ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
             RoleGroupName, builder::pod::container::EnvVarSet,
@@ -503,7 +497,7 @@ mod tests {
                 ),
             ]
             .into(),
-            OpenSearchTls::default(),
+            v1alpha1::OpenSearchTls::default(),
         )
     }
 

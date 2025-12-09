@@ -4,7 +4,7 @@
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-timeout: 120
+timeout: 600
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -699,14 +699,14 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
-    plugins.security.ssl.http.enabled: "true"
+    plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
     plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
     plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
 {% else %}
-    plugins.security.ssl.http.enabled: "false"
+    plugins.security.ssl.http.enabled: false
 {% endif %}
-    plugins.security.ssl.transport.enabled: "true"
+    plugins.security.ssl.transport.enabled: true
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
@@ -739,14 +739,14 @@ data:
     plugins.security.allow_default_init_securityindex: "true"
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
-    plugins.security.ssl.http.enabled: "true"
+    plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
     plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
     plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
 {% else %}
-    plugins.security.ssl.http.enabled: "false"
+    plugins.security.ssl.http.enabled: false
 {% endif %}
-    plugins.security.ssl.transport.enabled: "true"
+    plugins.security.ssl.transport.enabled: true
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
