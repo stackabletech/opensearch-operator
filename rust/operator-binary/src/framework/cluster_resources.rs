@@ -3,8 +3,13 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::ObjectReference,
 };
 
-use super::{ClusterName, ControllerName, NamespaceName, OperatorName, ProductName, Uid};
-use crate::framework::{MAX_LABEL_VALUE_LENGTH, NameIsValidLabelValue};
+use super::types::{
+    kubernetes::{NamespaceName, Uid},
+    operator::{ClusterName, ControllerName, OperatorName, ProductName},
+};
+use crate::framework::{
+    NameIsValidLabelValue, macros::attributed_string_type::MAX_LABEL_VALUE_LENGTH,
+};
 
 /// Infallible variant of [`stackable_operator::cluster_resources::ClusterResources::new`]
 pub fn cluster_resources_new(

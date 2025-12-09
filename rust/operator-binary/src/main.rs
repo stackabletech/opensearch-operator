@@ -2,7 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
 use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
-use framework::OperatorName;
+use framework::types::operator::OperatorName;
 use futures::{FutureExt, StreamExt};
 use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{

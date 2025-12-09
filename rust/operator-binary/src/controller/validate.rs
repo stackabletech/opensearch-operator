@@ -18,12 +18,15 @@ use super::{
 use crate::{
     crd::v1alpha1::{self},
     framework::{
-        ClusterName, ConfigMapName, NamespaceName, Uid,
         builder::pod::container::{EnvVarName, EnvVarSet},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
+        types::{
+            kubernetes::{ConfigMapName, NamespaceName, Uid},
+            operator::ClusterName,
+        },
     },
 };
 
@@ -45,13 +48,19 @@ pub enum Error {
     GetVectorAggregatorConfigMapName {},
 
     #[snafu(display("failed to set cluster name"))]
-    ParseClusterName { source: crate::framework::Error },
+    ParseClusterName {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 
     #[snafu(display("failed to set cluster namespace"))]
-    ParseClusterNamespace { source: crate::framework::Error },
+    ParseClusterNamespace {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 
     #[snafu(display("failed to set UID"))]
-    ParseClusterUid { source: crate::framework::Error },
+    ParseClusterUid {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
@@ -59,10 +68,14 @@ pub enum Error {
     },
 
     #[snafu(display("failed to set product version"))]
-    ParseProductVersion { source: crate::framework::Error },
+    ParseProductVersion {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 
     #[snafu(display("failed to set role-group name"))]
-    ParseRoleGroupName { source: crate::framework::Error },
+    ParseRoleGroupName {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
 
     #[snafu(display("failed to resolve product image"))]
     ResolveProductImage {
@@ -279,13 +292,18 @@ mod tests {
             v1alpha1::{self, OpenSearchTls},
         },
         framework::{
-            ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
-            OperatorName, ProductName, ProductVersion, RoleGroupName, SecretClassName,
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+            types::{
+                kubernetes::{ConfigMapName, ListenerClassName, NamespaceName, SecretClassName},
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
         },
     };
 

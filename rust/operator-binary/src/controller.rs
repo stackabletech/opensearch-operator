@@ -30,10 +30,16 @@ use validate::validate;
 use crate::{
     crd::{NodeRoles, v1alpha1},
     framework::{
-        ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
-        NamespaceName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
+        HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+        types::{
+            kubernetes::{ListenerClassName, NamespaceName, Uid},
+            operator::{
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                RoleGroupName, RoleName,
+            },
+        },
     },
 };
 
@@ -383,10 +389,13 @@ mod tests {
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
         crd::{NodeRoles, v1alpha1},
         framework::{
-            ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
-            RoleGroupName, builder::pod::container::EnvVarSet,
+            builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName},
+                operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
+            },
         },
     };
 

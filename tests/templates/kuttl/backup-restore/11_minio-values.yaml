@@ -25,7 +25,7 @@ persistence:
 provisioning:
   enabled: true
   buckets:
-    - name: opensearch
+    - name: opensearch-data
   users:
     - username: integrationtest
       password: integrationtest
