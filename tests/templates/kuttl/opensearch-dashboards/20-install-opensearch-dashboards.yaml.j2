@@ -7,7 +7,11 @@ commands:
       --repo https://opensearch-project.github.io/helm-charts
       --version "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
       --values 20_opensearch-dashboards-values.yaml
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
       --set opensearchHosts=https://opensearch-nodes-default-headless.$NAMESPACE.svc.cluster.local:9200
+{% else %}
+      --set opensearchHosts=http://opensearch-nodes-default-headless.$NAMESPACE.svc.cluster.local:9200
+{% endif %}
       --namespace $NAMESPACE
       --wait
     timeout: 600
