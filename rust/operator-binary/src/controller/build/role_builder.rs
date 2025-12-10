@@ -427,7 +427,7 @@ mod tests {
                         "app.kubernetes.io/version": "3.1.0",
                         "stackable.tech/vendor": "Stackable"
                     },
-                    "name": "my-opensearch-cluster",
+                    "name": "my-opensearch-cluster-discovery",
                     "namespace": "default",
                     "ownerReferences": [
                         {

@@ -222,15 +222,18 @@ impl ResourceNames {
     }
 
     pub fn discovery_service_name(&self) -> ServiceName {
+        const SUFFIX: &str = "-discovery";
+
         // compile-time checks
         const _: () = assert!(
-            ClusterName::MAX_LENGTH <= ServiceName::MAX_LENGTH,
-            "The string `<cluster_name>` must not exceed the limit of Service names."
+            ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceName::MAX_LENGTH,
+            "The string `<cluster_name>-discovery` must not exceed the limit of Service names."
         );
         let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
         let _ = ClusterName::IS_VALID_LABEL_VALUE;
 
-        ServiceName::from_str(self.cluster_name.as_ref()).expect("should be a valid Service name")
+        ServiceName::from_str(&format!("{}{SUFFIX}", self.cluster_name.as_ref()))
+            .expect("should be a valid Service name")
     }
 }
 
@@ -411,7 +414,7 @@ mod tests {
             resource_names.cluster_role_name()
         );
         assert_eq!(
-            ServiceName::from_str_unsafe("my-cluster"),
+            ServiceName::from_str_unsafe("my-cluster-discovery"),
             resource_names.discovery_service_name()
         );
     }

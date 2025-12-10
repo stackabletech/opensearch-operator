@@ -77,7 +77,7 @@ data:
 
     namespace = os.environ['NAMESPACE']
 
-    host = f'opensearch.{namespace}.svc.cluster.local'
+    host = f'opensearch-nodes-default-headless.{namespace}.svc.cluster.local'
     port = 9200
     auth = ('integrationtest', 'integrationtest')
     ca_certs_path = '/stackable/tls/ca.crt'

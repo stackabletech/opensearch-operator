@@ -37,7 +37,7 @@ spec:
                   volumeClaimTemplate:
                     metadata:
                       annotations:
-                        secrets.stackable.tech/scope: node,pod,service=opensearch,service=opensearch-nodes-cluster-manager-headless
+                        secrets.stackable.tech/scope: node,pod,service=opensearch-discovery,service=opensearch-nodes-cluster-manager-headless
       data:
         config:
           nodeRoles:

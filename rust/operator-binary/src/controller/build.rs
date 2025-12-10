@@ -105,7 +105,7 @@ mod tests {
         );
         assert_eq!(
             vec![
-                "my-opensearch",
+                "my-opensearch-discovery",
                 "my-opensearch-nodes-cluster-manager-headless",
                 "my-opensearch-nodes-coordinating-headless",
                 "my-opensearch-nodes-data-headless"

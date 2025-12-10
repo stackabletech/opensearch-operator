@@ -70,7 +70,7 @@ data:
 
     client = OpenSearch(
       hosts=[{
-        'host': f'opensearch-1-nodes-default.{namespace}.svc.cluster.local',
+        'host': f'opensearch-1-nodes-default-headless.{namespace}.svc.cluster.local',
         'port': 9200
       }],
       http_auth=('admin', 'AJVFsGJBbpT6mChn'),
