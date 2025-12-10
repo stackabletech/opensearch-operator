@@ -35,14 +35,7 @@ spec:
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
         plugins.security.restapi.roles_enabled: all_access
-        plugins.security.ssl.transport.enabled: "true"
-        plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
-        plugins.security.ssl.http.enabled: "true"
-        plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/tls.crt
-        plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/tls.key
-        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/ca.crt
+        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
         s3.client.default.endpoint: https://minio:9000/
         s3.client.default.protocol: https
         s3.client.default.region: unused # but required
@@ -117,7 +110,7 @@ spec:
                     /stackable/opensearch/config/tls-admin/tls.crt > \
                     /stackable/opensearch/config/tls-concatenated/ca.crt
             volumeMounts:
-              - name: tls
+              - name: tls-server
                 mountPath: /stackable/opensearch/config/tls
                 readOnly: true
               - name: admin-certificate
@@ -137,7 +130,7 @@ spec:
                 subPath: java/cacerts
                 readOnly: true
               - name: tls-concatenated
-                mountPath: /stackable/opensearch/config/tls
+                mountPath: /stackable/opensearch/config/tls/concatenated
                 readOnly: true
               - name: keystore
                 mountPath: /stackable/opensearch/config/opensearch.keystore
@@ -166,20 +159,6 @@ spec:
           - name: system-trust-store
             emptyDir:
               sizeLimit: 10Mi
-          - name: tls
-            ephemeral:
-              volumeClaimTemplate:
-                metadata:
-                  annotations:
-                    secrets.stackable.tech/scope: node,pod,service=opensearch-1,service=opensearch-1-nodes-default,service=opensearch-1-nodes-default-headless,listener-volume=listener
-                    secrets.stackable.tech/class: tls
-                spec:
-                  storageClassName: secrets.stackable.tech
-                  accessModes:
-                    - ReadWriteOnce
-                  resources:
-                    requests:
-                      storage: "1"
           - name: tls-concatenated
             emptyDir:
               sizeLimit: 1Mi

@@ -116,7 +116,7 @@ data:
         -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \
-        --hostname opensearch-1-nodes-default.$NAMESPACE.svc.cluster.local \
+        --hostname opensearch-1.$NAMESPACE.svc.cluster.local \
         -backup /tmp/backup
   upload-security-indices-backup.sh: |
     #!/usr/bin/env sh

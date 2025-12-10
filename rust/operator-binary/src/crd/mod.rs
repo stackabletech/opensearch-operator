@@ -32,13 +32,14 @@ use crate::{
         NameIsValidLabelValue,
         role_utils::GenericProductSpecificCommonConfig,
         types::{
-            kubernetes::{ConfigMapName, ContainerName, ListenerClassName},
+            kubernetes::{ConfigMapName, ContainerName, ListenerClassName, SecretClassName},
             operator::{ClusterName, ProductName, RoleName},
         },
     },
 };
 
 constant!(DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
+constant!(TLS_DEFAULT_SECRET_CLASS: SecretClassName = "tls");
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -84,12 +85,37 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
+        /// TLS configuration options for the server (REST API) and internal communication (transport).
+        #[serde(default)]
+        pub tls: OpenSearchTls,
+
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchTls {
+        /// Only affects client connections to the REST API.
+        /// This setting controls:
+        /// - If TLS encryption is used at all
+        /// - Which cert the servers should use to authenticate themselves against the client
+        #[serde(
+            default = "server_secret_class_default",
+            skip_serializing_if = "Option::is_none"
+        )]
+        pub server_secret_class: Option<SecretClassName>,
+
+        /// Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
+        /// This setting controls:
+        /// - Which cert the servers should use to authenticate themselves against other servers
+        /// - Which ca.crt to use when validating the other server
+        #[serde(default = "internal_secret_class_default")]
+        pub internal_secret_class: SecretClassName,
     }
 
     // The possible node roles are by default the built-in roles and the search role, see
@@ -171,6 +197,13 @@ pub mod versioned {
         /// Consult the [node roles
         /// documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/usage-guide/node-roles) for details.
         pub node_roles: NodeRoles,
+
+        /// Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+        /// This can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+        ///
+        /// Defaults to 1d.
+        #[fragment_attrs(serde(default))]
+        pub requested_secret_lifetime: Duration,
 
         #[fragment_attrs(serde(default))]
         pub resources: Resources<StorageConfig>,
@@ -274,6 +307,9 @@ impl v1alpha1::OpenSearchConfig {
                 v1alpha1::NodeRole::Data,
                 v1alpha1::NodeRole::RemoteClusterClient,
             ])),
+            requested_secret_lifetime: Some(
+                Duration::from_str("1d").expect("should be a valid duration"),
+            ),
             resources: ResourcesFragment {
                 memory: MemoryLimitsFragment {
                     // An idle node already requires 2 Gi.
@@ -301,6 +337,23 @@ impl v1alpha1::OpenSearchConfig {
             },
         }
     }
+}
+
+impl Default for v1alpha1::OpenSearchTls {
+    fn default() -> Self {
+        v1alpha1::OpenSearchTls {
+            server_secret_class: server_secret_class_default(),
+            internal_secret_class: internal_secret_class_default(),
+        }
+    }
+}
+
+fn server_secret_class_default() -> Option<SecretClassName> {
+    Some(TLS_DEFAULT_SECRET_CLASS.to_owned())
+}
+
+fn internal_secret_class_default() -> SecretClassName {
+    TLS_DEFAULT_SECRET_CLASS.to_owned()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]

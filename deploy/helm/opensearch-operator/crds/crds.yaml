@@ -29,9 +29,42 @@ spec:
                 generates in the [operator documentation](https://docs.stackable.tech/home/nightly/opensearch/).
               properties:
                 clusterConfig:
-                  default: {}
+                  default:
+                    tls:
+                      internalSecretClass: tls
+                      serverSecretClass: tls
                   description: Configuration that applies to all roles and role groups
                   properties:
+                    tls:
+                      default:
+                        internalSecretClass: tls
+                        serverSecretClass: tls
+                      description: TLS configuration options for the server (REST API) and internal communication (transport).
+                      properties:
+                        internalSecretClass:
+                          default: tls
+                          description: |-
+                            Only affects internal communication (transport). Used for mutual verification between OpenSearch nodes.
+                            This setting controls:
+                            - Which cert the servers should use to authenticate themselves against other servers
+                            - Which ca.crt to use when validating the other server
+                          maxLength: 253
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          type: string
+                        serverSecretClass:
+                          default: tls
+                          description: |-
+                            Only affects client connections to the REST API.
+                            This setting controls:
+                            - If TLS encryption is used at all
+                            - Which cert the servers should use to authenticate themselves against the client
+                          maxLength: 253
+                          minLength: 1
+                          nullable: true
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          type: string
+                      type: object
                     vectorAggregatorConfigMapName:
                       description: |-
                         Name of the Vector aggregator [discovery ConfigMap](https://docs.stackable.tech/home/nightly/concepts/service_discovery).
@@ -305,6 +338,14 @@ spec:
                             type: string
                           nullable: true
                           type: array
+                        requestedSecretLifetime:
+                          description: |-
+                            Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+                            This can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+
+                            Defaults to 1d.
+                          nullable: true
+                          type: string
                         resources:
                           default:
                             cpu:
@@ -654,6 +695,14 @@ spec:
                                   type: string
                                 nullable: true
                                 type: array
+                              requestedSecretLifetime:
+                                description: |-
+                                  Request secret (currently only autoTls certificates) lifetime from the secret operator, e.g. `7d`, or `30d`.
+                                  This can be shortened by the `maxCertificateLifetime` setting on the SecretClass issuing the TLS certificate.
+
+                                  Defaults to 1d.
+                                nullable: true
+                                type: string
                               resources:
                                 default:
                                   cpu:
