@@ -287,10 +287,7 @@ mod tests {
     use crate::{
         built_info,
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchTls},
-        },
+        crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
@@ -514,7 +511,7 @@ mod tests {
                     }
                 )]
                 .into(),
-                OpenSearchTls {
+                v1alpha1::OpenSearchTls {
                     server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                     internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
@@ -695,7 +692,7 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
-                    tls: OpenSearchTls::default(),
+                    tls: v1alpha1::OpenSearchTls::default(),
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

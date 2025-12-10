@@ -78,10 +78,7 @@ mod tests {
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchTls},
-        },
+        crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
@@ -201,7 +198,7 @@ mod tests {
                 ),
             ]
             .into(),
-            OpenSearchTls::default(),
+            v1alpha1::OpenSearchTls::default(),
         )
     }
 
