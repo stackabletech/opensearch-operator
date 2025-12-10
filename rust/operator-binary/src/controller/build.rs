@@ -82,9 +82,15 @@ mod tests {
             v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
         },
         framework::{
-            ClusterName, ControllerName, ListenerClassName, NamespaceName, OperatorName,
-            ProductName, ProductVersion, RoleGroupName, SecretKey, SecretName,
-            builder::pod::container::EnvVarSet, role_utils::GenericProductSpecificCommonConfig,
+            builder::pod::container::EnvVarSet,
+            role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName, SecretKey, SecretName},
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
         },
     };
 

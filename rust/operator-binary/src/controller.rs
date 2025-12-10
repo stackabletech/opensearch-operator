@@ -33,10 +33,16 @@ use crate::{
         v1alpha1::{self, OpenSearchKeystore},
     },
     framework::{
-        ClusterName, ControllerName, HasName, HasUid, ListenerClassName, NameIsValidLabelValue,
-        NamespaceName, OperatorName, ProductName, ProductVersion, RoleGroupName, RoleName, Uid,
+        HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+        types::{
+            kubernetes::{ListenerClassName, NamespaceName, Uid},
+            operator::{
+                ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                RoleGroupName, RoleName,
+            },
+        },
     },
 };
 
@@ -387,10 +393,13 @@ mod tests {
             v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
         },
         framework::{
-            ClusterName, ListenerClassName, NamespaceName, OperatorName, ProductVersion,
-            RoleGroupName, SecretKey, SecretName, builder::pod::container::EnvVarSet,
+            builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName, SecretKey, SecretName},
+                operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
+            },
         },
     };
 

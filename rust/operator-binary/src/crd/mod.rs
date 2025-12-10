@@ -29,9 +29,12 @@ use strum::{Display, EnumIter};
 use crate::{
     constant,
     framework::{
-        ClusterName, ConfigMapName, ContainerName, ListenerClassName, NameIsValidLabelValue,
-        ProductName, RoleName, SecretKey, SecretName,
+        NameIsValidLabelValue,
         role_utils::GenericProductSpecificCommonConfig,
+        types::{
+            kubernetes::{ConfigMapName, ContainerName, ListenerClassName, SecretKey, SecretName},
+            operator::{ClusterName, ProductName, RoleName},
+        },
     },
 };
 

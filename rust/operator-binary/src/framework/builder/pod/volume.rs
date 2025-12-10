@@ -3,7 +3,9 @@ use stackable_operator::{
     k8s_openapi::api::core::v1::PersistentVolumeClaim, kvp::Labels,
 };
 
-use crate::framework::{ListenerClassName, ListenerName, PersistentVolumeClaimName};
+use crate::framework::types::kubernetes::{
+    ListenerClassName, ListenerName, PersistentVolumeClaimName,
+};
 
 /// Infallible variant of [`stackable_operator::builder::pod::volume::ListenerReference`]
 #[derive(Clone, Debug, Eq, PartialEq)]

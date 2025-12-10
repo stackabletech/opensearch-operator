@@ -48,11 +48,13 @@ spec:
                                 description: Key in the Secret that contains the value
                                 maxLength: 253
                                 minLength: 1
+                                pattern: ^[-._a-zA-Z0-9]+$
                                 type: string
                               name:
                                 description: Name of the Secret
                                 maxLength: 253
                                 minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                 type: string
                             required:
                               - key
@@ -72,6 +74,7 @@ spec:
                       maxLength: 253
                       minLength: 1
                       nullable: true
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                       type: string
                   type: object
                 clusterOperation:
@@ -222,6 +225,7 @@ spec:
                           maxLength: 253
                           minLength: 1
                           nullable: true
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                           type: string
                         logging:
                           default:
@@ -570,6 +574,7 @@ spec:
                                 maxLength: 253
                                 minLength: 1
                                 nullable: true
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                 type: string
                               logging:
                                 default:

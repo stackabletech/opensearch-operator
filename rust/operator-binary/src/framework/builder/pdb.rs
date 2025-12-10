@@ -5,7 +5,8 @@ use stackable_operator::{
 };
 
 use crate::framework::{
-    ControllerName, HasName, HasUid, NameIsValidLabelValue, OperatorName, ProductName, RoleName,
+    HasName, HasUid, NameIsValidLabelValue,
+    types::operator::{ControllerName, OperatorName, ProductName, RoleName},
 };
 
 /// Infallible variant of
@@ -46,8 +47,12 @@ mod tests {
     };
 
     use crate::framework::{
-        ControllerName, HasName, HasUid, NameIsValidLabelValue, OperatorName, ProductName,
-        RoleName, Uid, builder::pdb::pod_disruption_budget_builder_with_role,
+        HasName, HasUid, NameIsValidLabelValue,
+        builder::pdb::pod_disruption_budget_builder_with_role,
+        types::{
+            kubernetes::Uid,
+            operator::{ControllerName, OperatorName, ProductName, RoleName},
+        },
     };
 
     struct Cluster {

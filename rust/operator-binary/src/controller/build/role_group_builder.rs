@@ -44,7 +44,6 @@ use crate::{
     },
     crd::v1alpha1,
     framework::{
-        PersistentVolumeClaimName, RoleGroupName, ServiceAccountName, ServiceName, VolumeName,
         builder::{
             meta::ownerreference_from_resource,
             pod::{
@@ -57,6 +56,10 @@ use crate::{
             STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
         },
         role_group_utils::ResourceNames,
+        types::{
+            kubernetes::{PersistentVolumeClaimName, ServiceAccountName, ServiceName, VolumeName},
+            operator::RoleGroupName,
+        },
     },
 };
 
@@ -759,11 +762,19 @@ mod tests {
             v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
         },
         framework::{
-            ClusterName, ConfigMapName, ControllerName, ListenerClassName, NamespaceName,
-            OperatorName, ProductName, ProductVersion, RoleGroupName, SecretKey, SecretName,
-            ServiceAccountName, ServiceName, builder::pod::container::EnvVarSet,
+            builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
             role_utils::GenericProductSpecificCommonConfig,
+            types::{
+                kubernetes::{
+                    ConfigMapName, ListenerClassName, NamespaceName, SecretKey, SecretName,
+                    ServiceAccountName, ServiceName,
+                },
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
         },
     };
 
