@@ -10,8 +10,17 @@ spec:
 {% endif %}
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
-{% if lookup('env', 'VECTOR_AGGREGATOR') %}
   clusterConfig:
+    keystore:
+    - key: s3.client.default.access_key
+      secretKeyRef:
+        name: s3-credentials
+        key: ACCESS_KEY
+    - key: s3.client.default.secret_key
+      secretKeyRef:
+        name: s3-credentials
+        key: SECRET_KEY
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
@@ -50,34 +59,6 @@ spec:
     podOverrides:
       spec:
         initContainers:
-          - name: init-keystore
-{% if test_scenario['values']['opensearch'].find(",") > 0 %}
-            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
-{% else %}
-            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
-{% endif %}
-            command:
-              - /bin/bash
-              - -euxo
-              - pipefail
-              - -c
-            args:
-              - |
-                bin/opensearch-keystore create
-
-                for i in keystore-secrets/*; do
-                  key=$(basename $i)
-                  bin/opensearch-keystore add-file "$key" "$i"
-                done
-
-                cp --archive config/opensearch.keystore initialized-keystore
-            volumeMounts:
-              - name: keystore
-                mountPath: /stackable/opensearch/initialized-keystore
-                readOnly: false
-              - name: keystore-secrets
-                mountPath: /stackable/opensearch/keystore-secrets
-                readOnly: true
           - name: init-system-keystore
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
             image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"

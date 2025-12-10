@@ -77,12 +77,12 @@ mod tests {
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
+        crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName, SecretKey, SecretName},
+                kubernetes::{ListenerClassName, NamespaceName},
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                     RoleGroupName,
@@ -197,13 +197,7 @@ mod tests {
                 ),
             ]
             .into(),
-            vec![v1alpha1::OpenSearchKeystore {
-                key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
-                secret_key_ref: v1alpha1::SecretKeyRef {
-                    name: SecretName::from_str_unsafe("my-keystore-secret"),
-                    key: SecretKey::from_str_unsafe("my-keystore-file"),
-                },
-            }],
+            vec![],
         )
     }
 

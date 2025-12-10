@@ -385,16 +385,13 @@ mod tests {
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
-        crd::{
-            NodeRoles, OpenSearchKeystoreKey,
-            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
-        },
+        crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName, SecretKey, SecretName},
+                kubernetes::{ListenerClassName, NamespaceName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
             },
         },
@@ -507,13 +504,7 @@ mod tests {
                 ),
             ]
             .into(),
-            vec![OpenSearchKeystore {
-                key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
-                secret_key_ref: SecretKeyRef {
-                    name: SecretName::from_str_unsafe("my-keystore-secret"),
-                    key: SecretKey::from_str_unsafe("my-keystore-file"),
-                },
-            }],
+            vec![],
         )
     }
 
