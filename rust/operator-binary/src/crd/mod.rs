@@ -27,7 +27,7 @@ use stackable_operator::{
 use strum::{Display, EnumIter};
 
 use crate::{
-    constant,
+    attributed_string_type, constant,
     framework::{
         NameIsValidLabelValue,
         role_utils::GenericProductSpecificCommonConfig,
@@ -87,6 +87,7 @@ pub mod versioned {
         /// Entries to add to the OpenSearch keystore.
         #[serde(default)]
         pub keystore: Vec<OpenSearchKeystore>,
+
         /// Name of the Vector aggregator [discovery ConfigMap](DOCS_BASE_URL_PLACEHOLDER/concepts/service_discovery).
         /// It must contain the key `ADDRESS` with the address of the Vector aggregator.
         /// Follow the [logging tutorial](DOCS_BASE_URL_PLACEHOLDER/tutorials/logging-vector-aggregator)
@@ -99,7 +100,7 @@ pub mod versioned {
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchKeystore {
         /// Key in the OpenSearch keystore
-        pub key: String,
+        pub key: OpenSearchKeystoreKey,
 
         /// Reference to the Secret containing the value which will be stored in the OpenSearch keystore
         pub secret_key_ref: SecretKeyRef,
@@ -355,6 +356,15 @@ impl v1alpha1::Container {
         })
         .expect("should be a valid container name")
     }
+}
+
+// See https://github.com/opensearch-project/OpenSearch/blob/8ff7c6ee924a49f0f59f80a6e1c73073c8904214/server/src/main/java/org/opensearch/common/settings/KeyStoreWrapper.java#L125
+attributed_string_type! {
+    OpenSearchKeystoreKey,
+    "Key in an OpenSearch keystore",
+    "s3.client.default.access_key",
+    (min_length = 1),
+    (regex = "[A-Za-z0-9_\\-.]+")
 }
 
 #[cfg(test)]

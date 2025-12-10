@@ -77,10 +77,7 @@ mod tests {
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
-        },
+        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
@@ -200,9 +197,9 @@ mod tests {
                 ),
             ]
             .into(),
-            vec![OpenSearchKeystore {
-                key: "Keystore1".to_string(),
-                secret_key_ref: SecretKeyRef {
+            vec![v1alpha1::OpenSearchKeystore {
+                key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                secret_key_ref: v1alpha1::SecretKeyRef {
                     name: SecretName::from_str_unsafe("my-keystore-secret"),
                     key: SecretKey::from_str_unsafe("my-keystore-file"),
                 },

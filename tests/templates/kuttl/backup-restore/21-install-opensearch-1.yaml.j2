@@ -15,11 +15,11 @@ spec:
     - key: s3.client.default.access_key
       secretKeyRef:
         name: s3-credentials
-        key: s3.client.default.access_key
+        key: ACCESS_KEY
     - key: s3.client.default.secret_key
       secretKeyRef:
         name: s3-credentials
-        key: s3.client.default.secret_key
+        key: SECRET_KEY
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}

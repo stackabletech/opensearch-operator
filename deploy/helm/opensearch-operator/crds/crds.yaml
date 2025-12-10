@@ -40,6 +40,8 @@ spec:
                         properties:
                           key:
                             description: Key in the OpenSearch keystore
+                            minLength: 1
+                            pattern: ^[A-Za-z0-9_\-.]+$
                             type: string
                           secretKeyRef:
                             description: Reference to the Secret containing the value which will be stored in the OpenSearch keystore

@@ -286,10 +286,7 @@ mod tests {
     use crate::{
         built_info,
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::{
-            NodeRoles,
-            v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
-        },
+        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
@@ -513,9 +510,9 @@ mod tests {
                     }
                 )]
                 .into(),
-                vec![OpenSearchKeystore {
-                    key: "Keystore1".to_string(),
-                    secret_key_ref: SecretKeyRef {
+                vec![v1alpha1::OpenSearchKeystore {
+                    key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                    secret_key_ref: v1alpha1::SecretKeyRef {
                         name: SecretName::from_str_unsafe("my-keystore-secret"),
                         key: SecretKey::from_str_unsafe("my-keystore-file")
                     }
@@ -697,9 +694,9 @@ mod tests {
                 image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
-                    keystore: vec![OpenSearchKeystore {
-                        key: "Keystore1".to_string(),
-                        secret_key_ref: SecretKeyRef {
+                    keystore: vec![v1alpha1::OpenSearchKeystore {
+                        key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                        secret_key_ref: v1alpha1::SecretKeyRef {
                             name: SecretName::from_str_unsafe("my-keystore-secret"),
                             key: SecretKey::from_str_unsafe("my-keystore-file"),
                         },

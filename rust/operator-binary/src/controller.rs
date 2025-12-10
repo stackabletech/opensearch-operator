@@ -28,10 +28,7 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    crd::{
-        NodeRoles,
-        v1alpha1::{self, OpenSearchKeystore},
-    },
+    crd::{NodeRoles, v1alpha1},
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
@@ -172,7 +169,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-    pub keystores: Vec<OpenSearchKeystore>,
+    pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
 }
 
 impl ValidatedCluster {
@@ -185,7 +182,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-        keystores: Vec<OpenSearchKeystore>,
+        keystores: Vec<v1alpha1::OpenSearchKeystore>,
     ) -> Self {
         let uid = uid.into();
         ValidatedCluster {
@@ -389,7 +386,7 @@ mod tests {
     use crate::{
         controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
         crd::{
-            NodeRoles,
+            NodeRoles, OpenSearchKeystoreKey,
             v1alpha1::{self, OpenSearchKeystore, SecretKeyRef},
         },
         framework::{
@@ -511,7 +508,7 @@ mod tests {
             ]
             .into(),
             vec![OpenSearchKeystore {
-                key: "Keystore1".to_string(),
+                key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                 secret_key_ref: SecretKeyRef {
                     name: SecretName::from_str_unsafe("my-keystore-secret"),
                     key: SecretKey::from_str_unsafe("my-keystore-file"),
