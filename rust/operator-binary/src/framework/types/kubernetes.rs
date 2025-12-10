@@ -85,7 +85,6 @@ attributed_string_type! {
     "The name of a SecretClass",
     "tls",
     // The secret class name is used in an annotation on the tls volume.
-    (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
     is_rfc_1123_dns_subdomain_name
 }
 
