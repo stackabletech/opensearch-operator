@@ -14,12 +14,14 @@ use stackable_operator::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
-                EmptyDirVolumeSource, PersistentVolumeClaim, PodSecurityContext, PodSpec,
-                PodTemplateSpec, Probe, Service, ServicePort, ServiceSpec, TCPSocketAction, Volume,
-                VolumeMount,
+                EmptyDirVolumeSource, KeyToPath, PersistentVolumeClaim, PodSecurityContext,
+                PodSpec, PodTemplateSpec, Probe, SecretVolumeSource, Service, ServicePort,
+                ServiceSpec, TCPSocketAction, Volume, VolumeMount,
             },
         },
-        apimachinery::pkg::{apis::meta::v1::LabelSelector, util::intstr::IntOrString},
+        apimachinery::pkg::{
+            api::resource::Quantity, apis::meta::v1::LabelSelector, util::intstr::IntOrString,
+        },
     },
     kvp::{Annotation, Annotations, Label, Labels},
     product_logging::framework::{
@@ -86,6 +88,12 @@ constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
+
+const OPENSEARCH_KEYSTORE_FILE_NAME: &str = "opensearch.keystore";
+const OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTORY_NAME: &str = "initialized-keystore";
+const OPENSEARCH_KEYSTORE_SECRETS_DIRECTORY: &str = "keystore-secrets";
+constant!(OPENSEARCH_KEYSTORE_VOLUME_NAME: VolumeName = "keystore");
+const OPENSEARCH_KEYSTORE_VOLUME_SIZE: &str = "1Mi";
 
 /// Builder for role-group resources
 pub struct RoleGroupBuilder<'a> {
@@ -261,6 +269,11 @@ impl<'a> RoleGroupBuilder<'a> {
                 )
             });
 
+        let mut init_containers = vec![];
+        if let Some(keystore_init_container) = self.build_maybe_keystore_init_container() {
+            init_containers.push(keystore_init_container);
+        }
+
         let log_config_volume_config_map =
             if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
                 &self.role_group_config.config.logging.opensearch_container
@@ -320,6 +333,34 @@ impl<'a> RoleGroupBuilder<'a> {
             ))
         };
 
+        if !self.cluster.keystores.is_empty() {
+            volumes.push(Volume {
+                name: OPENSEARCH_KEYSTORE_VOLUME_NAME.to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(OPENSEARCH_KEYSTORE_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            })
+        }
+
+        for (index, keystore) in self.cluster.keystores.iter().enumerate() {
+            volumes.push(Volume {
+                name: format!("keystore-{index}"),
+                secret: Some(SecretVolumeSource {
+                    default_mode: Some(0o660),
+                    secret_name: Some(keystore.secret_key_ref.name.to_string()),
+                    items: Some(vec![KeyToPath {
+                        key: keystore.secret_key_ref.key.to_string(),
+                        path: keystore.secret_key_ref.key.to_string(),
+                        ..KeyToPath::default()
+                    }]),
+                    ..SecretVolumeSource::default()
+                }),
+                ..Volume::default()
+            });
+        }
+
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
         // termination_grace_period_seconds into a Duration, the PodBuilder parses the Duration,
@@ -341,6 +382,7 @@ impl<'a> RoleGroupBuilder<'a> {
                     .into_iter()
                     .flatten()
                     .collect(),
+                init_containers: Some(init_containers),
                 node_selector: self
                     .role_group_config
                     .config
@@ -398,6 +440,58 @@ impl<'a> RoleGroupBuilder<'a> {
             "true".to_string(),
         ))
         .expect("should be a valid label")
+    }
+
+    /// Builds the container for the [`PodTemplateSpec`]
+    fn build_maybe_keystore_init_container(&self) -> Option<Container> {
+        if self.cluster.keystores.is_empty() {
+            return None;
+        }
+        let opensearch_home = self.node_config.opensearch_home();
+        let mut volume_mounts = vec![VolumeMount {
+            mount_path: format!(
+                "{opensearch_home}/{OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTORY_NAME}"
+            ),
+            name: OPENSEARCH_KEYSTORE_VOLUME_NAME.to_string(),
+            ..VolumeMount::default()
+        }];
+
+        for (index, keystore) in self.cluster.keystores.iter().enumerate() {
+            volume_mounts.push(VolumeMount {
+                mount_path: format!(
+                    "{opensearch_home}/{OPENSEARCH_KEYSTORE_SECRETS_DIRECTORY}/{}",
+                    keystore.key
+                ),
+                name: format!("keystore-{index}"),
+                read_only: Some(true),
+                sub_path: Some(keystore.secret_key_ref.key.to_string()),
+                ..VolumeMount::default()
+            });
+        }
+
+        Some(
+            new_container_builder(&v1alpha1::Container::InitKeystore.to_container_name())
+                .image_from_product_image(&self.cluster.image)
+                .command(vec![
+                    "/bin/bash".to_string(),
+                    "-x".to_string(),
+                    "-euo".to_string(),
+                    "pipefail".to_string(),
+                    "-c".to_string(),
+                ])
+                .args(vec![format!(
+                    "bin/opensearch-keystore create
+for i in keystore-secrets/*; do
+    key=$(basename $i)
+    bin/opensearch-keystore add-file \"$key\" \"$i\"
+done
+cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTORY_NAME}",
+                )])
+                .add_volume_mounts(volume_mounts)
+                .expect("The mount paths are statically defined and there should be no duplicates.")
+                .resources(self.role_group_config.config.resources.clone().into())
+                .build(),
+        )
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
@@ -471,6 +565,16 @@ impl<'a> RoleGroupBuilder<'a> {
             volume_mounts.push(VolumeMount {
                 mount_path: format!("{opensearch_path_conf}/tls/server"),
                 name: TLS_SERVER_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            })
+        }
+
+        if !self.cluster.keystores.is_empty() {
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/{OPENSEARCH_KEYSTORE_FILE_NAME}"),
+                name: OPENSEARCH_KEYSTORE_VOLUME_NAME.to_string(),
+                sub_path: Some(OPENSEARCH_KEYSTORE_FILE_NAME.to_owned()),
+                read_only: Some(true),
                 ..VolumeMount::default()
             })
         }
@@ -725,15 +829,15 @@ mod tests {
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
                 kubernetes::{
-                    ConfigMapName, ListenerClassName, NamespaceName, ServiceAccountName,
-                    ServiceName,
+                    ConfigMapName, ListenerClassName, NamespaceName, SecretKey, SecretName,
+                    ServiceAccountName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -820,6 +924,13 @@ mod tests {
             )]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            vec![v1alpha1::OpenSearchKeystore {
+                key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                secret_key_ref: v1alpha1::SecretKeyRef {
+                    name: SecretName::from_str_unsafe("my-keystore-secret"),
+                    key: SecretKey::from_str_unsafe("my-keystore-file"),
+                },
+            }],
         )
     }
 
@@ -1102,6 +1213,12 @@ mod tests {
                                         {
                                             "mountPath": "/stackable/opensearch/config/tls/server",
                                             "name": "tls-server",
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch.keystore",
+                                            "name": "keystore",
+                                            "readOnly": true,
+                                            "subPath": "opensearch.keystore",
                                         }
                                     ]
                                 },
@@ -1203,6 +1320,43 @@ mod tests {
                                     ],
                                 },
                             ],
+                            "initContainers": [
+                                {
+                                    "args": [
+                                        concat!(
+                                            "bin/opensearch-keystore create\n",
+                                            "for i in keystore-secrets/*; do\n",
+                                            "    key=$(basename $i)\n",
+                                            "    bin/opensearch-keystore add-file \"$key\" \"$i\"\n",
+                                            "done\n",
+                                            "cp --archive config/opensearch.keystore initialized-keystore"
+                                        ),
+                                    ],
+                                    "command": [
+                                        "/bin/bash",
+                                        "-x",
+                                        "-euo",
+                                        "pipefail",
+                                        "-c"
+                                    ],
+                                    "image": "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev",
+                                    "imagePullPolicy": "Always",
+                                    "name": "init-keystore",
+                                    "resources": {},
+                                    "volumeMounts": [
+                                        {
+                                            "mountPath": "/stackable/opensearch/initialized-keystore",
+                                            "name": "keystore",
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/keystore-secrets/Keystore1",
+                                            "name": "keystore-0",
+                                            "readOnly": true,
+                                            "subPath": "my-keystore-file"
+                                        }
+                                    ]
+                                }
+                            ],
                             "securityContext": {
                                 "fsGroup": 1000
                             },
@@ -1280,6 +1434,25 @@ mod tests {
                                         }
                                     },
                                     "name": "tls-server"
+                                 },
+                                {
+                                    "emptyDir": {
+                                        "sizeLimit": "1Mi"
+                                    },
+                                    "name": "keystore"
+                                },
+                                {
+                                    "name": "keystore-0",
+                                    "secret": {
+                                        "defaultMode": 0o660,
+                                        "items": [
+                                            {
+                                                "key": "my-keystore-file",
+                                                "path": "my-keystore-file"
+                                            }
+                                        ],
+                                        "secretName": "my-keystore-secret"
+                                    }
                                 }
                             ]
                         }

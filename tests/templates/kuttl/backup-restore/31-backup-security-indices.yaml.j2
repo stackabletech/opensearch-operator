@@ -53,12 +53,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: s3-credentials
-                  key: s3.client.default.access_key
+                  key: ACCESS_KEY
             - name: S3_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: s3-credentials
-                  key: s3.client.default.secret_key
+                  key: SECRET_KEY
           volumeMounts:
             - name: scripts
               mountPath: /root/scripts

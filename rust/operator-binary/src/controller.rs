@@ -171,6 +171,7 @@ pub struct ValidatedCluster {
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
     pub tls_config: v1alpha1::OpenSearchTls,
+    pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
 }
 
 impl ValidatedCluster {
@@ -184,6 +185,7 @@ impl ValidatedCluster {
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
         tls_config: v1alpha1::OpenSearchTls,
+        keystores: Vec<v1alpha1::OpenSearchKeystore>,
     ) -> Self {
         let uid = uid.into();
         ValidatedCluster {
@@ -201,6 +203,7 @@ impl ValidatedCluster {
             role_config,
             role_group_configs,
             tls_config,
+            keystores,
         }
     }
 
@@ -507,6 +510,7 @@ mod tests {
             ]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            vec![],
         )
     }
 

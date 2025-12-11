@@ -10,6 +10,7 @@
 ** xref:opensearch:usage-guide/logging.adoc[]
 ** xref:opensearch:usage-guide/opensearch-dashboards.adoc[]
 ** xref:opensearch:usage-guide/scaling.adoc[]
+** xref:opensearch:usage-guide/keystore.adoc[]
 ** xref:opensearch:usage-guide/security.adoc[]
 ** xref:opensearch:usage-guide/operations/index.adoc[]
 *** xref:opensearch:usage-guide/operations/cluster-operations.adoc[]
