@@ -502,6 +502,7 @@ mod tests {
             )]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            vec![],
         );
 
         NodeConfig::new(

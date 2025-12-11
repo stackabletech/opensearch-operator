@@ -154,6 +154,7 @@ pub fn validate(
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
         cluster.spec.cluster_config.tls.clone(),
+        cluster.spec.cluster_config.keystore.clone(),
     ))
 }
 
@@ -287,7 +288,7 @@ mod tests {
     use crate::{
         built_info,
         controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1},
+        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
             product_logging::framework::{
@@ -295,7 +296,10 @@ mod tests {
             },
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
             types::{
-                kubernetes::{ConfigMapName, ListenerClassName, NamespaceName, SecretClassName},
+                kubernetes::{
+                    ConfigMapName, ListenerClassName, NamespaceName, SecretClassName, SecretKey,
+                    SecretName,
+                },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                     RoleGroupName,
@@ -515,6 +519,13 @@ mod tests {
                     server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                     internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
+                vec![v1alpha1::OpenSearchKeystore {
+                    key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                    secret_key_ref: v1alpha1::SecretKeyRef {
+                        name: SecretName::from_str_unsafe("my-keystore-secret"),
+                        key: SecretKey::from_str_unsafe("my-keystore-file")
+                    }
+                }]
             )),
             result.ok()
         );
@@ -693,6 +704,13 @@ mod tests {
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
                     tls: v1alpha1::OpenSearchTls::default(),
+                    keystore: vec![v1alpha1::OpenSearchKeystore {
+                        key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
+                        secret_key_ref: v1alpha1::SecretKeyRef {
+                            name: SecretName::from_str_unsafe("my-keystore-secret"),
+                            key: SecretKey::from_str_unsafe("my-keystore-file"),
+                        },
+                    }],
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

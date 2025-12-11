@@ -27,12 +27,15 @@ use stackable_operator::{
 use strum::{Display, EnumIter};
 
 use crate::{
-    constant,
+    attributed_string_type, constant,
     framework::{
         NameIsValidLabelValue,
         role_utils::GenericProductSpecificCommonConfig,
         types::{
-            kubernetes::{ConfigMapName, ContainerName, ListenerClassName, SecretClassName},
+            kubernetes::{
+                ConfigMapName, ContainerName, ListenerClassName, SecretClassName, SecretKey,
+                SecretName,
+            },
             operator::{ClusterName, ProductName, RoleName},
         },
     },
@@ -85,6 +88,10 @@ pub mod versioned {
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterConfig {
+        /// Entries to add to the OpenSearch keystore.
+        #[serde(default)]
+        pub keystore: Vec<OpenSearchKeystore>,
+
         /// TLS configuration options for the server (REST API) and internal communication (transport).
         #[serde(default)]
         pub tls: OpenSearchTls,
@@ -95,6 +102,24 @@ pub mod versioned {
         /// to learn how to configure log aggregation with Vector.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub vector_aggregator_config_map_name: Option<ConfigMapName>,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchKeystore {
+        /// Key in the OpenSearch keystore
+        pub key: OpenSearchKeystoreKey,
+
+        /// Reference to the Secret containing the value which will be stored in the OpenSearch keystore
+        pub secret_key_ref: SecretKeyRef,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    pub struct SecretKeyRef {
+        /// Name of the Secret
+        pub name: SecretName,
+        /// Key in the Secret that contains the value
+        pub key: SecretKey,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -228,6 +253,9 @@ pub mod versioned {
 
         #[serde(rename = "vector")]
         Vector,
+
+        #[serde(rename = "init-keystore")]
+        InitKeystore,
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, PartialEq, Fragment)]
@@ -380,9 +408,19 @@ impl v1alpha1::Container {
         ContainerName::from_str(match self {
             v1alpha1::Container::OpenSearch => "opensearch",
             v1alpha1::Container::Vector => "vector",
+            v1alpha1::Container::InitKeystore => "init-keystore",
         })
         .expect("should be a valid container name")
     }
+}
+
+// See https://github.com/opensearch-project/OpenSearch/blob/8ff7c6ee924a49f0f59f80a6e1c73073c8904214/server/src/main/java/org/opensearch/common/settings/KeyStoreWrapper.java#L125
+attributed_string_type! {
+    OpenSearchKeystoreKey,
+    "Key in an OpenSearch keystore",
+    "s3.client.default.access_key",
+    (min_length = 1),
+    (regex = "[A-Za-z0-9_\\-.]+")
 }
 
 #[cfg(test)]

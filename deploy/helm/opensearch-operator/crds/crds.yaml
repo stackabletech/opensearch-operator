@@ -30,11 +30,46 @@ spec:
               properties:
                 clusterConfig:
                   default:
+                    keystore: []
                     tls:
                       internalSecretClass: tls
                       serverSecretClass: tls
                   description: Configuration that applies to all roles and role groups
                   properties:
+                    keystore:
+                      default: []
+                      description: Entries to add to the OpenSearch keystore.
+                      items:
+                        properties:
+                          key:
+                            description: Key in the OpenSearch keystore
+                            minLength: 1
+                            pattern: ^[A-Za-z0-9_\-.]+$
+                            type: string
+                          secretKeyRef:
+                            description: Reference to the Secret containing the value which will be stored in the OpenSearch keystore
+                            properties:
+                              key:
+                                description: Key in the Secret that contains the value
+                                maxLength: 253
+                                minLength: 1
+                                pattern: ^[-._a-zA-Z0-9]+$
+                                type: string
+                              name:
+                                description: Name of the Secret
+                                maxLength: 253
+                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                type: string
+                            required:
+                              - key
+                              - name
+                            type: object
+                        required:
+                          - key
+                          - secretKeyRef
+                        type: object
+                      type: array
                     tls:
                       default:
                         internalSecretClass: tls
