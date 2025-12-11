@@ -68,6 +68,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use uuid::uuid;
 
@@ -197,6 +198,7 @@ mod tests {
                 ),
             ]
             .into(),
+            v1alpha1::OpenSearchTls::default(),
             vec![],
         )
     }
@@ -217,6 +219,8 @@ mod tests {
                     vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
+                requested_secret_lifetime: Duration::from_str("1d")
+                    .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },

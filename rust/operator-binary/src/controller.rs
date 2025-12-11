@@ -134,6 +134,7 @@ pub struct ValidatedOpenSearchConfig {
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
     pub node_roles: NodeRoles,
+    pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
 }
@@ -169,6 +170,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: GenericRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+    pub tls_config: v1alpha1::OpenSearchTls,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
 }
 
@@ -182,6 +184,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: GenericRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
+        tls_config: v1alpha1::OpenSearchTls,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
     ) -> Self {
         let uid = uid.into();
@@ -199,6 +202,7 @@ impl ValidatedCluster {
             uid,
             role_config,
             role_group_configs,
+            tls_config,
             keystores,
         }
     }
@@ -379,6 +383,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use uuid::uuid;
 
@@ -504,6 +509,7 @@ mod tests {
                 ),
             ]
             .into(),
+            v1alpha1::OpenSearchTls::default(),
             vec![],
         )
     }
@@ -524,6 +530,8 @@ mod tests {
                     vector_container: None,
                 },
                 node_roles: NodeRoles(node_roles.to_vec()),
+                requested_secret_lifetime: Duration::from_str("1d")
+                    .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },

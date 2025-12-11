@@ -6,9 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Allow the configuration of TLS for the HTTP and TRANSPORT ports with the operator ([#55]).
 - Add the role group as a node attribute ([#63]).
 - Allow adding entries to the OpenSearch keystore ([#76]).
 
+[#55]: https://github.com/stackabletech/opensearch-operator/pull/55
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
 

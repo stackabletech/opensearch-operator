@@ -62,6 +62,41 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.node
 pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
     "plugins.security.ssl.http.enabled";
 
+/// Path to the cert PEM file used for TLS on the HTTP PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH: &str =
+    "plugins.security.ssl.http.pemcert_filepath";
+
+/// Path to the key PEM file used for TLS on the HTTP PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH: &str =
+    "plugins.security.ssl.http.pemkey_filepath";
+
+/// Path to the trusted CAs PEM file used for TLS on the HTTP PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
+    "plugins.security.ssl.http.pemtrustedcas_filepath";
+
+/// Whether to enable TLS on internal node-to-node communication using the transport port.
+/// type: boolean
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED: &str =
+    "plugins.security.ssl.transport.enabled";
+
+/// Path to the cert PEM file used for TLS on the transport PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemcert_filepath";
+
+/// Path to the key PEM file used for TLS on the transport PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemkey_filepath";
+
+/// Path to the trusted CAs PEM file used for TLS on the transport PORT.
+/// type: string
+pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
+    "plugins.security.ssl.transport.pemtrustedcas_filepath";
+
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
@@ -69,7 +104,7 @@ pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
-    discovery_service_name: ServiceName,
+    pub discovery_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -90,8 +125,29 @@ impl NodeConfig {
     }
 
     /// Creates the main OpenSearch configuration file in YAML format
-    pub fn static_opensearch_config_file_content(&self) -> String {
-        Self::to_yaml(self.static_opensearch_config())
+    pub fn opensearch_config_file_content(&self) -> String {
+        Self::to_yaml(self.opensearch_config())
+    }
+
+    pub fn opensearch_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = self.static_opensearch_config();
+
+        config.append(&mut self.tls_config());
+
+        for (setting, value) in self
+            .role_group_config
+            .config_overrides
+            .get(CONFIGURATION_FILE_OPENSEARCH_YML)
+            .into_iter()
+            .flatten()
+        {
+            config.insert(setting.to_owned(), json!(value));
+        }
+
+        // Ensure a deterministic result
+        config.sort_keys();
+
+        config
     }
 
     /// Creates the main OpenSearch configuration file as JSON map
@@ -125,25 +181,62 @@ impl NodeConfig {
             json!(self.role_group_name),
         );
 
-        for (setting, value) in self
-            .role_group_config
-            .config_overrides
-            .get(CONFIGURATION_FILE_OPENSEARCH_YML)
-            .into_iter()
-            .flatten()
-        {
-            config.insert(setting.to_owned(), json!(value));
-        }
+        config
+    }
 
-        // Ensure a deterministic result
-        config.sort_keys();
+    pub fn tls_config(&self) -> serde_json::Map<String, Value> {
+        let mut config = serde_json::Map::new();
+        let opensearch_path_conf = self.opensearch_path_conf();
+
+        // TLS config for TRANSPORT port which is always enabled.
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
+            json!(true),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
+            json!(format!("{opensearch_path_conf}/tls/internal/tls.crt")),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
+            json!(format!("{opensearch_path_conf}/tls/internal/tls.key")),
+        );
+        config.insert(
+            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+            json!(format!("{opensearch_path_conf}/tls/internal/ca.crt")),
+        );
+
+        // TLS config for HTTP port (REST API) (optional).
+        if self.cluster.tls_config.server_secret_class.is_some() {
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
+                json!(true),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/server/tls.crt")),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/server/tls.key")),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/server/ca.crt")),
+            );
+        } else {
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
+                json!(false),
+            );
+        }
 
         config
     }
 
     /// Returns `true` if TLS is enabled on the HTTP port
     pub fn tls_on_http_port_enabled(&self) -> bool {
-        self.static_opensearch_config()
+        self.opensearch_config()
             .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
             .and_then(Self::value_as_bool)
             == Some(true)
@@ -307,13 +400,14 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         role_utils::GenericRoleConfig,
+        shared::time::Duration,
     };
     use uuid::uuid;
 
     use super::*;
     use crate::{
         controller::{ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::NodeRoles,
+        crd::{NodeRoles, v1alpha1},
         framework::{
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
@@ -363,6 +457,8 @@ mod tests {
                     v1alpha1::NodeRole::Ingest,
                     v1alpha1::NodeRole::RemoteClusterClient,
                 ]),
+                requested_secret_lifetime: Duration::from_str("1d")
+                    .expect("should be a valid duration"),
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
@@ -405,6 +501,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
+            v1alpha1::OpenSearchTls::default(),
             vec![],
         );
 
@@ -430,10 +527,18 @@ mod tests {
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
-                "test: \"value\""
+                "plugins.security.ssl.http.enabled: true\n",
+                "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
+                "plugins.security.ssl.http.pemkey_filepath: \"/stackable/opensearch/config/tls/server/tls.key\"\n",
+                "plugins.security.ssl.http.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/server/ca.crt\"\n",
+                "plugins.security.ssl.transport.enabled: true\n",
+                "plugins.security.ssl.transport.pemcert_filepath: \"/stackable/opensearch/config/tls/internal/tls.crt\"\n",
+                "plugins.security.ssl.transport.pemkey_filepath: \"/stackable/opensearch/config/tls/internal/tls.key\"\n",
+                "plugins.security.ssl.transport.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/internal/ca.crt\"\n",
+                "test: \"value\"",
             )
             .to_owned(),
-            node_config.static_opensearch_config_file_content()
+            node_config.opensearch_config_file_content()
         );
     }
 
@@ -451,7 +556,7 @@ mod tests {
             ..TestConfig::default()
         });
 
-        assert!(!node_config_tls_undefined.tls_on_http_port_enabled());
+        assert!(node_config_tls_undefined.tls_on_http_port_enabled());
         assert!(node_config_tls_enabled.tls_on_http_port_enabled());
         assert!(!node_config_tls_disabled.tls_on_http_port_enabled());
     }

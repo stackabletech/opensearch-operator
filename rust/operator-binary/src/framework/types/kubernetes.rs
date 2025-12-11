@@ -81,6 +81,14 @@ attributed_string_type! {
 }
 
 attributed_string_type! {
+    SecretClassName,
+    "The name of a SecretClass",
+    "tls",
+    // The secret class name is used in an annotation on the tls volume.
+    is_rfc_1123_dns_subdomain_name
+}
+
+attributed_string_type! {
     SecretKey,
     "The key for a Secret",
     "accessKey",
@@ -145,8 +153,8 @@ attributed_string_type! {
 mod tests {
     use super::{
         ClusterRoleName, ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName,
-        ListenerName, NamespaceName, PersistentVolumeClaimName, RoleBindingName, SecretKey,
-        SecretName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
+        ListenerName, NamespaceName, PersistentVolumeClaimName, RoleBindingName, SecretClassName,
+        SecretKey, SecretName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
     };
 
     #[test]
@@ -160,6 +168,7 @@ mod tests {
         NamespaceName::test_example();
         PersistentVolumeClaimName::test_example();
         RoleBindingName::test_example();
+        SecretClassName::test_example();
         SecretKey::test_example();
         SecretName::test_example();
         ServiceAccountName::test_example();
