@@ -113,18 +113,7 @@ spec:
               - name: tls-concatenated
                 mountPath: /stackable/opensearch/config/tls/concatenated
                 readOnly: true
-              - name: keystore
-                mountPath: /stackable/opensearch/config/opensearch.keystore
-                subPath: opensearch.keystore
-                readOnly: true
         volumes:
-          - name: keystore
-            emptyDir:
-              sizeLimit: 1Mi
-          - name: keystore-secrets
-            secret:
-              secretName: s3-credentials
-              defaultMode: 0o660
           - name: s3-ca-crt
             secret:
               secretName: minio-ca-crt
