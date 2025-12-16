@@ -67,7 +67,6 @@ mod tests {
         kube::Resource,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -175,7 +174,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig::default(),
             [
                 (
                     RoleGroupName::from_str_unsafe("coordinating"),

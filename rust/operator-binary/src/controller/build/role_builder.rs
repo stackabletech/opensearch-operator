@@ -146,7 +146,7 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a [`PodDisruptionBudget`] used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
-        let pdb_config = &self.cluster.role_config.pod_disruption_budget;
+        let pdb_config = &self.cluster.role_config.common.pod_disruption_budget;
 
         if pdb_config.enabled {
             let max_unavailable = pdb_config
@@ -229,7 +229,6 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -308,7 +307,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
                 role_group_config.clone(),

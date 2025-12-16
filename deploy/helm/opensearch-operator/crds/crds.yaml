@@ -246,6 +246,10 @@ spec:
                               type: object
                               x-kubernetes-preserve-unknown-fields: true
                           type: object
+                        discoveryServiceExposed:
+                          description: Determines whether this role group is exposed in the discovery service.
+                          nullable: true
+                          type: boolean
                         gracefulShutdownTimeout:
                           description: |-
                             Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the
@@ -520,11 +524,19 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     roleConfig:
                       default:
+                        discoveryServiceListenerClass: cluster-internal
                         podDisruptionBudget:
                           enabled: true
                           maxUnavailable: null
                       description: This is a product-agnostic RoleConfig, which is sufficient for most of the products.
                       properties:
+                        discoveryServiceListenerClass:
+                          default: cluster-internal
+                          description: The [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) that is used for the discovery service.
+                          maxLength: 253
+                          minLength: 1
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                          type: string
                         podDisruptionBudget:
                           default:
                             enabled: true
@@ -603,6 +615,10 @@ spec:
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                 type: object
+                              discoveryServiceExposed:
+                                description: Determines whether this role group is exposed in the discovery service.
+                                nullable: true
+                                type: boolean
                               gracefulShutdownTimeout:
                                 description: |-
                                   Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the

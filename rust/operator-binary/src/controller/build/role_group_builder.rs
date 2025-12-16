@@ -822,7 +822,6 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use strum::IntoEnumIterator;
@@ -925,7 +924,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
                 role_group_config.clone(),

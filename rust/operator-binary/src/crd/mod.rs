@@ -41,7 +41,8 @@ use crate::{
     },
 };
 
-constant!(DEFAULT_LISTENER_CLASS: ListenerClassName = "cluster-internal");
+constant!(DEFAULT_ROLE_GROUP_LISTENER_CLASS: ListenerClassName = "cluster-internal");
+constant!(DEFAULT_DISCOVERY_SERVICE_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 constant!(TLS_DEFAULT_SECRET_CLASS: SecretClassName = "tls");
 
 #[versioned(
@@ -81,8 +82,11 @@ pub mod versioned {
         pub cluster_operation: ClusterOperation,
 
         // no doc - docs in Role struct
-        pub nodes:
-            Role<OpenSearchConfigFragment, GenericRoleConfig, GenericProductSpecificCommonConfig>,
+        pub nodes: Role<
+            OpenSearchConfigFragment,
+            OpenSearchRoleConfig,
+            GenericProductSpecificCommonConfig,
+        >,
     }
 
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -202,6 +206,9 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub affinity: StackableAffinity,
 
+        /// Determines whether this role group is exposed in the discovery service.
+        pub discovery_service_exposed: bool,
+
         /// Time period Pods have to gracefully shut down, e.g. `30m`, `1h` or `2d`. Consult the
         /// operator documentation for details.
         #[fragment_attrs(serde(default))]
@@ -277,6 +284,17 @@ pub mod versioned {
         pub data: PvcConfig,
     }
 
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct OpenSearchRoleConfig {
+        #[serde(flatten)]
+        pub common: GenericRoleConfig,
+
+        /// The [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) that is used for the discovery service.
+        #[serde(default = "discovery_service_listener_class_default")]
+        pub discovery_service_listener_class: ListenerClassName,
+    }
+
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct OpenSearchClusterStatus {
@@ -320,12 +338,13 @@ impl v1alpha1::OpenSearchConfig {
                 node_affinity: None,
                 node_selector: None,
             },
+            discovery_service_exposed: Some(true),
             // Default taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L364
             graceful_shutdown_timeout: Some(
                 Duration::from_str("2m").expect("should be a valid duration"),
             ),
-            listener_class: Some(DEFAULT_LISTENER_CLASS.to_owned()),
+            listener_class: Some(DEFAULT_ROLE_GROUP_LISTENER_CLASS.to_owned()),
             logging: product_logging::spec::default_logging(),
             // Defaults taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L16-L20
@@ -382,6 +401,19 @@ fn server_secret_class_default() -> Option<SecretClassName> {
 
 fn internal_secret_class_default() -> SecretClassName {
     TLS_DEFAULT_SECRET_CLASS.to_owned()
+}
+
+impl Default for v1alpha1::OpenSearchRoleConfig {
+    fn default() -> Self {
+        v1alpha1::OpenSearchRoleConfig {
+            common: GenericRoleConfig::default(),
+            discovery_service_listener_class: discovery_service_listener_class_default(),
+        }
+    }
+}
+
+fn discovery_service_listener_class_default() -> ListenerClassName {
+    DEFAULT_DISCOVERY_SERVICE_LISTENER_CLASS.to_owned()
 }
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]

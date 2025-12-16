@@ -20,7 +20,6 @@ use stackable_operator::{
     },
     kube::{Resource, api::ObjectMeta, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
-    role_utils::GenericRoleConfig,
     shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -168,7 +167,7 @@ pub struct ValidatedCluster {
     pub name: ClusterName,
     pub namespace: NamespaceName,
     pub uid: Uid,
-    pub role_config: GenericRoleConfig,
+    pub role_config: v1alpha1::OpenSearchRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
     pub tls_config: v1alpha1::OpenSearchTls,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
@@ -182,7 +181,7 @@ impl ValidatedCluster {
         name: ClusterName,
         namespace: NamespaceName,
         uid: impl Into<Uid>,
-        role_config: GenericRoleConfig,
+        role_config: v1alpha1::OpenSearchRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
         tls_config: v1alpha1::OpenSearchTls,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
@@ -382,7 +381,6 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -475,7 +473,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig::default(),
             [
                 (
                     RoleGroupName::from_str_unsafe("coordinating"),

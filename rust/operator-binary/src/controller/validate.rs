@@ -279,7 +279,7 @@ mod tests {
             ContainerLogConfigChoiceFragment, ContainerLogConfigFragment,
             CustomContainerLogConfigFragment, LogLevel, LoggerConfig, LoggingFragment,
         },
-        role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+        role_utils::{CommonConfiguration, Role, RoleGroup},
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -332,7 +332,7 @@ mod tests {
                 ClusterName::from_str_unsafe("my-opensearch"),
                 NamespaceName::from_str_unsafe("default"),
                 uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
-                GenericRoleConfig::default(),
+                v1alpha1::OpenSearchRoleConfig::default(),
                 [(
                     RoleGroupName::from_str_unsafe("default"),
                     RoleGroupConfig {
@@ -764,7 +764,7 @@ mod tests {
                         product_specific_common_config: GenericProductSpecificCommonConfig::default(
                         ),
                     },
-                    role_config: GenericRoleConfig::default(),
+                    role_config: v1alpha1::OpenSearchRoleConfig::default(),
                     role_groups: [(
                         "default".to_owned(),
                         RoleGroup {
