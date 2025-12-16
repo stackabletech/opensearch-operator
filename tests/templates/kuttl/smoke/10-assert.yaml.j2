@@ -446,7 +446,6 @@ spec:
           value: "true"
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
-        - name: cluster.initial_cluster_manager_nodes
         - name: discovery.seed_hosts
           value: opensearch-discovery
         - name: node.name
@@ -614,7 +613,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-discovery,listener-volume=listener,pod
+                secrets.stackable.tech/scope: listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce

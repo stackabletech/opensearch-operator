@@ -232,7 +232,6 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
-        let service_scopes = vec![self.node_config.discovery_service_name.clone()];
 
         for node_role in self.role_group_config.config.node_roles.iter() {
             node_role_labels.insert(Self::build_node_role_label(node_role));
@@ -323,6 +322,15 @@ impl<'a> RoleGroupBuilder<'a> {
         ];
 
         if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
+            let mut service_scopes = vec![];
+            if self
+                .role_group_config
+                .config
+                .node_roles
+                .contains(&v1alpha1::NodeRole::ClusterManager)
+            {
+                service_scopes.push(self.node_config.discovery_service_name.clone());
+            }
             volumes.push(self.build_tls_volume(
                 &TLS_SERVER_VOLUME_NAME,
                 tls_http_secret_class_name,
@@ -1129,10 +1137,6 @@ mod tests {
                                         "-c"
                                     ],
                                     "env": [
-                                        {
-                                            "name": "cluster.initial_cluster_manager_nodes",
-                                            "value": ""
-                                        },
                                         {
                                             "name": "discovery.seed_hosts",
                                             "value": "my-opensearch-cluster"
