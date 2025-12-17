@@ -17,9 +17,7 @@ use stackable_operator::{
     },
 };
 
-use super::role_group_builder::{
-    HTTP_PORT, HTTP_PORT_NAME, RoleGroupBuilder, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-};
+use super::role_group_builder::{RoleGroupBuilder, TRANSPORT_PORT, TRANSPORT_PORT_NAME};
 use crate::{
     controller::{ContextNames, ValidatedCluster},
     framework::{
@@ -64,7 +62,7 @@ impl<'a> RoleBuilder<'a> {
                     role_group_name.clone(),
                     role_group_config.clone(),
                     self.context_names,
-                    self.resource_names.discovery_service_name(),
+                    self.resource_names.seed_nodes_service_name(),
                 )
             })
             .collect()
@@ -101,28 +99,14 @@ impl<'a> RoleBuilder<'a> {
     }
 
     /// Builds a Service that references all nodes with the cluster_manager node role
-    ///
-    /// Initially, this service was meant to be used by
-    /// [`super::node_config::NodeConfig::initial_cluster_manager_nodes`], but the function uses now another approach.
-    /// Afterwards, it was meant to be used as an entry point to OpenSearch, but it could also make
-    /// sense to use coordinating only nodes as entry points and not cluster manager nodes.
-    /// Therefore, this service will bei either adapted or removed. There is already an according
-    /// task entry in <https://github.com/stackabletech/opensearch-operator/issues/1>.
-    pub fn build_cluster_manager_service(&self) -> Service {
-        let ports = vec![
-            ServicePort {
-                name: Some(HTTP_PORT_NAME.to_owned()),
-                port: HTTP_PORT.into(),
-                ..ServicePort::default()
-            },
-            ServicePort {
-                name: Some(TRANSPORT_PORT_NAME.to_owned()),
-                port: TRANSPORT_PORT.into(),
-                ..ServicePort::default()
-            },
-        ];
+    pub fn build_seed_nodes_service(&self) -> Service {
+        let ports = vec![ServicePort {
+            name: Some(TRANSPORT_PORT_NAME.to_owned()),
+            port: TRANSPORT_PORT.into(),
+            ..ServicePort::default()
+        }];
 
-        let metadata = self.common_metadata(self.resource_names.discovery_service_name());
+        let metadata = self.common_metadata(self.resource_names.seed_nodes_service_name());
 
         let service_selector =
             RoleGroupBuilder::cluster_manager_labels(&self.cluster, self.context_names);
@@ -410,13 +394,12 @@ mod tests {
     }
 
     #[test]
-    fn test_build_cluster_manager_service() {
+    fn test_build_seed_nodes_service() {
         let context_names = context_names();
         let role_builder = role_builder(&context_names);
 
-        let cluster_manager_service =
-            serde_json::to_value(role_builder.build_cluster_manager_service())
-                .expect("should be serializable");
+        let cluster_manager_service = serde_json::to_value(role_builder.build_seed_nodes_service())
+            .expect("should be serializable");
 
         assert_eq!(
             json!({
@@ -431,7 +414,7 @@ mod tests {
                         "app.kubernetes.io/version": "3.1.0",
                         "stackable.tech/vendor": "Stackable"
                     },
-                    "name": "my-opensearch-cluster-discovery",
+                    "name": "my-opensearch-cluster-seed-nodes",
                     "namespace": "default",
                     "ownerReferences": [
                         {
@@ -446,10 +429,6 @@ mod tests {
                 "spec": {
                     "clusterIP": "None",
                     "ports": [
-                        {
-                            "name": "http",
-                            "port": 9200
-                        },
                         {
                             "name": "transport",
                             "port": 9300

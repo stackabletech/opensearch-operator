@@ -33,7 +33,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         listeners.push(role_group_builder.build_listener());
     }
 
-    let cluster_manager_service = role_builder.build_cluster_manager_service();
+    let cluster_manager_service = role_builder.build_seed_nodes_service();
     services.push(cluster_manager_service);
 
     let service_accounts = vec![role_builder.build_service_account()];
@@ -105,10 +105,10 @@ mod tests {
         );
         assert_eq!(
             vec![
-                "my-opensearch-discovery",
                 "my-opensearch-nodes-cluster-manager-headless",
                 "my-opensearch-nodes-coordinating-headless",
-                "my-opensearch-nodes-data-headless"
+                "my-opensearch-nodes-data-headless",
+                "my-opensearch-seed-nodes"
             ],
             extract_resource_names(&resources.services)
         );

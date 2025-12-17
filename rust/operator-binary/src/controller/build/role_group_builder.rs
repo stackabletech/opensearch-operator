@@ -113,7 +113,7 @@ impl<'a> RoleGroupBuilder<'a> {
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
         context_names: &'a ContextNames,
-        discovery_service_name: ServiceName,
+        seed_nodes_service_name: ServiceName,
     ) -> RoleGroupBuilder<'a> {
         RoleGroupBuilder {
             service_account_name,
@@ -122,7 +122,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 cluster.clone(),
                 role_group_name.clone(),
                 role_group_config.clone(),
-                discovery_service_name,
+                seed_nodes_service_name,
             ),
             role_group_name: role_group_name.clone(),
             role_group_config,
@@ -329,7 +329,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 .node_roles
                 .contains(&v1alpha1::NodeRole::ClusterManager)
             {
-                service_scopes.push(self.node_config.discovery_service_name.clone());
+                service_scopes.push(self.node_config.seed_nodes_service_name.clone());
             }
             volumes.push(self.build_tls_volume(
                 &TLS_SERVER_VOLUME_NAME,

@@ -115,7 +115,7 @@ spec:
         - name: cluster.initial_cluster_manager_nodes
           value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
         - name: discovery.seed_hosts
-          value: opensearch-discovery
+          value: opensearch-seed-nodes
         - name: node.name
           valueFrom:
             fieldRef:
@@ -281,7 +281,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-discovery,listener-volume=listener,pod
+                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -447,7 +447,7 @@ spec:
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
         - name: discovery.seed_hosts
-          value: opensearch-discovery
+          value: opensearch-seed-nodes
         - name: node.name
           valueFrom:
             fieldRef:
@@ -820,7 +820,7 @@ metadata:
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
-  name: opensearch-discovery
+  name: opensearch-seed-nodes
   ownerReferences:
   - apiVersion: opensearch.stackable.tech/v1alpha1
     controller: true
@@ -828,10 +828,6 @@ metadata:
     name: opensearch
 spec:
   ports:
-  - name: http
-    port: 9200
-    protocol: TCP
-    targetPort: 9200
   - name: transport
     port: 9300
     protocol: TCP

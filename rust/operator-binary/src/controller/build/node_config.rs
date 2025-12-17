@@ -104,7 +104,7 @@ pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
-    pub discovery_service_name: ServiceName,
+    pub seed_nodes_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -114,13 +114,13 @@ impl NodeConfig {
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
-        discovery_service_name: ServiceName,
+        seed_nodes_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
             role_group_name,
             role_group_config,
-            discovery_service_name,
+            seed_nodes_service_name,
         }
     }
 
@@ -267,7 +267,7 @@ impl NodeConfig {
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
-                &self.discovery_service_name,
+                &self.seed_nodes_service_name,
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),

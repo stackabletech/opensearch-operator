@@ -221,13 +221,13 @@ impl ResourceNames {
             .expect("should be a valid cluster role name")
     }
 
-    pub fn discovery_service_name(&self) -> ServiceName {
-        const SUFFIX: &str = "-discovery";
+    pub fn seed_nodes_service_name(&self) -> ServiceName {
+        const SUFFIX: &str = "-seed-nodes";
 
         // compile-time checks
         const _: () = assert!(
             ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceName::MAX_LENGTH,
-            "The string `<cluster_name>-discovery` must not exceed the limit of Service names."
+            "The string `<cluster_name>-seed-nodes` must not exceed the limit of Service names."
         );
         let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
         let _ = ClusterName::IS_VALID_LABEL_VALUE;
@@ -414,8 +414,8 @@ mod tests {
             resource_names.cluster_role_name()
         );
         assert_eq!(
-            ServiceName::from_str_unsafe("my-cluster-discovery"),
-            resource_names.discovery_service_name()
+            ServiceName::from_str_unsafe("my-cluster-seed-nodes"),
+            resource_names.seed_nodes_service_name()
         );
     }
 }
