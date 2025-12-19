@@ -14,9 +14,9 @@ use stackable_operator::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
-                EmptyDirVolumeSource, KeyToPath, PersistentVolumeClaim, PodSecurityContext,
-                PodSpec, PodTemplateSpec, Probe, SecretVolumeSource, Service, ServicePort,
-                ServiceSpec, TCPSocketAction, Volume, VolumeMount,
+                EmptyDirVolumeSource, KeyToPath, PodSecurityContext, PodSpec, PodTemplateSpec,
+                Probe, SecretVolumeSource, Service, ServicePort, ServiceSpec, TCPSocketAction,
+                Volume, VolumeMount,
             },
         },
         apimachinery::pkg::{
@@ -61,9 +61,10 @@ use crate::{
         },
         role_group_utils::ResourceNames,
         types::{
+            common::Port,
             kubernetes::{
-                PersistentVolumeClaimName, SecretClassName, ServiceAccountName, ServiceName,
-                VolumeName,
+                ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
+                ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -71,17 +72,22 @@ use crate::{
 };
 
 pub const HTTP_PORT_NAME: &str = "http";
-pub const HTTP_PORT: u16 = 9200;
+pub const HTTP_PORT: Port = Port(9200);
 pub const TRANSPORT_PORT_NAME: &str = "transport";
-pub const TRANSPORT_PORT: u16 = 9300;
+pub const TRANSPORT_PORT: Port = Port(9300);
 
 constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
 
 constant!(LOG_CONFIG_VOLUME_NAME: VolumeName = "log-config");
 constant!(DATA_VOLUME_NAME: VolumeName = "data");
 
-constant!(LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
-const LISTENER_VOLUME_DIR: &str = "/stackable/listener";
+// This is the main listener which is sometimes referenced by users in podOverrides, so keep its
+// name simple.
+constant!(ROLE_GROUP_LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "listener");
+const ROLE_GROUP_LISTENER_VOLUME_DIR: &str = "/stackable/listeners/role-group";
+
+constant!(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "discovery-service-listener");
+const DISCOVERY_SERVICE_LISTENER_VOLUME_DIR: &str = "/stackable/listeners/discovery-service";
 
 constant!(TLS_SERVER_VOLUME_NAME: VolumeName = "tls-server");
 constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
@@ -104,6 +110,7 @@ pub struct RoleGroupBuilder<'a> {
     role_group_config: OpenSearchRoleGroupConfig,
     context_names: &'a ContextNames,
     resource_names: ResourceNames,
+    discovery_service_listener_name: ListenerName,
 }
 
 impl<'a> RoleGroupBuilder<'a> {
@@ -114,6 +121,7 @@ impl<'a> RoleGroupBuilder<'a> {
         role_group_config: OpenSearchRoleGroupConfig,
         context_names: &'a ContextNames,
         seed_nodes_service_name: ServiceName,
+        discovery_service_listener_name: ListenerName,
     ) -> RoleGroupBuilder<'a> {
         RoleGroupBuilder {
             service_account_name,
@@ -132,6 +140,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 role_name: ValidatedCluster::role_name(),
                 role_group_name,
             },
+            discovery_service_listener_name,
         }
     }
 
@@ -190,23 +199,36 @@ impl<'a> RoleGroupBuilder<'a> {
             .data
             .build_pvc(DATA_VOLUME_NAME.as_ref(), Some(vec!["ReadWriteOnce"]));
 
-        let listener_group_name = self.resource_names.listener_name();
+        // Listener endpoints for all rolegroups will use persistent volumes so that load balancers
+        // can hard-code the target addresses. This will be the case even when no class is set (and
+        // the value defaults to cluster-internal) as the address should still be consistent.
+        let role_group_listener_volume_claim_template =
+            listener_operator_volume_source_builder_build_pvc(
+                &ListenerReference::Listener(self.resource_names.listener_name()),
+                &self.recommended_labels(),
+                &ROLE_GROUP_LISTENER_VOLUME_NAME,
+            );
 
-        // Listener endpoints for the all rolegroups will use persistent
-        // volumes so that load balancers can hard-code the target
-        // addresses. This will be the case even when no class is set (and
-        // the value defaults to cluster-internal) as the address should
-        // still be consistent.
-        let listener_volume_claim_template = listener_operator_volume_source_builder_build_pvc(
-            &ListenerReference::Listener(listener_group_name),
-            &self.recommended_labels(),
-            &LISTENER_VOLUME_NAME,
-        );
+        let maybe_discovery_service_listener_volume_claim_template = self
+            .role_group_config
+            .config
+            .discovery_service_exposed
+            .then(|| {
+                listener_operator_volume_source_builder_build_pvc(
+                    &ListenerReference::Listener(self.discovery_service_listener_name.to_owned()),
+                    &self.recommended_labels(),
+                    &DISCOVERY_SERVICE_LISTENER_VOLUME_NAME,
+                )
+            });
 
-        let pvcs: Option<Vec<PersistentVolumeClaim>> = Some(vec![
-            data_volume_claim_template,
-            listener_volume_claim_template,
-        ]);
+        let pvcs = vec![
+            Some(data_volume_claim_template),
+            Some(role_group_listener_volume_claim_template),
+            maybe_discovery_service_listener_volume_claim_template,
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
@@ -218,7 +240,7 @@ impl<'a> RoleGroupBuilder<'a> {
             },
             service_name: Some(self.resource_names.headless_service_name().to_string()),
             template,
-            volume_claim_templates: pvcs,
+            volume_claim_templates: Some(pvcs),
             ..StatefulSetSpec::default()
         };
 
@@ -317,7 +339,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 vec![],
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
-                &LISTENER_VOLUME_NAME,
+                vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
             ),
         ];
 
@@ -331,13 +353,19 @@ impl<'a> RoleGroupBuilder<'a> {
             {
                 service_scopes.push(self.node_config.seed_nodes_service_name.clone());
             }
+
+            let mut listener_scopes = vec![ROLE_GROUP_LISTENER_VOLUME_NAME.to_owned()];
+            if self.role_group_config.config.discovery_service_exposed {
+                listener_scopes.push(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_owned());
+            }
+
             volumes.push(self.build_tls_volume(
                 &TLS_SERVER_VOLUME_NAME,
                 tls_http_secret_class_name,
                 service_scopes,
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
-                &LISTENER_VOLUME_NAME,
+                listener_scopes,
             ))
         };
 
@@ -420,7 +448,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Returns the labels of OpenSearch nodes with the `cluster_manager` role.
     ///
-    /// As described in [`super::role_builder::RoleBuilder::build_cluster_manager_service`], this
+    /// As described in [`super::role_builder::RoleBuilder::build_seed_nodes_service`], this
     /// function will be changed or deleted.
     pub fn cluster_manager_labels(
         cluster: &ValidatedCluster,
@@ -553,8 +581,8 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                 ..VolumeMount::default()
             },
             VolumeMount {
-                mount_path: LISTENER_VOLUME_DIR.to_owned(),
-                name: LISTENER_VOLUME_NAME.to_string(),
+                mount_path: ROLE_GROUP_LISTENER_VOLUME_DIR.to_owned(),
+                name: ROLE_GROUP_LISTENER_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
             VolumeMount {
@@ -569,12 +597,20 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             },
         ];
 
+        if self.role_group_config.config.discovery_service_exposed {
+            volume_mounts.push(VolumeMount {
+                mount_path: DISCOVERY_SERVICE_LISTENER_VOLUME_DIR.to_owned(),
+                name: DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            });
+        }
+
         if self.cluster.tls_config.server_secret_class.is_some() {
             volume_mounts.push(VolumeMount {
                 mount_path: format!("{opensearch_path_conf}/tls/server"),
                 name: TLS_SERVER_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
-            })
+            });
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -716,17 +752,17 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
         let listener_class = self.role_group_config.config.listener_class.to_owned();
 
-        let ports = [listener::v1alpha1::ListenerPort {
-            name: HTTP_PORT_NAME.to_string(),
+        let ports = vec![listener::v1alpha1::ListenerPort {
+            name: HTTP_PORT_NAME.to_owned(),
             port: HTTP_PORT.into(),
-            protocol: Some("TCP".to_string()),
+            protocol: Some("TCP".to_owned()),
         }];
 
         listener::v1alpha1::Listener {
             metadata,
             spec: listener::v1alpha1::ListenerSpec {
                 class_name: Some(listener_class.to_string()),
-                ports: Some(ports.to_vec()),
+                ports: Some(ports),
                 ..listener::v1alpha1::ListenerSpec::default()
             },
             status: None,
@@ -782,7 +818,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         service_scopes: Vec<ServiceName>,
         secret_format: SecretFormat,
         requested_secret_lifetime: &Duration,
-        listener_scope: &PersistentVolumeClaimName,
+        listener_volume_scopes: Vec<PersistentVolumeClaimName>,
     ) -> Volume {
         let mut secret_volume_source_builder =
             SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
@@ -790,11 +826,13 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         for scope in service_scopes {
             secret_volume_source_builder.with_service_scope(scope);
         }
+        for scope in listener_volume_scopes {
+            secret_volume_source_builder.with_listener_volume_scope(scope);
+        }
 
         VolumeBuilder::new(volume_name.to_string())
             .ephemeral(
                 secret_volume_source_builder
-                    .with_listener_volume_scope(listener_scope)
                     .with_pod_scope()
                     .with_format(secret_format)
                     .with_auto_tls_cert_lifetime(*requested_secret_lifetime)
@@ -828,13 +866,17 @@ mod tests {
     use uuid::uuid;
 
     use super::{
-        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, LISTENER_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME,
-        LOG_VOLUME_NAME, RoleGroupBuilder,
+        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
+        ROLE_GROUP_LISTENER_VOLUME_NAME, RoleGroupBuilder,
     };
     use crate::{
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
+            build::role_group_builder::{
+                DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
+                TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
+            },
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
@@ -843,8 +885,8 @@ mod tests {
             role_utils::GenericProductSpecificCommonConfig,
             types::{
                 kubernetes::{
-                    ConfigMapName, ListenerClassName, NamespaceName, SecretKey, SecretName,
-                    ServiceAccountName, ServiceName,
+                    ConfigMapName, ListenerClassName, ListenerName, NamespaceName, SecretKey,
+                    SecretName, ServiceAccountName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -860,8 +902,12 @@ mod tests {
         let _ = CONFIG_VOLUME_NAME;
         let _ = LOG_CONFIG_VOLUME_NAME;
         let _ = DATA_VOLUME_NAME;
-        let _ = LISTENER_VOLUME_NAME;
+        let _ = ROLE_GROUP_LISTENER_VOLUME_NAME;
+        let _ = DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
+        let _ = TLS_SERVER_VOLUME_NAME;
+        let _ = TLS_INTERNAL_VOLUME_NAME;
         let _ = LOG_VOLUME_NAME;
+        let _ = OPENSEARCH_KEYSTORE_VOLUME_NAME;
     }
 
     fn context_names() -> ContextNames {
@@ -886,6 +932,7 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
@@ -938,6 +985,7 @@ mod tests {
                     key: SecretKey::from_str_unsafe("my-keystore-file"),
                 },
             }],
+            None,
         )
     }
 
@@ -958,7 +1006,8 @@ mod tests {
             role_group_name,
             role_group_config,
             context_names,
-            ServiceName::from_str_unsafe("my-opensearch-cluster"),
+            ServiceName::from_str_unsafe("my-opensearch-cluster-seed-nodes"),
+            ListenerName::from_str_unsafe("my-opensearch-cluster"),
         )
     }
 
@@ -1138,7 +1187,7 @@ mod tests {
                                     "env": [
                                         {
                                             "name": "discovery.seed_hosts",
-                                            "value": "my-opensearch-cluster"
+                                            "value": "my-opensearch-cluster-seed-nodes"
                                         },
                                         {
                                             "name": "node.name",
@@ -1202,16 +1251,20 @@ mod tests {
                                             "name": "data"
                                         },
                                         {
-                                            "mountPath": "/stackable/listener",
+                                            "mountPath": "/stackable/listeners/role-group",
                                             "name": "listener"
                                         },
                                         {
                                             "mountPath": "/stackable/log",
                                             "name": "log"
                                         },
-                                                                                {
+                                        {
                                             "mountPath": "/stackable/opensearch/config/tls/internal",
                                             "name": "tls-internal"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/listeners/discovery-service",
+                                            "name": "discovery-service-listener"
                                         },
                                         {
                                             "mountPath": "/stackable/opensearch/config/tls/server",
@@ -1420,7 +1473,7 @@ mod tests {
                                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                                     "secrets.stackable.tech/class": "tls",
                                                     "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster,listener-volume=listener,pod"
+                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster-seed-nodes,listener-volume=listener,listener-volume=discovery-service-listener,pod"
                                                 }
                                             },
                                             "spec": {
@@ -1493,6 +1546,36 @@ mod tests {
                                     "stackable.tech/vendor": "Stackable"
                                 },
                                 "name": "listener"
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteMany",
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1",
+                                    },
+                                },
+                                "storageClassName": "listeners.stackable.tech",
+                            },
+                        },
+                        {
+                            "apiVersion": "v1",
+                            "kind": "PersistentVolumeClaim",
+                            "metadata": {
+                                "annotations": {
+                                    "listeners.stackable.tech/listener-name": "my-opensearch-cluster",
+                                },
+                                "labels": {
+                                    "app.kubernetes.io/component": "nodes",
+                                    "app.kubernetes.io/instance": "my-opensearch-cluster",
+                                    "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                                    "app.kubernetes.io/name": "opensearch",
+                                    "app.kubernetes.io/role-group": "default",
+                                    "app.kubernetes.io/version": "3.1.0",
+                                    "stackable.tech/vendor": "Stackable",
+                                },
+                                "name": "discovery-service-listener",
                             },
                             "spec": {
                                 "accessModes": [

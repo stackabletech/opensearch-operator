@@ -17,7 +17,7 @@ use stackable_operator::{
 use super::{
     builder::pod::container::EnvVarSet,
     types::{
-        kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+        kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName},
         operator::{ClusterName, ProductName},
     },
 };
@@ -220,21 +220,6 @@ impl ResourceNames {
         ClusterRoleName::from_str(&format!("{}{SUFFIX}", self.product_name))
             .expect("should be a valid cluster role name")
     }
-
-    pub fn seed_nodes_service_name(&self) -> ServiceName {
-        const SUFFIX: &str = "-seed-nodes";
-
-        // compile-time checks
-        const _: () = assert!(
-            ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceName::MAX_LENGTH,
-            "The string `<cluster_name>-seed-nodes` must not exceed the limit of Service names."
-        );
-        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
-        let _ = ClusterName::IS_VALID_LABEL_VALUE;
-
-        ServiceName::from_str(&format!("{}{SUFFIX}", self.cluster_name.as_ref()))
-            .expect("should be a valid Service name")
-    }
 }
 
 #[cfg(test)]
@@ -255,7 +240,7 @@ mod tests {
     use crate::framework::{
         role_utils::with_validated_config,
         types::{
-            kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+            kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName},
             operator::{ClusterName, ProductName},
         },
     };
@@ -412,10 +397,6 @@ mod tests {
         assert_eq!(
             ClusterRoleName::from_str_unsafe("my-product-clusterrole"),
             resource_names.cluster_role_name()
-        );
-        assert_eq!(
-            ServiceName::from_str_unsafe("my-cluster-seed-nodes"),
-            resource_names.seed_nodes_service_name()
         );
     }
 }

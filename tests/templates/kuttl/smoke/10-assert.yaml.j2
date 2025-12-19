@@ -165,12 +165,14 @@ spec:
           subPath: log4j2.properties
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/data
           name: data
-        - mountPath: /stackable/listener
+        - mountPath: /stackable/listeners/role-group
           name: listener
         - mountPath: /stackable/log
           name: log
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
           name: tls-internal
+        - mountPath: /stackable/listeners/discovery-service
+          name: discovery-service-listener
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
           name: tls-server
@@ -262,7 +264,9 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
+                secrets.stackable.tech/format: tls-pem
                 secrets.stackable.tech/scope: listener-volume=listener,pod
             spec:
               accessModes:
@@ -281,7 +285,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,pod
+                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,listener-volume=discovery-service-listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -324,6 +328,30 @@ spec:
         app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
         stackable.tech/vendor: Stackable
       name: listener
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: "1"
+      storageClassName: listeners.stackable.tech
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      annotations:
+        listeners.stackable.tech/listener-name: opensearch
+      labels:
+        app.kubernetes.io/component: nodes
+        app.kubernetes.io/instance: opensearch
+        app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+        app.kubernetes.io/name: opensearch
+        app.kubernetes.io/role-group: cluster-manager
+        app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
+        stackable.tech/vendor: Stackable
+      name: discovery-service-listener
     spec:
       accessModes:
       - ReadWriteMany
@@ -497,7 +525,7 @@ spec:
           subPath: log4j2.properties
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/data
           name: data
-        - mountPath: /stackable/listener
+        - mountPath: /stackable/listeners/role-group
           name: listener
         - mountPath: /stackable/log
           name: log
@@ -594,7 +622,9 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
+                secrets.stackable.tech/format: tls-pem
                 secrets.stackable.tech/scope: listener-volume=listener,pod
             spec:
               accessModes:
@@ -916,7 +946,7 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 spec:
-  className: external-unstable
+  className: cluster-internal
   extraPodSelectorLabels: {}
   ports:
   - name: http
@@ -949,3 +979,51 @@ spec:
     port: 9200
     protocol: TCP
   publishNotReadyAddresses: null
+---
+apiVersion: listeners.stackable.tech/v1alpha1
+kind: Listener
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
+    stackable.tech/vendor: Stackable
+  name: opensearch
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+spec:
+  className: external-unstable
+  extraPodSelectorLabels: {}
+  ports:
+  - name: http
+    port: 9200
+    protocol: TCP
+  publishNotReadyAddresses: null
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
+    stackable.tech/vendor: Stackable
+  name: opensearch
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+data:
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
+  OPENSEARCH_PROTOCOL: https
+{% else %}
+  OPENSEARCH_PROTOCOL: http
+{% endif %}

@@ -22,19 +22,22 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleConfig:
+      discoveryServiceListenerClass: external-unstable
     roleGroups:
       cluster-manager:
         config:
+          discoveryServiceExposed: true
           nodeRoles:
             - cluster_manager
           resources:
             storage:
               data:
                 capacity: 100Mi
-          listenerClass: external-unstable
         replicas: 3
       data:
         config:
+          discoveryServiceExposed: false
           nodeRoles:
             - ingest
             - data
@@ -43,7 +46,6 @@ spec:
             storage:
               data:
                 capacity: 2Gi
-          listenerClass: cluster-internal
         replicas: 2
     envOverrides:
       # Only required for the official image

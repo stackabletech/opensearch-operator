@@ -22,12 +22,9 @@ spec:
             # required for pip install
             - name: HOME
               value: /stackable
-            - name: HTTP_USE_TLS
-              value: "{{ test_scenario['values']['server-use-tls'] }}"
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+          envFrom:
+            - configMapRef:
+                name: opensearch
           volumeMounts:
             - name: script
               mountPath: /stackable/scripts
@@ -51,22 +48,21 @@ spec:
           configMap:
             name: test-opensearch
         - name: tls
-          ephemeral:
-            volumeClaimTemplate:
-              metadata:
-                annotations:
-                  secrets.stackable.tech/class: tls
-              spec:
-                storageClassName: secrets.stackable.tech
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: "1"
+          configMap:
+            name: truststore-pem
       serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+---
+apiVersion: secrets.stackable.tech/v1alpha1
+kind: TrustStore
+metadata:
+  name: truststore-pem
+spec:
+  secretClassName: tls
+  format: tls-pem
+  targetKind: ConfigMap
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -79,11 +75,10 @@ data:
     import os
     from opensearchpy import OpenSearch
 
-    namespace = os.environ['NAMESPACE']
-    http_use_tls = os.environ['HTTP_USE_TLS'] == 'true'
+    host = os.environ['OPENSEARCH_HOST']
+    port = os.environ['OPENSEARCH_PORT']
+    http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
 
-    host = f'opensearch-nodes-cluster-manager-headless.{namespace}.svc.cluster.local'
-    port = 9200
     auth = ('admin', 'AJVFsGJBbpT6mChn') # For testing only. Don't store credentials in code.
     ca_certs_path = '/stackable/tls/ca.crt'
 

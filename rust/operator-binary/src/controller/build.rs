@@ -33,8 +33,11 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         listeners.push(role_group_builder.build_listener());
     }
 
-    let cluster_manager_service = role_builder.build_seed_nodes_service();
-    services.push(cluster_manager_service);
+    if let Some(discovery_config_map) = role_builder.build_discovery_config_map() {
+        config_maps.push(discovery_config_map);
+    }
+    services.push(role_builder.build_seed_nodes_service());
+    listeners.push(role_builder.build_discovery_service_listener());
 
     let service_accounts = vec![role_builder.build_service_account()];
 
@@ -75,14 +78,16 @@ mod tests {
     use crate::{
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
+            ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
+            ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                common::Port,
+                kubernetes::{Hostname, ListenerClassName, NamespaceName},
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                     RoleGroupName,
@@ -114,6 +119,7 @@ mod tests {
         );
         assert_eq!(
             vec![
+                "my-opensearch",
                 "my-opensearch-nodes-cluster-manager",
                 "my-opensearch-nodes-coordinating",
                 "my-opensearch-nodes-data"
@@ -122,6 +128,7 @@ mod tests {
         );
         assert_eq!(
             vec![
+                "my-opensearch",
                 "my-opensearch-nodes-cluster-manager",
                 "my-opensearch-nodes-coordinating",
                 "my-opensearch-nodes-data"
@@ -199,6 +206,10 @@ mod tests {
             .into(),
             v1alpha1::OpenSearchTls::default(),
             vec![],
+            Some(ValidatedDiscoveryEndpoint {
+                hostname: Hostname::from_str_unsafe("1.2.3.4"),
+                port: Port(12345),
+            }),
         )
     }
 
@@ -210,6 +221,7 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("external-stable"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(

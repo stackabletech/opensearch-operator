@@ -1,12 +1,10 @@
 //! The validate step in the OpenSearchCluster controller
 
-use std::{collections::BTreeMap, num::TryFromIntError, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    kube::{Resource, ResourceExt},
-    product_logging::spec::Logging,
-    role_utils::RoleGroup,
+    crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
     shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
@@ -16,15 +14,18 @@ use super::{
     ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
+    controller::{DereferencedObjects, ValidatedDiscoveryEndpoint},
     crd::v1alpha1::{self},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
         types::{
-            kubernetes::{ConfigMapName, NamespaceName, Uid},
+            common::Port,
+            kubernetes::{ConfigMapName, Hostname},
             operator::ClusterName,
         },
     },
@@ -34,37 +35,41 @@ use crate::{
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display("failed to get the cluster name"))]
-    GetClusterName {},
+    GetClusterName {
+        source: crate::framework::controller_utils::Error,
+    },
 
     #[snafu(display("failed to get the cluster namespace"))]
-    GetClusterNamespace {},
+    GetClusterNamespace {
+        source: crate::framework::controller_utils::Error,
+    },
 
     #[snafu(display("failed to get the cluster UID"))]
-    GetClusterUid {},
+    GetClusterUid {
+        source: crate::framework::controller_utils::Error,
+    },
+
+    #[snafu(display("failed to get the port of the Listener status"))]
+    GetListenerStatusPort {},
 
     #[snafu(display(
         "failed to get vectorAggregatorConfigMapName; It must be set if enableVectorAgent is true."
     ))]
     GetVectorAggregatorConfigMapName {},
 
-    #[snafu(display("failed to set cluster name"))]
-    ParseClusterName {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
-
-    #[snafu(display("failed to set cluster namespace"))]
-    ParseClusterNamespace {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
-
-    #[snafu(display("failed to set UID"))]
-    ParseClusterUid {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
-
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
         source: crate::framework::builder::pod::container::Error,
+    },
+
+    #[snafu(display("failed to parse the hostname of the Listener status"))]
+    ParseListenerStatusHostname {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
+
+    #[snafu(display("failed to parse the port of the Listener status"))]
+    ParseListenerStatusPort {
+        source: crate::framework::types::common::Error,
     },
 
     #[snafu(display("failed to set product version"))]
@@ -94,7 +99,7 @@ pub enum Error {
 
     #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
     TerminationGracePeriodTooLong {
-        source: TryFromIntError,
+        source: std::num::TryFromIntError,
         duration: Duration,
     },
 }
@@ -113,15 +118,11 @@ const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
 pub fn validate(
     context_names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
+    dereferenced_objects: &DereferencedObjects,
 ) -> Result<ValidatedCluster> {
-    let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
-    let cluster_name = ClusterName::from_str(&raw_cluster_name).context(ParseClusterNameSnafu)?;
-
-    let raw_namespace = cluster.namespace().context(GetClusterNamespaceSnafu)?;
-    let namespace = NamespaceName::from_str(&raw_namespace).context(ParseClusterNamespaceSnafu)?;
-
-    let raw_uid = cluster.uid().context(GetClusterUidSnafu)?;
-    let uid = Uid::from_str(&raw_uid).context(ParseClusterUidSnafu)?;
+    let cluster_name = get_cluster_name(cluster).context(GetClusterNameSnafu)?;
+    let namespace = get_namespace(cluster).context(GetClusterNamespaceSnafu)?;
+    let uid = get_uid(cluster).context(GetClusterUidSnafu)?;
 
     let product_image = cluster
         .spec
@@ -145,6 +146,8 @@ pub fn validate(
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
+    let validated_discovery_endpoint = validate_discovery_endpoint(dereferenced_objects)?;
+
     Ok(ValidatedCluster::new(
         product_image,
         product_version,
@@ -155,6 +158,7 @@ pub fn validate(
         role_group_configs,
         cluster.spec.cluster_config.tls.clone(),
         cluster.spec.cluster_config.keystore.clone(),
+        validated_discovery_endpoint,
     ))
 }
 
@@ -195,6 +199,7 @@ fn validate_role_group_config(
 
     let validated_config = ValidatedOpenSearchConfig {
         affinity: merged_role_group.config.config.affinity,
+        discovery_service_exposed: merged_role_group.config.config.discovery_service_exposed,
         listener_class: merged_role_group.config.config.listener_class,
         logging,
         node_roles: merged_role_group.config.config.node_roles,
@@ -254,6 +259,69 @@ fn validate_logging_configuration(
     })
 }
 
+fn validate_discovery_endpoint(
+    dereferenced_objects: &DereferencedObjects,
+) -> Result<Option<ValidatedDiscoveryEndpoint>> {
+    let validated_discovery_endpoint = if let Some(discovery_service_listener) =
+        &dereferenced_objects.maybe_discovery_service_listener
+    {
+        if let Some((hostname, port)) = extract_listener_ingresses(discovery_service_listener)? {
+            tracing::info!(
+                "The status of the discovery service listener {} contains the discovery endpoint. \
+                The discovery ConfigMap will be created or updated.",
+                discovery_service_listener.name_any()
+            );
+            Some(ValidatedDiscoveryEndpoint { hostname, port })
+        } else {
+            tracing::info!(
+                "The status of the discovery service listener {} does not yet contain the \
+                discovery endpoint. The creation of the discovery ConfigMap will be postponed \
+                until the status is updated.",
+                discovery_service_listener.name_any()
+            );
+            None
+        }
+    } else {
+        tracing::info!(
+            "The discovery service listener is not yet deployed. The creation of the discovery \
+            ConfigMap will be postponed until the discovery service listener is deployed and its \
+            status is set."
+        );
+        None
+    };
+
+    Ok(validated_discovery_endpoint)
+}
+
+fn extract_listener_ingresses(
+    discovery_service_listener: &listener::v1alpha1::Listener,
+) -> Result<Option<(Hostname, Port)>> {
+    let maybe_first_ingress_address = discovery_service_listener
+        .status
+        .as_ref()
+        .and_then(|status| status.ingress_addresses.as_ref())
+        .into_iter()
+        .flatten()
+        .next();
+
+    // It is okay if the status is not set yet. But if it is set, then it must be valid.
+    if let Some(ingress_address) = maybe_first_ingress_address {
+        let hostname = Hostname::from_str(&ingress_address.address)
+            .context(ParseListenerStatusHostnameSnafu)?;
+
+        let raw_port = *ingress_address
+            .ports
+            // TODO Use HTTP_PORT_NAME somehow
+            .get("http")
+            .context(GetListenerStatusPortSnafu)?;
+        let port = Port::try_from(raw_port).context(ParseListenerStatusPortSnafu)?;
+
+        Ok(Some((hostname, port)))
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, str::FromStr};
@@ -287,7 +355,10 @@ mod tests {
     use super::{ErrorDiscriminants, validate};
     use crate::{
         built_info,
-        controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
+        controller::{
+            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedLogging,
+            ValidatedOpenSearchConfig,
+        },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
@@ -310,7 +381,11 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let result = validate(&context_names(), &cluster());
+        let dereferenced_objects = DereferencedObjects {
+            maybe_discovery_service_listener: None,
+        };
+
+        let result = validate(&context_names(), &cluster(), &dereferenced_objects);
 
         assert_eq!(
             Some(ValidatedCluster::new(
@@ -376,6 +451,7 @@ mod tests {
                                 }),
                                 ..StackableAffinity::default()
                             },
+                            discovery_service_exposed: true,
                             listener_class: ListenerClassName::from_str_unsafe(
                                 "listener-class-from-role-group-level"
                             ),
@@ -525,7 +601,8 @@ mod tests {
                         name: SecretName::from_str_unsafe("my-keystore-secret"),
                         key: SecretKey::from_str_unsafe("my-keystore-file")
                     }
-                }]
+                }],
+                None
             )),
             result.ok()
         );
@@ -540,14 +617,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_cluster_name() {
-        test_validate_err(
-            |cluster| cluster.metadata.name = Some("invalid cluster name".to_owned()),
-            ErrorDiscriminants::ParseClusterName,
-        );
-    }
-
-    #[test]
     fn test_validate_err_get_cluster_namespace() {
         test_validate_err(
             |cluster| cluster.metadata.namespace = None,
@@ -556,26 +625,10 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_cluster_namespace() {
-        test_validate_err(
-            |cluster| cluster.metadata.namespace = Some("invalid cluster namespace".to_owned()),
-            ErrorDiscriminants::ParseClusterNamespace,
-        );
-    }
-
-    #[test]
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
             |cluster| cluster.metadata.uid = None,
             ErrorDiscriminants::GetClusterUid,
-        );
-    }
-
-    #[test]
-    fn test_validate_err_parse_cluster_uid() {
-        test_validate_err(
-            |cluster| cluster.metadata.uid = Some("invalid cluster UID".to_owned()),
-            ErrorDiscriminants::ParseClusterUid,
         );
     }
 
@@ -678,7 +731,11 @@ mod tests {
         let mut cluster = cluster();
         f(&mut cluster);
 
-        let result = validate(&context_names(), &cluster);
+        let dereferenced_objects = DereferencedObjects {
+            maybe_discovery_service_listener: None,
+        };
+
+        let result = validate(&context_names(), &cluster, &dereferenced_objects);
 
         assert_eq!(Err(expected_err), result.map_err(ErrorDiscriminants::from));
     }

@@ -7,11 +7,12 @@ use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
 
 use apply::Applier;
 use build::build;
+use dereference::dereference;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
-    crd::listener::v1alpha1::Listener,
+    crd::listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service, ServiceAccount},
@@ -33,7 +34,8 @@ use crate::{
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         types::{
-            kubernetes::{ListenerClassName, NamespaceName, Uid},
+            common::Port,
+            kubernetes::{Hostname, ListenerClassName, NamespaceName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -44,6 +46,7 @@ use crate::{
 
 mod apply;
 mod build;
+mod dereference;
 mod update_status;
 mod validate;
 
@@ -102,6 +105,9 @@ pub enum Error {
         source: Box<stackable_operator::kube::core::error_boundary::InvalidObject>,
     },
 
+    #[snafu(display("failed to dereference resources"))]
+    Dereference { source: dereference::Error },
+
     #[snafu(display("failed to validate cluster"))]
     ValidateCluster { source: validate::Error },
 
@@ -126,10 +132,16 @@ type OpenSearchRoleGroupConfig =
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
 
+/// Additional objects required for building the cluster
+pub struct DereferencedObjects {
+    pub maybe_discovery_service_listener: Option<listener::v1alpha1::Listener>,
+}
+
 /// Validated [`v1alpha1::OpenSearchConfig`]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
+    pub discovery_service_exposed: bool,
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
     pub node_roles: NodeRoles,
@@ -149,6 +161,12 @@ impl ValidatedLogging {
     pub fn is_vector_agent_enabled(&self) -> bool {
         self.vector_container.is_some()
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedDiscoveryEndpoint {
+    pub hostname: Hostname,
+    pub port: Port,
 }
 
 /// The validated [`v1alpha1::OpenSearchCluster`]
@@ -171,6 +189,7 @@ pub struct ValidatedCluster {
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
     pub tls_config: v1alpha1::OpenSearchTls,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
+    pub discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
 }
 
 impl ValidatedCluster {
@@ -185,9 +204,10 @@ impl ValidatedCluster {
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
         tls_config: v1alpha1::OpenSearchTls,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
+        discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
     ) -> Self {
         let uid = uid.into();
-        ValidatedCluster {
+        Self {
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
                 namespace: Some(namespace.to_string()),
@@ -203,6 +223,7 @@ impl ValidatedCluster {
             role_group_configs,
             tls_config,
             keystores,
+            discovery_endpoint,
         }
     }
 
@@ -285,6 +306,27 @@ impl Resource for ValidatedCluster {
     }
 }
 
+/// Marker for prepared Kubernetes resources which are not applied yet
+struct Prepared;
+/// Marker for applied Kubernetes resources
+struct Applied;
+
+/// List of all Kubernetes resources produced by this controller
+///
+/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
+/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
+/// resources.
+struct KubernetesResources<T> {
+    stateful_sets: Vec<StatefulSet>,
+    services: Vec<Service>,
+    listeners: Vec<listener::v1alpha1::Listener>,
+    config_maps: Vec<ConfigMap>,
+    service_accounts: Vec<ServiceAccount>,
+    role_bindings: Vec<RoleBinding>,
+    pod_disruption_budgets: Vec<PodDisruptionBudget>,
+    status: PhantomData<T>,
+}
+
 pub fn error_policy(
     _object: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
     error: &Error,
@@ -316,10 +358,14 @@ pub async fn reconcile(
         .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
         .context(DeserializeClusterDefinitionSnafu)?;
 
-    // not necessary in this controller: dereference (client required)
+    // dereference (client required)
+    let dereferenced_objects = dereference(&context.client, cluster)
+        .await
+        .context(DereferenceSnafu)?;
 
     // validate (no client required)
-    let validated_cluster = validate(&context.names, cluster).context(ValidateClusterSnafu)?;
+    let validated_cluster =
+        validate(&context.names, cluster, &dereferenced_objects).context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());
@@ -346,27 +392,6 @@ pub async fn reconcile(
         .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
-}
-
-/// Marker for prepared Kubernetes resources which are not applied yet
-struct Prepared;
-/// Marker for applied Kubernetes resources
-struct Applied;
-
-/// List of all Kubernetes resources produced by this controller
-///
-/// `T` is a marker that indicates if these resources are only [`Prepared`] or already [`Applied`].
-/// The marker is useful e.g. to ensure that the cluster status is updated based on the applied
-/// resources.
-struct KubernetesResources<T> {
-    stateful_sets: Vec<StatefulSet>,
-    services: Vec<Service>,
-    listeners: Vec<Listener>,
-    config_maps: Vec<ConfigMap>,
-    service_accounts: Vec<ServiceAccount>,
-    role_bindings: Vec<RoleBinding>,
-    pod_disruption_budgets: Vec<PodDisruptionBudget>,
-    status: PhantomData<T>,
 }
 
 #[cfg(test)]
@@ -509,6 +534,7 @@ mod tests {
             .into(),
             v1alpha1::OpenSearchTls::default(),
             vec![],
+            None,
         )
     }
 
@@ -520,6 +546,7 @@ mod tests {
             replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("external-stable"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(

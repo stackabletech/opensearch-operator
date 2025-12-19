@@ -480,6 +480,7 @@ mod tests {
             replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
@@ -539,6 +540,7 @@ mod tests {
             .into(),
             v1alpha1::OpenSearchTls::default(),
             vec![],
+            None,
         );
 
         NodeConfig::new(

@@ -8,8 +8,14 @@ use snafu::{ResultExt as _, Snafu};
 use stackable_operator::{
     YamlSchema as _,
     cli::{Command, RunArguments},
+    crd::listener,
     eos::EndOfSupportChecker,
-    k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service},
+    k8s_openapi::api::{
+        apps::v1::StatefulSet,
+        core::v1::{ConfigMap, Service, ServiceAccount},
+        policy::v1::PodDisruptionBudget,
+        rbac::v1::RoleBinding,
+    },
     kube::{
         core::DeserializeGuard,
         runtime::{
@@ -133,40 +139,60 @@ async fn main() -> Result<()> {
             let controller = Controller::new(
                 watch_namespace.get_api::<DeserializeGuard<v1alpha1::OpenSearchCluster>>(&client),
                 watcher::Config::default(),
-            );
-            let controller = controller
-                .owns(
-                    watch_namespace.get_api::<Service>(&client),
-                    watcher::Config::default(),
-                )
-                .owns(
-                    watch_namespace.get_api::<StatefulSet>(&client),
-                    watcher::Config::default(),
-                )
-                .shutdown_on_signal()
-                .run(
-                    controller::reconcile,
-                    controller::error_policy,
-                    Arc::new(controller_context),
-                )
-                .for_each_concurrent(
-                    16, // concurrency limit
-                    |result| {
-                        // The event_recorder needs to be shared across all invocations, so that
-                        // events are correctly aggregated
-                        let event_recorder = event_recorder.clone();
-                        let full_controller_name = full_controller_name.clone();
-                        async move {
-                            report_controller_reconciled(
-                                &event_recorder,
-                                &full_controller_name,
-                                &result,
-                            )
-                            .await;
-                        }
-                    },
-                )
-                .map(Ok);
+            )
+            .owns(
+                // TODO Test if other ConfigMaps start a reconciliation
+                watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<listener::v1alpha1::Listener>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<RoleBinding>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<PodDisruptionBudget>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<Service>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<ServiceAccount>>(&client),
+                watcher::Config::default(),
+            )
+            .owns(
+                watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
+                watcher::Config::default(),
+            )
+            .shutdown_on_signal()
+            .run(
+                controller::reconcile,
+                controller::error_policy,
+                Arc::new(controller_context),
+            )
+            .for_each_concurrent(
+                16, // concurrency limit
+                |result| {
+                    // The event_recorder needs to be shared across all invocations, so that
+                    // events are correctly aggregated
+                    let event_recorder = event_recorder.clone();
+                    let full_controller_name = full_controller_name.clone();
+                    async move {
+                        report_controller_reconciled(
+                            &event_recorder,
+                            &full_controller_name,
+                            &result,
+                        )
+                        .await;
+                    }
+                },
+            )
+            .map(Ok);
 
             futures::try_join!(controller, eos_checker)?;
         }
