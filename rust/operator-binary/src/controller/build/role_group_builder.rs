@@ -304,6 +304,25 @@ impl<'a> RoleGroupBuilder<'a> {
                 self.resource_names.role_group_config_map()
             };
 
+        let mut internal_tls_volume_service_scopes = vec![];
+        if self
+            .role_group_config
+            .config
+            .node_roles
+            .contains(&v1alpha1::NodeRole::ClusterManager)
+        {
+            internal_tls_volume_service_scopes
+                .push(self.node_config.seed_nodes_service_name.clone());
+        }
+        let internal_tls_volume = self.build_tls_volume(
+            &TLS_INTERNAL_VOLUME_NAME,
+            &self.cluster.tls_config.internal_secret_class,
+            internal_tls_volume_service_scopes,
+            SecretFormat::TlsPem,
+            &self.role_group_config.config.requested_secret_lifetime,
+            vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
+        );
+
         let mut volumes = vec![
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
@@ -333,27 +352,10 @@ impl<'a> RoleGroupBuilder<'a> {
                 }),
                 ..Volume::default()
             },
-            self.build_tls_volume(
-                &TLS_INTERNAL_VOLUME_NAME,
-                &self.cluster.tls_config.internal_secret_class,
-                vec![],
-                SecretFormat::TlsPem,
-                &self.role_group_config.config.requested_secret_lifetime,
-                vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
-            ),
+            internal_tls_volume,
         ];
 
         if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
-            let mut service_scopes = vec![];
-            if self
-                .role_group_config
-                .config
-                .node_roles
-                .contains(&v1alpha1::NodeRole::ClusterManager)
-            {
-                service_scopes.push(self.node_config.seed_nodes_service_name.clone());
-            }
-
             let mut listener_scopes = vec![ROLE_GROUP_LISTENER_VOLUME_NAME.to_owned()];
             if self.role_group_config.config.discovery_service_exposed {
                 listener_scopes.push(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_owned());
@@ -362,7 +364,7 @@ impl<'a> RoleGroupBuilder<'a> {
             volumes.push(self.build_tls_volume(
                 &TLS_SERVER_VOLUME_NAME,
                 tls_http_secret_class_name,
-                service_scopes,
+                vec![],
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
                 listener_scopes,
