@@ -48,11 +48,9 @@ spec:
           image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
           command:
             - /stackable/scripts/restore-security-indices.sh
-          env:
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+          envFrom:
+            - configMapRef:
+                name: opensearch-2
           volumeMounts:
             - name: scripts
               mountPath: /stackable/scripts
@@ -121,5 +119,5 @@ data:
         -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \
-        --hostname opensearch-2-nodes-default-headless.$NAMESPACE.svc.cluster.local \
+        --hostname $OPENSEARCH_HOST \
         --configdir /tmp/backup

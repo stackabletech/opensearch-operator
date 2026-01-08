@@ -22,10 +22,9 @@ spec:
             # required for pip install
             - name: HOME
               value: /stackable
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
+          envFrom:
+            - configMapRef:
+                name: opensearch-1
           volumeMounts:
             - name: script
               mountPath: /stackable/scripts
@@ -66,16 +65,15 @@ data:
     from opensearchpy import OpenSearch
     from opensearchpy.exceptions import RequestError
 
-    namespace = os.environ['NAMESPACE']
+    host = os.environ['OPENSEARCH_HOST']
+    port = os.environ['OPENSEARCH_PORT']
+    http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
 
     client = OpenSearch(
-      hosts=[{
-        'host': f'opensearch-1-nodes-default-headless.{namespace}.svc.cluster.local',
-        'port': 9200
-      }],
+      hosts = [{'host': host, 'port': port}],
       http_auth=('admin', 'AJVFsGJBbpT6mChn'),
       http_compress=True,
-      use_ssl=True,
+      use_ssl=http_use_tls,
       verify_certs=True,
       ca_certs='/stackable/tls/ca.crt'
     )

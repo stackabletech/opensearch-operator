@@ -115,7 +115,7 @@ spec:
         - name: cluster.initial_cluster_manager_nodes
           value: opensearch-nodes-cluster-manager-0,opensearch-nodes-cluster-manager-1,opensearch-nodes-cluster-manager-2
         - name: discovery.seed_hosts
-          value: opensearch-seed-nodes
+          # value: opensearch-seed-nodes.$NAMESPACE.svc.cluster.local
         - name: node.name
           valueFrom:
             fieldRef:
@@ -267,7 +267,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,pod
+                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -285,7 +285,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,listener-volume=discovery-service-listener,pod
+                secrets.stackable.tech/scope: listener-volume=listener,listener-volume=discovery-service-listener,pod
             spec:
               accessModes:
               - ReadWriteOnce
@@ -475,7 +475,7 @@ spec:
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
         - name: discovery.seed_hosts
-          value: opensearch-seed-nodes
+          # value: opensearch-seed-nodes.$NAMESPACE.svc.cluster.local
         - name: node.name
           valueFrom:
             fieldRef:
