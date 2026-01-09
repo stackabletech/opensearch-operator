@@ -10,9 +10,14 @@ All notable changes to this project will be documented in this file.
 - Add the role group as a node attribute ([#63]).
 - Allow adding entries to the OpenSearch keystore ([#76]).
 
+### Changed
+
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#91]).
+
 [#55]: https://github.com/stackabletech/opensearch-operator/pull/55
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
+[#91]: https://github.com/stackabletech/opensearch-operator/pull/91
 
 ## [25.11.0] - 2025-11-07
 
