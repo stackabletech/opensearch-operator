@@ -12,7 +12,9 @@ dimensions:
   - name: server-use-tls
     values:
       - "true"
-      - "false"
+  - name: s3-use-tls
+    values:
+      - "true"
   # The release must sometimes be known in podOverrides or Helm values
   - name: release
     values:
@@ -50,6 +52,7 @@ tests:
     dimensions:
       - opensearch
       - release
+      - s3-use-tls
 suites:
   - name: nightly
     patch:

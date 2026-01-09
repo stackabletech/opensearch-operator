@@ -8,7 +8,11 @@ spec:
     spec:
       initContainers:
         - name: backup-security-indices
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+          image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
           image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
           command:
             - /stackable/scripts/backup-security-indices.sh
           envFrom:
@@ -60,8 +64,13 @@ spec:
           volumeMounts:
             - name: scripts
               mountPath: /root/scripts
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
             - name: s3-ca-crt
               mountPath: /root/.mc/certs/CAs
+{% else %}
+            - name: mc-config
+              mountPath: /root/.mc
+{% endif %}
             - name: backup
               mountPath: /tmp/backup
           securityContext:
@@ -90,10 +99,16 @@ spec:
           secret:
             secretName: opensearch-1-admin-certificate
             defaultMode: 0o660
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
         - name: s3-ca-crt
           secret:
             secretName: minio-ca-crt
             defaultMode: 0o660
+{% else %}
+        - name: mc-config
+          emptyDir:
+            sizeLimit: 1Mi
+{% endif %}
         - name: backup
           emptyDir:
             sizeLimit: 1Mi
@@ -110,7 +125,7 @@ data:
   backup-security-indices.sh: |
     #!/usr/bin/env sh
 
-    plugins/opensearch-security/tools/securityadmin.sh \
+    bash plugins/opensearch-security/tools/securityadmin.sh \
         -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \
@@ -119,6 +134,11 @@ data:
   upload-security-indices-backup.sh: |
     #!/usr/bin/env sh
 
-    mc alias set minio https://minio:9000/ $S3_ACCESS_KEY $S3_SECRET_KEY
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
+    S3_PROTOCOL=https
+{% else %}
+    S3_PROTOCOL=http
+{% endif %}
+    mc alias set minio $S3_PROTOCOL://minio:9000/ $S3_ACCESS_KEY $S3_SECRET_KEY
     mc mb minio/opensearch-security
     mc cp /tmp/backup/* minio/opensearch-security/
