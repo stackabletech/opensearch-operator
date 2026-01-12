@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 - Add the role group as a node attribute ([#63]).
 - Allow adding entries to the OpenSearch keystore ([#76]).
 - Support objectOverrides using `.spec.objectOverrides`.
-  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#XX]).
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#93]).
 
 ### Changed
 
@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
 [#91]: https://github.com/stackabletech/opensearch-operator/pull/91
-[#XX]: https://github.com/stackabletech/opensearch-operator/pull/XX
+[#93]: https://github.com/stackabletech/opensearch-operator/pull/93
 
 ## [25.11.0] - 2025-11-07
 
