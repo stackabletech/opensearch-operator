@@ -6,6 +6,7 @@ use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     client::Client,
     cluster_resources::{ClusterResource, ClusterResourceApplyStrategy, ClusterResources},
+    deep_merger::ObjectOverrides,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -40,7 +41,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 /// stackable_operator if [`KubernetesResources`] would contain all possible resource types.
 pub struct Applier<'a> {
     client: &'a Client,
-    cluster_resources: ClusterResources,
+    cluster_resources: ClusterResources<'a>,
 }
 
 impl<'a> Applier<'a> {
@@ -51,6 +52,7 @@ impl<'a> Applier<'a> {
         cluster_namespace: &NamespaceName,
         cluster_uid: &Uid,
         apply_strategy: ClusterResourceApplyStrategy,
+        object_overrides: &'a ObjectOverrides,
     ) -> Applier<'a> {
         let cluster_resources = cluster_resources_new(
             &names.product_name,
@@ -60,6 +62,7 @@ impl<'a> Applier<'a> {
             cluster_namespace,
             cluster_uid,
             apply_strategy,
+            object_overrides,
         );
 
         Applier {

@@ -9,10 +9,18 @@ All notable changes to this project will be documented in this file.
 - Allow the configuration of TLS for the HTTP and TRANSPORT ports with the operator ([#55]).
 - Add the role group as a node attribute ([#63]).
 - Allow adding entries to the OpenSearch keystore ([#76]).
+- Support objectOverrides using `.spec.objectOverrides`.
+  See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#93]).
+
+### Changed
+
+- Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#91]).
 
 [#55]: https://github.com/stackabletech/opensearch-operator/pull/55
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
+[#91]: https://github.com/stackabletech/opensearch-operator/pull/91
+[#93]: https://github.com/stackabletech/opensearch-operator/pull/93
 
 ## [25.11.0] - 2025-11-07
 

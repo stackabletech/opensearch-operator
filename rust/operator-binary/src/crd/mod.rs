@@ -15,6 +15,7 @@ use stackable_operator::{
         fragment::Fragment,
         merge::{Atomic, Merge},
     },
+    deep_merger::ObjectOverrides,
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
     product_logging::{self, spec::Logging},
@@ -80,6 +81,10 @@ pub mod versioned {
         // no doc - docs in ClusterOperation struct
         #[serde(default)]
         pub cluster_operation: ClusterOperation,
+
+        // no doc - docs in ObjectOverrides struct
+        #[serde(default)]
+        pub object_overrides: ObjectOverrides,
 
         // no doc - docs in Role struct
         pub nodes: Role<

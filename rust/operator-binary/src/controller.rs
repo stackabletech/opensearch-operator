@@ -386,6 +386,7 @@ pub async fn reconcile(
         &validated_cluster.namespace,
         &validated_cluster.uid,
         apply_strategy,
+        &cluster.spec.object_overrides,
     )
     .apply(prepared_resources)
     .await
