@@ -1,5 +1,6 @@
 use stackable_operator::{
     cluster_resources::{ClusterResourceApplyStrategy, ClusterResources},
+    deep_merger::ObjectOverrides,
     k8s_openapi::api::core::v1::ObjectReference,
 };
 
@@ -12,7 +13,8 @@ use crate::framework::{
 };
 
 /// Infallible variant of [`stackable_operator::cluster_resources::ClusterResources::new`]
-pub fn cluster_resources_new(
+#[allow(clippy::too_many_arguments)]
+pub fn cluster_resources_new<'a>(
     product_name: &ProductName,
     operator_name: &OperatorName,
     controller_name: &ControllerName,
@@ -20,7 +22,8 @@ pub fn cluster_resources_new(
     cluster_namespace: &NamespaceName,
     cluster_uid: &Uid,
     apply_strategy: ClusterResourceApplyStrategy,
-) -> ClusterResources {
+    object_overrides: &'a ObjectOverrides,
+) -> ClusterResources<'a> {
     // compile-time check
     // ClusterResources::new creates a label value from the given app name by appending
     // `-operator`. For the resulting label value to be valid, it must not exceed
@@ -41,6 +44,7 @@ pub fn cluster_resources_new(
             ..Default::default()
         },
         apply_strategy,
+        object_overrides,
     )
     .expect("ClusterResources should be created because the cluster object reference contains name, namespace and uid.")
 }

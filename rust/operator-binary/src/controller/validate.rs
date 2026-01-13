@@ -266,6 +266,7 @@ mod tests {
             product_image_selection::ResolvedProductImage,
             resources::{CpuLimits, MemoryLimits, PvcConfig, Resources},
         },
+        deep_merger::ObjectOverrides,
         k8s_openapi::{
             api::core::v1::{
                 PodAffinityTerm, PodAntiAffinity, PodTemplateSpec, WeightedPodAffinityTerm,
@@ -716,6 +717,7 @@ mod tests {
                     )),
                 },
                 cluster_operation: ClusterOperation::default(),
+                object_overrides: ObjectOverrides::default(),
                 nodes: Role {
                     config: CommonConfiguration {
                         config: v1alpha1::OpenSearchConfigFragment {
