@@ -2,6 +2,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
+  # TODO Get opensearchHosts from discovery ConfigMap
   - script: >
       helm install opensearch-dashboards opensearch-dashboards
       --repo https://opensearch-project.github.io/helm-charts

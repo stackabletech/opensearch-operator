@@ -135,7 +135,7 @@ data:
   restore-security-indices.sh: |
     #!/usr/bin/env sh
 
-    bash plugins/opensearch-security/tools/securityadmin.sh \
+    plugins/opensearch-security/tools/securityadmin.sh \
         -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \

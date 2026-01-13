@@ -65,7 +65,10 @@ mod tests {
     };
 
     use stackable_operator::{
-        commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
+        commons::{
+            affinity::StackableAffinity, networking::DomainName,
+            product_image_selection::ResolvedProductImage,
+        },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::Resource,
         kvp::LabelValue,
@@ -164,6 +167,8 @@ mod tests {
             product_name: ProductName::from_str_unsafe("opensearch"),
             operator_name: OperatorName::from_str_unsafe("opensearch.stackable.tech"),
             controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
+            cluster_domain_name: DomainName::from_str("cluster.local")
+                .expect("should be a valid domain name"),
         }
     }
 

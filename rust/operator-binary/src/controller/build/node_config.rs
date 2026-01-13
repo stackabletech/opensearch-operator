@@ -3,7 +3,9 @@
 use std::str::FromStr;
 
 use serde_json::{Value, json};
-use stackable_operator::builder::pod::container::FieldPathEnvVar;
+use stackable_operator::{
+    builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
+};
 
 use super::ValidatedCluster;
 use crate::{
@@ -32,6 +34,11 @@ pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 /// Type: string
 pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
+/// Specifies an address or addresses that an OpenSearch node publishes to other nodes for HTTP
+/// communication.
+/// Type: (comma-separated) list of strings
+pub const CONFIG_OPTION_HTTP_PUBLISH_HOST: &str = "http.publish_host";
+
 /// A list of cluster-manager-eligible nodes used to bootstrap the cluster.
 /// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
@@ -40,6 +47,11 @@ pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
 /// Binds an OpenSearch node to an address.
 /// Type: string
 pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
+
+/// Specifies an address or addresses that an OpenSearch node publishes to other nodes in the
+/// cluster so that they can connect to it.
+/// Type: (comma-separated) list of strings
+pub const CONFIG_OPTION_NETWORK_PUBLISH_HOST: &str = "network.publish_host";
 
 /// The custom node attribute "role-group"
 /// Type: string
@@ -97,6 +109,11 @@ pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH: &str =
 pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
     "plugins.security.ssl.transport.pemtrustedcas_filepath";
 
+/// Specifies an address or addresses that an OpenSearch node publishes to other nodes for
+/// transport communication.
+/// Type: (comma-separated) list of strings
+pub const CONFIG_OPTION_TRANSPORT_PUBLISH_HOST: &str = "transport.publish_host";
+
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
@@ -105,6 +122,8 @@ pub struct NodeConfig {
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
     pub seed_nodes_service_name: ServiceName,
+    cluster_domain_name: DomainName,
+    headless_service_name: ServiceName,
 }
 
 // Most functions are public because their configuration values could also be used in environment
@@ -115,12 +134,16 @@ impl NodeConfig {
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
         seed_nodes_service_name: ServiceName,
+        cluster_domain_name: DomainName,
+        headless_service_name: ServiceName,
     ) -> Self {
         Self {
             cluster,
             role_group_name,
             role_group_config,
             seed_nodes_service_name,
+            cluster_domain_name,
+            headless_service_name,
         }
     }
 
@@ -258,16 +281,42 @@ impl NodeConfig {
     /// The environment variables should only contain node-specific configuration options.
     /// Cluster-wide options should be added to the configuration file.
     pub fn environment_variables(&self) -> EnvVarSet {
+        let fqdn = format!(
+            "$(_POD_NAME).{}.{}.svc.{}",
+            self.headless_service_name, self.cluster.namespace, self.cluster_domain_name
+        );
+
         let mut env_vars = EnvVarSet::new()
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
+            .with_field_path(
+                // Prefix with an underscore, so that it occurs before the other environment
+                // variables which depend on it.
+                &EnvVarName::from_str_unsafe("_POD_NAME"),
+                FieldPathEnvVar::Name,
+            )
             .with_field_path(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,
             )
             .with_value(
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NETWORK_PUBLISH_HOST),
+                &fqdn,
+            )
+            .with_value(
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_TRANSPORT_PUBLISH_HOST),
+                &fqdn,
+            )
+            .with_value(
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_HTTP_PUBLISH_HOST),
+                &fqdn,
+            )
+            .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
-                &self.seed_nodes_service_name,
+                format!(
+                    "{}.{}.svc.{}",
+                    self.seed_nodes_service_name, self.cluster.namespace, self.cluster_domain_name
+                ),
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
@@ -547,7 +596,9 @@ mod tests {
             cluster,
             role_group_name,
             role_group_config,
-            ServiceName::from_str_unsafe("my-opensearch-cluster-discovery"),
+            ServiceName::from_str_unsafe("my-opensearch-seed-nodes"),
+            DomainName::from_str("cluster.local").expect("should be a valid domain name"),
+            ServiceName::from_str_unsafe("my-opensearch-cluster-default-headless"),
         )
     }
 

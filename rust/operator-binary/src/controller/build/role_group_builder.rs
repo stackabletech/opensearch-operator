@@ -123,6 +123,11 @@ impl<'a> RoleGroupBuilder<'a> {
         seed_nodes_service_name: ServiceName,
         discovery_service_listener_name: ListenerName,
     ) -> RoleGroupBuilder<'a> {
+        let resource_names = ResourceNames {
+            cluster_name: cluster.name.clone(),
+            role_name: ValidatedCluster::role_name(),
+            role_group_name: role_group_name.clone(),
+        };
         RoleGroupBuilder {
             service_account_name,
             cluster: cluster.clone(),
@@ -131,6 +136,8 @@ impl<'a> RoleGroupBuilder<'a> {
                 role_group_name.clone(),
                 role_group_config.clone(),
                 seed_nodes_service_name,
+                context_names.cluster_domain_name.clone(),
+                resource_names.headless_service_name(),
             ),
             role_group_name: role_group_name.clone(),
             role_group_config,
@@ -856,8 +863,8 @@ mod tests {
     use serde_json::json;
     use stackable_operator::{
         commons::{
-            affinity::StackableAffinity, product_image_selection::ResolvedProductImage,
-            resources::Resources,
+            affinity::StackableAffinity, networking::DomainName,
+            product_image_selection::ResolvedProductImage, resources::Resources,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
@@ -917,6 +924,8 @@ mod tests {
             product_name: ProductName::from_str_unsafe("opensearch"),
             operator_name: OperatorName::from_str_unsafe("opensearch.stackable.tech"),
             controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
+            cluster_domain_name: DomainName::from_str("cluster.local")
+                .expect("should be a valid domain name"),
         }
     }
 

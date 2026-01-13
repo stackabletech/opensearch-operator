@@ -86,7 +86,10 @@ data:
       body={
         "type": "s3",
         "settings": {
-          "bucket": "opensearch-data"
+          "bucket": "opensearch-data",
+          # The S3CrtClient that was introduced in OpenSearch 3.3.0, does not
+          # work with a TLS-secured MinIO. Use the old Netty client instead.
+          "s3_async_client_type": "netty"
         }
       }
     )
