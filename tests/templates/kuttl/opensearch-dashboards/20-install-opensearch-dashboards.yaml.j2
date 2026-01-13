@@ -2,17 +2,18 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  # TODO Get opensearchHosts from discovery ConfigMap
-  - script: >
-      helm install opensearch-dashboards opensearch-dashboards
-      --repo https://opensearch-project.github.io/helm-charts
-      --version "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
-      --values 20_opensearch-dashboards-values.yaml
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
-      --set opensearchHosts=https://opensearch-nodes-default-headless.$NAMESPACE.svc.cluster.local:9200
-{% else %}
-      --set opensearchHosts=http://opensearch-nodes-default-headless.$NAMESPACE.svc.cluster.local:9200
-{% endif %}
-      --namespace $NAMESPACE
-      --wait
+  - script: |
+{% raw %}
+      OPENSEARCH_URL=$(kubectl get configmaps opensearch \
+        --namespace $NAMESPACE \
+        --output=template='{{.data.OPENSEARCH_PROTOCOL}}://{{.data.OPENSEARCH_HOST}}:{{.data.OPENSEARCH_PORT}}')
+{% endraw %}
+
+      helm install opensearch-dashboards opensearch-dashboards \
+        --repo https://opensearch-project.github.io/helm-charts \
+        --version "{{ test_scenario['values']['opensearch'].split(',')[0] }}" \
+        --values 20_opensearch-dashboards-values.yaml \
+        --set opensearchHosts=$OPENSEARCH_URL \
+        --namespace $NAMESPACE \
+        --wait
     timeout: 600
