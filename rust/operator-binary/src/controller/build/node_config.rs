@@ -476,6 +476,7 @@ impl NodeConfig {
 mod tests {
     use std::collections::BTreeMap;
 
+    use pretty_assertions::assert_eq;
     use stackable_operator::{
         commons::{
             affinity::StackableAffinity,
@@ -698,13 +699,25 @@ mod tests {
         assert_eq!(
             EnvVarSet::new()
                 .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
+                .with_field_path(
+                    &EnvVarName::from_str_unsafe("_POD_NAME"),
+                    FieldPathEnvVar::Name
+                )
                 .with_value(
                     &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
                     "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1",
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("discovery.seed_hosts"),
-                    "my-opensearch-cluster-discovery",
+                    "my-opensearch-seed-nodes.default.svc.cluster.local",
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("http.publish_host"),
+                    "$(_POD_NAME).my-opensearch-cluster-default-headless.default.svc.cluster.local",
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("network.publish_host"),
+                    "$(_POD_NAME).my-opensearch-cluster-default-headless.default.svc.cluster.local",
                 )
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("node.name"),
@@ -713,6 +726,10 @@ mod tests {
                 .with_value(
                     &EnvVarName::from_str_unsafe("node.roles"),
                     "cluster_manager,data,ingest,remote_cluster_client"
+                )
+                .with_value(
+                    &EnvVarName::from_str_unsafe("transport.publish_host"),
+                    "$(_POD_NAME).my-opensearch-cluster-default-headless.default.svc.cluster.local",
                 ),
             node_config.environment_variables()
         );

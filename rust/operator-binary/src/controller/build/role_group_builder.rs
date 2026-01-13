@@ -1197,8 +1197,24 @@ mod tests {
                                     ],
                                     "env": [
                                         {
+                                            "name": "_POD_NAME",
+                                            "valueFrom": {
+                                                "fieldRef": {
+                                                    "fieldPath": "metadata.name"
+                                                }
+                                            }
+                                        },
+                                        {
                                             "name": "discovery.seed_hosts",
-                                            "value": "my-opensearch-cluster-seed-nodes"
+                                            "value": "my-opensearch-cluster-seed-nodes.default.svc.cluster.local"
+                                        },
+                                        {
+                                            "name": "http.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                                        },
+                                        {
+                                            "name": "network.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                                         },
                                         {
                                             "name": "node.name",
@@ -1211,7 +1227,11 @@ mod tests {
                                         {
                                             "name": "node.roles",
                                             "value": "cluster_manager,data,ingest,remote_cluster_client"
-                                        }
+                                        },
+                                        {
+                                            "name": "transport.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                                        },
                                     ],
                                     "image": "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev",
                                     "imagePullPolicy": "Always",
@@ -1458,7 +1478,7 @@ mod tests {
                                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                                     "secrets.stackable.tech/class": "tls",
                                                     "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "listener-volume=listener,pod"
+                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster-seed-nodes,listener-volume=listener,pod"
                                                 }
                                             },
                                             "spec": {
@@ -1484,7 +1504,7 @@ mod tests {
                                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                                     "secrets.stackable.tech/class": "tls",
                                                     "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster-seed-nodes,listener-volume=listener,listener-volume=discovery-service-listener,pod"
+                                                    "secrets.stackable.tech/scope": "listener-volume=listener,listener-volume=discovery-service-listener,pod"
                                                 }
                                             },
                                             "spec": {
