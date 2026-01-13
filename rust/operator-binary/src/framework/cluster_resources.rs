@@ -13,6 +13,7 @@ use crate::framework::{
 };
 
 /// Infallible variant of [`stackable_operator::cluster_resources::ClusterResources::new`]
+#[allow(clippy::too_many_arguments)]
 pub fn cluster_resources_new<'a>(
     product_name: &ProductName,
     operator_name: &OperatorName,
