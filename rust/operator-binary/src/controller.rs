@@ -53,6 +53,11 @@ mod dereference;
 mod update_status;
 mod validate;
 
+pub const HTTP_PORT_NAME: &str = "http";
+pub const HTTP_PORT: Port = Port(9200);
+pub const TRANSPORT_PORT_NAME: &str = "transport";
+pub const TRANSPORT_PORT: Port = Port(9300);
+
 /// Names in the controller context which are passed to the submodules of the controller
 ///
 /// The names are not directly defined in [`Context`] because not every submodule requires a

@@ -41,7 +41,8 @@ use super::{
 use crate::{
     constant,
     controller::{
-        ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
+        TRANSPORT_PORT_NAME, ValidatedCluster,
         build::product_logging::config::{
             MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
         },
@@ -61,7 +62,6 @@ use crate::{
         },
         role_group_utils::ResourceNames,
         types::{
-            common::Port,
             kubernetes::{
                 ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
                 ServiceName, VolumeName,
@@ -70,11 +70,6 @@ use crate::{
         },
     },
 };
-
-pub const HTTP_PORT_NAME: &str = "http";
-pub const HTTP_PORT: Port = Port(9200);
-pub const TRANSPORT_PORT_NAME: &str = "transport";
-pub const TRANSPORT_PORT: Port = Port(9300);
 
 constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
 

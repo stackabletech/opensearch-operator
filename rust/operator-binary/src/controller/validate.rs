@@ -14,7 +14,7 @@ use super::{
     ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
-    controller::{DereferencedObjects, ValidatedDiscoveryEndpoint},
+    controller::{DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint},
     crd::v1alpha1::{self},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
@@ -146,7 +146,11 @@ pub fn validate(
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
-    let validated_discovery_endpoint = validate_discovery_endpoint(dereferenced_objects)?;
+    let validated_discovery_endpoint = validate_discovery_endpoint(
+        dereferenced_objects
+            .maybe_discovery_service_listener
+            .as_ref(),
+    )?;
 
     Ok(ValidatedCluster::new(
         product_image,
@@ -259,11 +263,13 @@ fn validate_logging_configuration(
     })
 }
 
+/// Return the validated discovery endpoint if a Listener is given with a status containing the
+/// endpoint
 fn validate_discovery_endpoint(
-    dereferenced_objects: &DereferencedObjects,
+    maybe_discovery_service_listener: Option<&listener::v1alpha1::Listener>,
 ) -> Result<Option<ValidatedDiscoveryEndpoint>> {
     let validated_discovery_endpoint = if let Some(discovery_service_listener) =
-        &dereferenced_objects.maybe_discovery_service_listener
+        maybe_discovery_service_listener
     {
         if let Some((hostname, port)) = extract_listener_ingresses(discovery_service_listener)? {
             tracing::info!(
@@ -293,6 +299,7 @@ fn validate_discovery_endpoint(
     Ok(validated_discovery_endpoint)
 }
 
+/// Return the first address and the HTTP port from the given Listener if it has a status
 fn extract_listener_ingresses(
     discovery_service_listener: &listener::v1alpha1::Listener,
 ) -> Result<Option<(Hostname, Port)>> {
@@ -311,8 +318,7 @@ fn extract_listener_ingresses(
 
         let raw_port = *ingress_address
             .ports
-            // TODO Use HTTP_PORT_NAME somehow
-            .get("http")
+            .get(HTTP_PORT_NAME)
             .context(GetListenerStatusPortSnafu)?;
         let port = Port::try_from(raw_port).context(ParseListenerStatusPortSnafu)?;
 

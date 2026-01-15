@@ -22,10 +22,8 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        ContextNames, ValidatedCluster,
-        build::role_group_builder::{
-            HTTP_PORT, HTTP_PORT_NAME, RoleGroupBuilder, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        },
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
+        ValidatedCluster, build::role_group_builder::RoleGroupBuilder,
     },
     framework::{
         NameIsValidLabelValue,
