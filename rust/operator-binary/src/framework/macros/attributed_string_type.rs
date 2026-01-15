@@ -3,7 +3,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 /// Maximum length of label values
 ///
-/// Duplicates the private constant [`stackable-operator::kvp::label::value::LABEL_VALUE_MAX_LEN`]
+/// Duplicates the private constant [`stackable_operator::kvp::LABEL_VALUE_MAX_LEN`]
 pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 
 #[derive(Debug, EnumDiscriminants, Snafu)]

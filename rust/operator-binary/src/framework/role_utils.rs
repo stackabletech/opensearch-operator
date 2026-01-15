@@ -17,7 +17,7 @@ use stackable_operator::{
 use super::{
     builder::pod::container::EnvVarSet,
     types::{
-        kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+        kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName},
         operator::{ClusterName, ProductName},
     },
 };
@@ -220,18 +220,6 @@ impl ResourceNames {
         ClusterRoleName::from_str(&format!("{}{SUFFIX}", self.product_name))
             .expect("should be a valid cluster role name")
     }
-
-    pub fn discovery_service_name(&self) -> ServiceName {
-        // compile-time checks
-        const _: () = assert!(
-            ClusterName::MAX_LENGTH <= ServiceName::MAX_LENGTH,
-            "The string `<cluster_name>` must not exceed the limit of Service names."
-        );
-        let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
-        let _ = ClusterName::IS_VALID_LABEL_VALUE;
-
-        ServiceName::from_str(self.cluster_name.as_ref()).expect("should be a valid Service name")
-    }
 }
 
 #[cfg(test)]
@@ -252,7 +240,7 @@ mod tests {
     use crate::framework::{
         role_utils::with_validated_config,
         types::{
-            kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName, ServiceName},
+            kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName},
             operator::{ClusterName, ProductName},
         },
     };
@@ -409,10 +397,6 @@ mod tests {
         assert_eq!(
             ClusterRoleName::from_str_unsafe("my-product-clusterrole"),
             resource_names.cluster_role_name()
-        );
-        assert_eq!(
-            ServiceName::from_str_unsafe("my-cluster"),
-            resource_names.discovery_service_name()
         );
     }
 }

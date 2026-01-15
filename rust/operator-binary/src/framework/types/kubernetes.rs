@@ -41,6 +41,16 @@ attributed_string_type! {
 }
 
 attributed_string_type! {
+    Hostname,
+    "A hostname",
+    "example.com",
+    (min_length = 1),
+    (max_length = 253),
+    // see https://en.wikipedia.org/wiki/Hostname#Syntax
+    (regex = "[a-zA-Z0-9]([-a-zA-Z0-9]{0,60}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([-a-zA-Z0-9]{0,60}[a-zA-Z0-9])?)*\\.?")
+}
+
+attributed_string_type! {
     ListenerName,
     "The name of a Listener",
     "opensearch-nodes-default",
@@ -152,7 +162,7 @@ attributed_string_type! {
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusterRoleName, ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName,
+        ClusterRoleName, ConfigMapKey, ConfigMapName, ContainerName, Hostname, ListenerClassName,
         ListenerName, NamespaceName, PersistentVolumeClaimName, RoleBindingName, SecretClassName,
         SecretKey, SecretName, ServiceAccountName, ServiceName, StatefulSetName, Uid, VolumeName,
     };
@@ -163,6 +173,7 @@ mod tests {
         ConfigMapKey::test_example();
         ContainerName::test_example();
         ClusterRoleName::test_example();
+        Hostname::test_example();
         ListenerName::test_example();
         ListenerClassName::test_example();
         NamespaceName::test_example();

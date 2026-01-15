@@ -59,4 +59,4 @@ kind: Service
 metadata:
   name: opensearch
 spec:
-  type: ClusterIP
+  type: NodePort # external-stable
