@@ -1,7 +1,6 @@
 image:
-  # TODO Revert when the image is released
-  repository: oci.stackable.tech/sandbox/sdp26.3/opensearch-dashboards
-  tag: {{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}-amd64
+  repository: oci.stackable.tech/sdp/opensearch-dashboards
+  tag: {{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
 service:
   type: NodePort
 serviceAccount:
