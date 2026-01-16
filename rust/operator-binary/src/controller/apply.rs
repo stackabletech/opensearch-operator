@@ -76,8 +76,6 @@ impl<'a> Applier<'a> {
         mut self,
         resources: KubernetesResources<Prepared>,
     ) -> Result<KubernetesResources<Applied>> {
-        let stateful_sets = self.add_resources(resources.stateful_sets).await?;
-
         let services = self.add_resources(resources.services).await?;
 
         let listeners = self.add_resources(resources.listeners).await?;
@@ -89,6 +87,11 @@ impl<'a> Applier<'a> {
         let role_bindings = self.add_resources(resources.role_bindings).await?;
 
         let pod_disruption_budgets = self.add_resources(resources.pod_disruption_budgets).await?;
+
+        // Note: The StatefulSet needs to be applied after all ConfigMaps and Secrets it mounts
+        // to prevent unnecessary Pod restarts.
+        // See https://github.com/stackabletech/commons-operator/issues/111 for details.
+        let stateful_sets = self.add_resources(resources.stateful_sets).await?;
 
         self.cluster_resources
             .delete_orphaned_resources(self.client)

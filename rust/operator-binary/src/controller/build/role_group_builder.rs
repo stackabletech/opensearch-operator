@@ -7,6 +7,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
     },
+    constants::RESTART_CONTROLLER_ENABLED_LABEL,
     crd::listener::{self},
     k8s_openapi::{
         DeepMerge,
@@ -178,6 +179,7 @@ impl<'a> RoleGroupBuilder<'a> {
     pub fn build_stateful_set(&self) -> StatefulSet {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
+            .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
             .build();
 
         let template = self.build_pod_template();
