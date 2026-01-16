@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - Allow adding entries to the OpenSearch keystore ([#76]).
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#93]).
-- Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#XX]).
+- Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#97]).
 
 ### Changed
 
@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
 [#91]: https://github.com/stackabletech/opensearch-operator/pull/91
 [#93]: https://github.com/stackabletech/opensearch-operator/pull/93
-[#XX]: https://github.com/stackabletech/opensearch-operator/pull/XX
+[#97]: https://github.com/stackabletech/opensearch-operator/pull/97
 
 ## [25.11.0] - 2025-11-07
 
