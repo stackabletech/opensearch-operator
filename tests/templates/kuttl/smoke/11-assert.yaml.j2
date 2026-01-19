@@ -9,6 +9,7 @@ timeout: 600
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  name: opensearch-nodes-cluster-manager
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -17,7 +18,8 @@ metadata:
     app.kubernetes.io/role-group: cluster-manager
     app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
-  name: opensearch-nodes-cluster-manager
+    restarter.stackable.tech/enabled: "true"
+  generation: 1 # There should be no unneeded Pod restarts
   ownerReferences:
   - apiVersion: opensearch.stackable.tech/v1alpha1
     controller: true
@@ -380,6 +382,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  name: opensearch-nodes-data
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -388,7 +391,8 @@ metadata:
     app.kubernetes.io/role-group: data
     app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
     stackable.tech/vendor: Stackable
-  name: opensearch-nodes-data
+    restarter.stackable.tech/enabled: "true"
+  generation: 1 # There should be no unneeded Pod restarts
   ownerReferences:
   - apiVersion: opensearch.stackable.tech/v1alpha1
     controller: true
