@@ -141,7 +141,6 @@ async fn main() -> Result<()> {
                 watcher::Config::default(),
             )
             .owns(
-                // TODO Test if other ConfigMaps start a reconciliation
                 watch_namespace.get_api::<DeserializeGuard<ConfigMap>>(&client),
                 watcher::Config::default(),
             )
