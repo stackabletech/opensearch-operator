@@ -377,24 +377,27 @@ macro_rules! attributed_string_type {
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1035_label_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1035_LABEL_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L228
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z]([-a-z0-9]*[a-z0-9])?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1123_dns_subdomain_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_SUBDOMAIN_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L193
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1123_label_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_LABEL_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L163
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_valid_label_value $($attribute:tt)*) => {
         // regular expression from stackable_operator::kvp::label::LABEL_VALUE_REGEX
-        $crate::framework::macros::attributed_string_type::Regex::Expression("[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?")
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_uid $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
 

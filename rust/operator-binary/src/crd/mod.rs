@@ -457,7 +457,7 @@ attributed_string_type! {
     "Key in an OpenSearch keystore",
     "s3.client.default.access_key",
     (min_length = 1),
-    (regex = "[A-Za-z0-9_\\-.]+")
+    (regex = "^[A-Za-z0-9_\\-.]+$")
 }
 
 #[cfg(test)]
