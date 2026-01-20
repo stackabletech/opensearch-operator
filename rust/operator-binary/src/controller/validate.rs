@@ -993,7 +993,6 @@ mod tests {
                 spec: listener::v1alpha1::ListenerSpec::default(),
                 status: Some(listener::v1alpha1::ListenerStatus {
                     ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
-                        // TODO Check if it is the FQDN
                         address: "my-opensearch.default.svc.cluster.local".to_owned(),
                         address_type: listener::v1alpha1::AddressType::Hostname,
                         ports: [("http".to_owned(), 9200)].into(),

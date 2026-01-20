@@ -87,19 +87,19 @@ mod tests {
         type DynamicType = ();
 
         fn kind(_dyntype: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
-            "".into()
+            "TestResource".into()
         }
 
         fn group(_dyntype: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
-            todo!()
+            "stackable.tech".into()
         }
 
         fn version(_dyntype: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
-            todo!()
+            "v1".into()
         }
 
         fn plural(_dyntype: &Self::DynamicType) -> std::borrow::Cow<'_, str> {
-            todo!()
+            "testresources".into()
         }
 
         fn name(&self) -> Option<std::borrow::Cow<'_, str>> {
@@ -111,7 +111,7 @@ mod tests {
         }
 
         fn resource_version(&self) -> Option<std::borrow::Cow<'_, str>> {
-            todo!()
+            Some("1".into())
         }
 
         fn uid(&self) -> Option<std::borrow::Cow<'_, str>> {
