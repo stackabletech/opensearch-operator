@@ -453,9 +453,6 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     /// Returns the labels of OpenSearch nodes with the `cluster_manager` role.
-    ///
-    /// As described in [`super::role_builder::RoleBuilder::build_seed_nodes_service`], this
-    /// function will be changed or deleted.
     pub fn cluster_manager_labels(
         cluster: &ValidatedCluster,
         context_names: &ContextNames,

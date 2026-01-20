@@ -185,7 +185,7 @@ macro_rules! attributed_string_type {
                         None
                     },
                     "pattern": match $name::REGEX {
-                        $crate::framework::macros::attributed_string_type::Regex::Expression(regex) => Some(std::format!("^{regex}$")),
+                        $crate::framework::macros::attributed_string_type::Regex::Expression(regex) => Some(regex),
                         _ => None
                     }
                 })
@@ -513,7 +513,7 @@ mod tests {
         "test",
         (min_length = 2), // should set the minimum length to 2
         (max_length = 8), // should not affect the minimum length
-        (regex = ".{4}"), // should not affect the minimum length
+        (regex = "^.{4}$"), // should not affect the minimum length
         is_rfc_1035_label_name, // should be overruled by the greater min_length
         is_valid_label_value // should be overruled by the greater min_length
     }
@@ -550,7 +550,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the maximum length
         (max_length = 8), // should set the maximum length to 8
-        (regex = ".{4}"), // should not affect the maximum length
+        (regex = "^.{4}$"), // should not affect the maximum length
         is_rfc_1035_label_name, // should be overruled by the lower max_length
         is_valid_label_value // should be overruled by the lower max_length
     }
@@ -587,7 +587,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the regular expression
         (max_length = 8), // should not affect the regular expression
-        (regex = "[est]{4}") // should set the regular expression to "[est]{4}"
+        (regex = "^[est]{4}$") // should set the regular expression to "[est]{4}"
     }
 
     #[test]
@@ -595,7 +595,7 @@ mod tests {
         type T = RegexWithOneConstraintTest;
 
         T::test_example();
-        assert_eq!(Regex::Expression("[est]{4}"), T::REGEX);
+        assert_eq!(Regex::Expression("^[est]{4}$"), T::REGEX);
         assert_eq!(
             Err(ErrorDiscriminants::RegexNotMatched),
             T::from_str("t-st").map_err(ErrorDiscriminants::from)
@@ -608,7 +608,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the regular expression
         (max_length = 8), // should not affect the regular expression
-        (regex = "[est]{4}"), // should not be combinable with is_rfc_1123_dns_subdomain_name
+        (regex = "^[est]{4}$"), // should not be combinable with is_rfc_1123_dns_subdomain_name
         is_rfc_1123_dns_subdomain_name // should not be combinable with regex
     }
 
@@ -679,7 +679,7 @@ mod tests {
         "test",
         (min_length = 2),
         (max_length = 4),
-        (regex = "[est-]+"),
+        (regex = "^[est-]+$"),
         is_rfc_1035_label_name
     }
 
@@ -785,7 +785,7 @@ mod tests {
         "test",
         (min_length = 4),
         (max_length = 8),
-        (regex = "[est]+")
+        (regex = "^[est]+$")
     }
 
     #[test]

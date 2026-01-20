@@ -612,6 +612,7 @@ mod tests {
                 "spec": {
                     "className": "external-stable",
                     "extraPodSelectorLabels": {},
+                    "objectOverrides": [],
                     "ports": [
                         {
                             "name": "http",

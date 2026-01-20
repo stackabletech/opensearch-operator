@@ -341,6 +341,7 @@ mod tests {
             product_image_selection::ResolvedProductImage,
             resources::{CpuLimits, MemoryLimits, PvcConfig, Resources},
         },
+        crd::listener::{self},
         deep_merger::ObjectOverrides,
         k8s_openapi::{
             api::core::v1::{
@@ -364,8 +365,8 @@ mod tests {
     use crate::{
         built_info,
         controller::{
-            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedLogging,
-            ValidatedOpenSearchConfig,
+            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
+            ValidatedLogging, ValidatedOpenSearchConfig,
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
@@ -375,9 +376,10 @@ mod tests {
             },
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
             types::{
+                common::Port,
                 kubernetes::{
-                    ConfigMapName, ListenerClassName, NamespaceName, SecretClassName, SecretKey,
-                    SecretName,
+                    ConfigMapName, Hostname, ListenerClassName, NamespaceName, SecretClassName,
+                    SecretKey, SecretName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -389,11 +391,7 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let dereferenced_objects = DereferencedObjects {
-            maybe_discovery_service_listener: None,
-        };
-
-        let result = validate(&context_names(), &cluster(), &dereferenced_objects);
+        let result = validate(&context_names(), &cluster(), &dereferenced_objects());
 
         assert_eq!(
             Some(ValidatedCluster::new(
@@ -610,7 +608,10 @@ mod tests {
                         key: SecretKey::from_str_unsafe("my-keystore-file")
                     }
                 }],
-                None
+                Some(ValidatedDiscoveryEndpoint {
+                    hostname: Hostname::from_str_unsafe("my-opensearch.default.svc.cluster.local"),
+                    port: Port(9200),
+                })
             )),
             result.ok()
         );
@@ -620,6 +621,7 @@ mod tests {
     fn test_validate_err_get_cluster_name() {
         test_validate_err(
             |cluster| cluster.metadata.name = None,
+            |_| (),
             ErrorDiscriminants::GetClusterName,
         );
     }
@@ -628,6 +630,7 @@ mod tests {
     fn test_validate_err_get_cluster_namespace() {
         test_validate_err(
             |cluster| cluster.metadata.namespace = None,
+            |_| (),
             ErrorDiscriminants::GetClusterNamespace,
         );
     }
@@ -636,6 +639,7 @@ mod tests {
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
             |cluster| cluster.metadata.uid = None,
+            |_| (),
             ErrorDiscriminants::GetClusterUid,
         );
     }
@@ -648,6 +652,7 @@ mod tests {
                     serde_json::from_str(r#"{"productVersion": "invalid product version"}"#)
                         .expect("should be a valid ProductImage structure")
             },
+            |_| (),
             ErrorDiscriminants::ResolveProductImage,
         );
     }
@@ -668,6 +673,7 @@ mod tests {
                     .role_groups
                     .insert("invalid role-group name".to_owned(), role_group);
             },
+            |_| (),
             ErrorDiscriminants::ParseRoleGroupName,
         );
     }
@@ -690,6 +696,7 @@ mod tests {
                 )]
                 .into()
             },
+            |_| (),
             ErrorDiscriminants::ValidateLoggingConfig,
         );
     }
@@ -703,6 +710,7 @@ mod tests {
                     .cluster_config
                     .vector_aggregator_config_map_name = None
             },
+            |_| (),
             ErrorDiscriminants::GetVectorAggregatorConfigMapName,
         );
     }
@@ -714,6 +722,7 @@ mod tests {
                 cluster.spec.nodes.config.config.graceful_shutdown_timeout =
                     Some(Duration::from_secs(u64::MAX))
             },
+            |_| (),
             ErrorDiscriminants::TerminationGracePeriodTooLong,
         );
     }
@@ -728,20 +737,91 @@ mod tests {
                 )]
                 .into()
             },
+            |_| (),
             ErrorDiscriminants::ParseEnvironmentVariable,
         );
     }
 
+    #[test]
+    fn test_validate_err_parse_listener_status_hostname() {
+        test_validate_err(
+            |_| (),
+            |dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "invalid hostname".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                ports: [("http".to_owned(), 9200)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::ParseListenerStatusHostname,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_get_listener_status_port() {
+        test_validate_err(
+            |_| (),
+            |dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                // Validation should fail because the http port is expected.
+                                ports: [("transport".to_owned(), 9300)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::GetListenerStatusPort,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_parse_listener_status_port() {
+        test_validate_err(
+            |_| (),
+            |dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                ports: [("http".to_owned(), -1)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::ParseListenerStatusPort,
+        );
+    }
+
     fn test_validate_err(
-        f: fn(&mut v1alpha1::OpenSearchCluster) -> (),
+        change_cluster: fn(&mut v1alpha1::OpenSearchCluster) -> (),
+        change_dereferenced_objects: fn(&mut DereferencedObjects) -> (),
         expected_err: ErrorDiscriminants,
     ) {
         let mut cluster = cluster();
-        f(&mut cluster);
+        change_cluster(&mut cluster);
 
-        let dereferenced_objects = DereferencedObjects {
-            maybe_discovery_service_listener: None,
-        };
+        let mut dereferenced_objects = dereferenced_objects();
+        change_dereferenced_objects(&mut dereferenced_objects);
 
         let result = validate(&context_names(), &cluster, &dereferenced_objects);
 
@@ -903,6 +983,24 @@ mod tests {
                 },
             },
             status: None,
+        }
+    }
+
+    fn dereferenced_objects() -> DereferencedObjects {
+        DereferencedObjects {
+            maybe_discovery_service_listener: Some(listener::v1alpha1::Listener {
+                metadata: ObjectMeta::default(),
+                spec: listener::v1alpha1::ListenerSpec::default(),
+                status: Some(listener::v1alpha1::ListenerStatus {
+                    ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                        // TODO Check if it is the FQDN
+                        address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                        address_type: listener::v1alpha1::AddressType::Hostname,
+                        ports: [("http".to_owned(), 9200)].into(),
+                    }]),
+                    ..listener::v1alpha1::ListenerStatus::default()
+                }),
+            }),
         }
     }
 }
