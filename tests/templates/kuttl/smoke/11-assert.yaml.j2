@@ -325,8 +325,6 @@ spec:
         requests:
           storage: 100Mi
       volumeMode: Filesystem
-    status:
-      phase: Pending
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
@@ -349,8 +347,6 @@ spec:
           storage: "1"
       storageClassName: listeners.stackable.tech
       volumeMode: Filesystem
-    status:
-      phase: Pending
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
@@ -373,8 +369,6 @@ spec:
           storage: "1"
       storageClassName: listeners.stackable.tech
       volumeMode: Filesystem
-    status:
-      phase: Pending
 status:
   readyReplicas: 3
   replicas: 3
@@ -696,8 +690,6 @@ spec:
         requests:
           storage: 2Gi
       volumeMode: Filesystem
-    status:
-      phase: Pending
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
@@ -720,8 +712,6 @@ spec:
           storage: "1"
       storageClassName: listeners.stackable.tech
       volumeMode: Filesystem
-    status:
-      phase: Pending
 status:
   readyReplicas: 2
   replicas: 2
