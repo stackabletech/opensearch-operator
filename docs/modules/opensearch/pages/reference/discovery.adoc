@@ -1,0 +1,86 @@
+:clusterName: simple-opensearch
+:namespace: stackable
+:discoveryServiceListenerClass: external-stable
+
+= Discovery
+:page-aliases: discovery.adoc
+
+The Stackable Operator for OpenSearch publishes a xref:concepts:service_discovery.adoc[service discovery ConfigMap] which exposes a client configuration bundle that allows access to the OpenSearch cluster.
+
+The bundle includes the connection parameters to access the OpenSearch cluster.
+These parameters may be used by other operators or tools to configure their products with access to OpenSearch.
+
+== Example
+
+Given the following OpenSearch cluster:
+
+[source,yaml,subs="normal,callouts"]
+----
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: {clusterName}  # <1>
+  namespace: {namespace} # <2>
+spec:
+  clusterConfig:
+    tls:
+      serverSecretClass: tls # <3>
+  nodes:
+    roleConfig:
+      discoveryServiceListenerClass: {discoveryServiceListenerClass} # <4>
+    roleGroups:
+      cluster-manager:
+        config:
+          discoveryServiceExposed: true # <5>
+          nodeRoles:
+            - cluster_manager
+      data:
+        config:
+          discoveryServiceExposed: false # <6>
+          nodeRoles:
+            - ingest
+            - data
+            - remote_cluster_client
+----
+<1> The name of the OpenSearch cluster which is also the name of the created discovery ConfigMap.
+<2> The namespace of the cluster and the discovery ConfigMap.
+<3> Whether a `serverSecretClass` is set or not, determines the value of the `OPENSEARCH_PROTOCOL` key in the discovery ConfigMap.
+<4> The xref:listener-operator:listenerclass.adoc[ListenerClass] that is used for the discovery service.
+<5> The `cluster-manager` role group is exposed in the discovery service.
+<6> The `data` role group is not exposed in the discovery service.
+
+The resulting discovery ConfigMap is `{namespace}/{clusterName}`.
+
+== Contents
+
+The `{namespace}/{clusterName}` discovery ConfigMap contains the following fields where `{clusterName}` represents the name and `{namespace}` the namespace of the cluster:
+
+`OPENSEARCH_HOST`::
+====
+Contains the hostname or IP of the service that references the exposed role groups.
+
+In case, `discoveryServiceListenerClass` was set to `cluster-internal`, the following hostname will be set:
+
+[subs="normal"]
+  {clusterName}.{namespace}.svc.cluster.local
+
+If `discoveryServiceListenerClass` was set to `external-stable`, the content could look like:
+
+  10.104.213.49
+====
+
+`OPENSEARCH_PORT`::
+====
+Contains the port of the service that references the exposed role groups.
+
+Depending on the `discoveryServiceListenerClass`, the port will be either the default HTTP port 9200 or a NodePort:
+
+  31315
+====
+
+`OPENSEARCH_PROTOCOL`::
+====
+Contains either `http` or `https`, depending on whether a `serverSecretClass` is configured:
+
+  https
+====
