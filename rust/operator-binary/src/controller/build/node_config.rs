@@ -287,14 +287,14 @@ impl NodeConfig {
         );
 
         let mut env_vars = EnvVarSet::new()
-            // Set the OpenSearch node name to the Pod name.
-            // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
                 // Prefix with an underscore, so that it occurs before the other environment
                 // variables which depend on it.
                 &EnvVarName::from_str_unsafe("_POD_NAME"),
                 FieldPathEnvVar::Name,
             )
+            // Set the OpenSearch node name to the Pod name.
+            // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
                 FieldPathEnvVar::Name,

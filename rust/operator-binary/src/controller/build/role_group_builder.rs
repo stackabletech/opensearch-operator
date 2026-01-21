@@ -138,11 +138,7 @@ impl<'a> RoleGroupBuilder<'a> {
             role_group_name: role_group_name.clone(),
             role_group_config,
             context_names,
-            resource_names: ResourceNames {
-                cluster_name: cluster.name.clone(),
-                role_name: ValidatedCluster::role_name(),
-                role_group_name,
-            },
+            resource_names,
             discovery_service_listener_name,
         }
     }
