@@ -1,5 +1,3 @@
-allow_k8s_contexts('default')
-
 # If tilt_options.json exists read it and load the default_registry value from it
 settings = read_json('tilt_options.json', default={})
 registry = settings.get('default_registry', 'oci.stackable.tech/sandbox')
