@@ -116,6 +116,11 @@ impl<'a> RoleGroupBuilder<'a> {
         context_names: &'a ContextNames,
         discovery_service_name: ServiceName,
     ) -> RoleGroupBuilder<'a> {
+        let resource_names = ResourceNames {
+            cluster_name: cluster.name.clone(),
+            role_name: ValidatedCluster::role_name(),
+            role_group_name: role_group_name.clone(),
+        };
         RoleGroupBuilder {
             service_account_name,
             cluster: cluster.clone(),
@@ -124,15 +129,13 @@ impl<'a> RoleGroupBuilder<'a> {
                 role_group_name.clone(),
                 role_group_config.clone(),
                 discovery_service_name,
+                context_names.cluster_domain_name.clone(),
+                resource_names.headless_service_name(),
             ),
             role_group_name: role_group_name.clone(),
             role_group_config,
             context_names,
-            resource_names: ResourceNames {
-                cluster_name: cluster.name.clone(),
-                role_name: ValidatedCluster::role_name(),
-                role_group_name,
-            },
+            resource_names,
         }
     }
 
@@ -810,8 +813,8 @@ mod tests {
     use serde_json::json;
     use stackable_operator::{
         commons::{
-            affinity::StackableAffinity, product_image_selection::ResolvedProductImage,
-            resources::Resources,
+            affinity::StackableAffinity, networking::DomainName,
+            product_image_selection::ResolvedProductImage, resources::Resources,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
@@ -864,6 +867,8 @@ mod tests {
             product_name: ProductName::from_str_unsafe("opensearch"),
             operator_name: OperatorName::from_str_unsafe("opensearch.stackable.tech"),
             controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
+            cluster_domain_name: DomainName::from_str("cluster.local")
+                .expect("should be a valid domain name"),
         }
     }
 
@@ -1133,12 +1138,28 @@ mod tests {
                                     ],
                                     "env": [
                                         {
+                                            "name": "_POD_NAME",
+                                            "valueFrom": {
+                                                "fieldRef": {
+                                                    "fieldPath": "metadata.name"
+                                                }
+                                            }
+                                        },
+                                        {
                                             "name": "cluster.initial_cluster_manager_nodes",
                                             "value": ""
                                         },
                                         {
                                             "name": "discovery.seed_hosts",
                                             "value": "my-opensearch-cluster"
+                                        },
+                                        {
+                                            "name": "http.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                                        },
+                                        {
+                                            "name": "network.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                                         },
                                         {
                                             "name": "node.name",
@@ -1151,7 +1172,11 @@ mod tests {
                                         {
                                             "name": "node.roles",
                                             "value": "cluster_manager,data,ingest,remote_cluster_client"
-                                        }
+                                        },
+                                        {
+                                            "name": "transport.publish_host",
+                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                                        },
                                     ],
                                     "image": "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev",
                                     "imagePullPolicy": "Always",
