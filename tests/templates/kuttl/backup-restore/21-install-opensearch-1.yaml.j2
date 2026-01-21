@@ -45,13 +45,19 @@ spec:
         plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
         plugins.security.restapi.roles_enabled: all_access
         plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
         s3.client.default.endpoint: https://minio:9000/
         s3.client.default.protocol: https
+{% else %}
+        s3.client.default.endpoint: http://minio:9000/
+        s3.client.default.protocol: http
+{% endif %}
         s3.client.default.region: unused # but required
         s3.client.default.path_style_access: "true"
     podOverrides:
       spec:
         initContainers:
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
           - name: init-system-keystore
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
             image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
@@ -72,6 +78,7 @@ spec:
                 mountPath: /etc/pki/ca-trust/source/anchors/s3-ca.crt
                 subPath: tls.crt
                 readOnly: true
+{% endif %}
           - name: init-tls
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
             image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
@@ -106,18 +113,16 @@ spec:
               - name: security-config
                 mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
               - name: system-trust-store
                 mountPath: /etc/pki/java/cacerts
                 subPath: java/cacerts
                 readOnly: true
+{% endif %}
               - name: tls-concatenated
                 mountPath: /stackable/opensearch/config/tls/concatenated
                 readOnly: true
         volumes:
-          - name: s3-ca-crt
-            secret:
-              secretName: minio-ca-crt
-              defaultMode: 0o660
           - name: admin-certificate
             secret:
               secretName: opensearch-1-admin-certificate
@@ -126,9 +131,15 @@ spec:
             secret:
               secretName: opensearch-1-security-config
               defaultMode: 0o660
+{% if test_scenario['values']['s3-use-tls'] == 'true' %}
+          - name: s3-ca-crt
+            secret:
+              secretName: minio-ca-crt
+              defaultMode: 0o660
           - name: system-trust-store
             emptyDir:
               sizeLimit: 10Mi
+{% endif %}
           - name: tls-concatenated
             emptyDir:
               sizeLimit: 1Mi
