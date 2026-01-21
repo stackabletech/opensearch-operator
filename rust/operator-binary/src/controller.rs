@@ -10,7 +10,10 @@ use build::build;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
     cluster_resources::ClusterResourceApplyStrategy,
-    commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
+    commons::{
+        affinity::StackableAffinity, networking::DomainName,
+        product_image_selection::ResolvedProductImage,
+    },
     crd::listener::v1alpha1::Listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -56,6 +59,7 @@ pub struct ContextNames {
     pub product_name: ProductName,
     pub operator_name: OperatorName,
     pub controller_name: ControllerName,
+    pub cluster_domain_name: DomainName,
 }
 
 /// The controller context
@@ -66,19 +70,22 @@ pub struct Context {
 
 impl Context {
     pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
+        let cluster_domain_name = client.kubernetes_cluster_info.cluster_domain.clone();
+
         Context {
             client,
-            names: Self::context_names(operator_name),
+            names: Self::context_names(operator_name, cluster_domain_name),
         }
     }
 
-    fn context_names(operator_name: OperatorName) -> ContextNames {
+    fn context_names(operator_name: OperatorName, cluster_domain_name: DomainName) -> ContextNames {
         ContextNames {
             product_name: ProductName::from_str("opensearch")
                 .expect("should be a valid product name"),
             operator_name,
             controller_name: ControllerName::from_str("opensearchcluster")
                 .expect("should be a valid controller name"),
+            cluster_domain_name,
         }
     }
 
@@ -379,7 +386,10 @@ mod tests {
     };
 
     use stackable_operator::{
-        commons::{affinity::StackableAffinity, product_image_selection::ResolvedProductImage},
+        commons::{
+            affinity::StackableAffinity, networking::DomainName,
+            product_image_selection::ResolvedProductImage,
+        },
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
@@ -406,7 +416,10 @@ mod tests {
     #[test]
     fn test_context_names() {
         // Test that the function does not panic
-        Context::context_names(OperatorName::from_str_unsafe("my-operator"));
+        Context::context_names(
+            OperatorName::from_str_unsafe("my-operator"),
+            DomainName::from_str("cluster.local").expect("should be a valid domain name"),
+        );
     }
 
     #[test]

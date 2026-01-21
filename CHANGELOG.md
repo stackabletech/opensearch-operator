@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - Support objectOverrides using `.spec.objectOverrides`.
   See [objectOverrides concepts page](https://docs.stackable.tech/home/nightly/concepts/overrides/#object-overrides) for details ([#93]).
 - Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#97]).
+- Configure OpenSearch to publish the fully-qualified domain names of the nodes instead of the IP
+  addresses, so that TLS certificates can be verified ([#100]).
 
 ### Changed
 
@@ -23,6 +25,7 @@ All notable changes to this project will be documented in this file.
 [#91]: https://github.com/stackabletech/opensearch-operator/pull/91
 [#93]: https://github.com/stackabletech/opensearch-operator/pull/93
 [#97]: https://github.com/stackabletech/opensearch-operator/pull/97
+[#100]: https://github.com/stackabletech/opensearch-operator/pull/100
 
 ## [25.11.0] - 2025-11-07
 
