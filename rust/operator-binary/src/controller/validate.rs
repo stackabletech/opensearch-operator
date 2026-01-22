@@ -1,13 +1,10 @@
 //! The validate step in the OpenSearchCluster controller
 
-use std::{collections::BTreeMap, num::TryFromIntError, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    kube::{Resource, ResourceExt},
-    product_logging::spec::Logging,
-    role_utils::RoleGroup,
-    shared::time::Duration,
+    product_logging::spec::Logging, role_utils::RoleGroup, shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -19,14 +16,12 @@ use crate::{
     crd::v1alpha1::{self},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
-        types::{
-            kubernetes::{ConfigMapName, NamespaceName, Uid},
-            operator::ClusterName,
-        },
+        types::{kubernetes::ConfigMapName, operator::ClusterName},
     },
 };
 
@@ -34,33 +29,24 @@ use crate::{
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display("failed to get the cluster name"))]
-    GetClusterName {},
+    GetClusterName {
+        source: crate::framework::controller_utils::Error,
+    },
 
     #[snafu(display("failed to get the cluster namespace"))]
-    GetClusterNamespace {},
+    GetClusterNamespace {
+        source: crate::framework::controller_utils::Error,
+    },
 
     #[snafu(display("failed to get the cluster UID"))]
-    GetClusterUid {},
+    GetClusterUid {
+        source: crate::framework::controller_utils::Error,
+    },
 
     #[snafu(display(
         "failed to get vectorAggregatorConfigMapName; It must be set if enableVectorAgent is true."
     ))]
     GetVectorAggregatorConfigMapName {},
-
-    #[snafu(display("failed to set cluster name"))]
-    ParseClusterName {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
-
-    #[snafu(display("failed to set cluster namespace"))]
-    ParseClusterNamespace {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
-
-    #[snafu(display("failed to set UID"))]
-    ParseClusterUid {
-        source: crate::framework::macros::attributed_string_type::Error,
-    },
 
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
@@ -94,7 +80,7 @@ pub enum Error {
 
     #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
     TerminationGracePeriodTooLong {
-        source: TryFromIntError,
+        source: std::num::TryFromIntError,
         duration: Duration,
     },
 }
@@ -114,14 +100,9 @@ pub fn validate(
     context_names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
 ) -> Result<ValidatedCluster> {
-    let raw_cluster_name = cluster.meta().name.clone().context(GetClusterNameSnafu)?;
-    let cluster_name = ClusterName::from_str(&raw_cluster_name).context(ParseClusterNameSnafu)?;
-
-    let raw_namespace = cluster.namespace().context(GetClusterNamespaceSnafu)?;
-    let namespace = NamespaceName::from_str(&raw_namespace).context(ParseClusterNamespaceSnafu)?;
-
-    let raw_uid = cluster.uid().context(GetClusterUidSnafu)?;
-    let uid = Uid::from_str(&raw_uid).context(ParseClusterUidSnafu)?;
+    let cluster_name = get_cluster_name(cluster).context(GetClusterNameSnafu)?;
+    let namespace = get_namespace(cluster).context(GetClusterNamespaceSnafu)?;
+    let uid = get_uid(cluster).context(GetClusterUidSnafu)?;
 
     let product_image = cluster
         .spec
@@ -542,14 +523,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_cluster_name() {
-        test_validate_err(
-            |cluster| cluster.metadata.name = Some("invalid cluster name".to_owned()),
-            ErrorDiscriminants::ParseClusterName,
-        );
-    }
-
-    #[test]
     fn test_validate_err_get_cluster_namespace() {
         test_validate_err(
             |cluster| cluster.metadata.namespace = None,
@@ -558,26 +531,10 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_cluster_namespace() {
-        test_validate_err(
-            |cluster| cluster.metadata.namespace = Some("invalid cluster namespace".to_owned()),
-            ErrorDiscriminants::ParseClusterNamespace,
-        );
-    }
-
-    #[test]
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
             |cluster| cluster.metadata.uid = None,
             ErrorDiscriminants::GetClusterUid,
-        );
-    }
-
-    #[test]
-    fn test_validate_err_parse_cluster_uid() {
-        test_validate_err(
-            |cluster| cluster.metadata.uid = Some("invalid cluster UID".to_owned()),
-            ErrorDiscriminants::ParseClusterUid,
         );
     }
 
