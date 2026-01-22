@@ -1,6 +1,9 @@
 :clusterName: simple-opensearch
 :namespace: stackable
-:discoveryServiceListenerClass: external-stable
+:exampleDiscoveryServiceListenerClass: external-unstable
+:exampleOpensearchProtocol: https
+:exampleOpensearchIp: 10.104.213.49
+:exampleOpensearchPort: 31315
 
 = Discovery
 :page-aliases: discovery.adoc
@@ -27,7 +30,7 @@ spec:
       serverSecretClass: tls # <3>
   nodes:
     roleConfig:
-      discoveryServiceListenerClass: {discoveryServiceListenerClass} # <4>
+      discoveryServiceListenerClass: {exampleDiscoveryServiceListenerClass} # <4>
     roleGroups:
       cluster-manager:
         config:
@@ -55,7 +58,7 @@ The resulting discovery ConfigMap is `{namespace}/{clusterName}`.
 
 The `{namespace}/{clusterName}` discovery ConfigMap contains the following fields where `{clusterName}` represents the name and `{namespace}` the namespace of the cluster:
 
-`OPENSEARCH_HOST`::
+`OPENSEARCH_HOSTNAME`::
 ====
 Contains the hostname or IP of the service that references the exposed role groups.
 
@@ -64,9 +67,10 @@ In case, `discoveryServiceListenerClass` was set to `cluster-internal`, the foll
 [subs="normal"]
   {clusterName}.{namespace}.svc.cluster.local
 
-If `discoveryServiceListenerClass` was set to `external-stable`, the content could look like:
+If `discoveryServiceListenerClass` was set to `{exampleDiscoveryServiceListenerClass}`, the content could look like:
 
-  10.104.213.49
+[subs="normal"]
+  {exampleOpensearchIp}
 ====
 
 `OPENSEARCH_PORT`::
@@ -75,12 +79,22 @@ Contains the port of the service that references the exposed role groups.
 
 Depending on the `discoveryServiceListenerClass`, the port will be either the default HTTP port 9200 or a NodePort:
 
-  31315
+[subs="normal"]
+  {exampleOpensearchPort}
 ====
 
 `OPENSEARCH_PROTOCOL`::
 ====
 Contains either `http` or `https`, depending on whether a `serverSecretClass` is configured:
 
-  https
+[subs="normal"]
+  {exampleOpensearchProtocol}
+====
+
+`OPENSEARCH_HOSTS`::
+====
+Contains the URL of the service that references the exposed role groups.
+
+[subs="normal"]
+  {exampleOpensearchProtocol}://{exampleOpensearchIp}:{exampleOpensearchPort}
 ====

@@ -65,7 +65,7 @@ data:
     from opensearchpy import OpenSearch
     from opensearchpy.exceptions import RequestError
 
-    host = os.environ['OPENSEARCH_HOST']
+    host = os.environ['OPENSEARCH_HOSTNAME']
     port = os.environ['OPENSEARCH_PORT']
     http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
 

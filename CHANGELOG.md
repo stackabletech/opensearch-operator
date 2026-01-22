@@ -19,8 +19,8 @@ All notable changes to this project will be documented in this file.
   - Discovery service named `<cluster-name>`, added.
     The discovery service is used to populate the discovery ConfigMap.
   - Discovery ConfigMap named `<cluster-name>`, added.
-    The ConfigMap contains the keys `OPENSEARCH_HOST`, `OPENSEARCH_PORT` and `OPENSEARCH_PROTOCOL`.
-    Users should use this information to connect to the cluster.
+    The ConfigMap contains the keys `OPENSEARCH_HOSTNAME`, `OPENSEARCH_PORT`, `OPENSEARCH_PROTOCOL`
+    and `OPENSEARCH_HOSTS`. Users should use this information to connect to the cluster.
   - Configuration parameter `spec.nodes.roleConfig.discoveryServiceListenerClass` added to set the
     ListenerClass for the discovery service.
   - Configuration parameter `spec.nodes.roleGroups.<role-group-name>.config.discoveryServiceExposed`

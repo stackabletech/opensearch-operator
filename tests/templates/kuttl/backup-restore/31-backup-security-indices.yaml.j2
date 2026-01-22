@@ -129,7 +129,7 @@ data:
         -cacert config/tls/ca.crt \
         -cert config/tls-client/tls.crt \
         -key config/tls-client/tls.key \
-        --hostname $OPENSEARCH_HOST \
+        --hostname $OPENSEARCH_HOSTNAME \
         -backup /tmp/backup
   upload-security-indices-backup.sh: |
     #!/usr/bin/env sh

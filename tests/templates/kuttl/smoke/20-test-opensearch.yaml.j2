@@ -75,7 +75,7 @@ data:
     import os
     from opensearchpy import OpenSearch
 
-    host = os.environ['OPENSEARCH_HOST']
+    host = os.environ['OPENSEARCH_HOSTNAME']
     port = os.environ['OPENSEARCH_PORT']
     http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
 

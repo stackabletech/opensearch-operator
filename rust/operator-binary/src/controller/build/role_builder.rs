@@ -171,22 +171,29 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
+        let protocol = if self.cluster.tls_config.server_secret_class.is_some() {
+            "https"
+        } else {
+            "http"
+        };
+
         let data = [
+            ("OPENSEARCH_PROTOCOL".to_owned(), protocol.to_owned()),
             (
-                "OPENSEARCH_PROTOCOL".to_owned(),
-                if self.cluster.tls_config.server_secret_class.is_some() {
-                    "https".to_owned()
-                } else {
-                    "http".to_owned()
-                },
-            ),
-            (
-                "OPENSEARCH_HOST".to_owned(),
+                "OPENSEARCH_HOSTNAME".to_owned(),
                 discovery_endpoint.hostname.to_string(),
             ),
             (
                 "OPENSEARCH_PORT".to_owned(),
                 discovery_endpoint.port.to_string(),
+            ),
+            (
+                "OPENSEARCH_HOSTS".to_owned(),
+                format!(
+                    "{protocol}://{hostname}:{port}",
+                    hostname = discovery_endpoint.hostname,
+                    port = discovery_endpoint.port
+                ),
             ),
         ];
 
@@ -661,9 +668,10 @@ mod tests {
                     ],
                 },
                 "data": {
-                    "OPENSEARCH_HOST": "1.2.3.4",
+                    "OPENSEARCH_HOSTNAME": "1.2.3.4",
                     "OPENSEARCH_PORT": "12345",
                     "OPENSEARCH_PROTOCOL": "https",
+                    "OPENSEARCH_HOSTS": "https://1.2.3.4:12345",
                 },
             }),
             discovery_config_map
