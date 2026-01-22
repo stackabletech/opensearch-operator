@@ -1,5 +1,4 @@
 ---
-opensearchHosts: https://simple-opensearch-nodes-default.default.svc.cluster.local:9200
 image:
   repository: oci.stackable.tech/sdp/opensearch-dashboards
   tag: 3.1.0-stackable{{ versions.opensearch }}
@@ -23,6 +22,11 @@ config:
       cookie:
         secure: true
 extraEnvs:
+  - name: OPENSEARCH_HOSTS
+    valueFrom:
+      configMapKeyRef:
+        name: simple-opensearch
+        key: OPENSEARCH_HOSTS
   - name: OPENSEARCH_PASSWORD
     valueFrom:
       secretKeyRef:

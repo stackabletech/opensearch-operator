@@ -7,6 +7,8 @@ spec:
   image:
     productVersion: 3.1.0
   nodes:
+    roleConfig:
+      discoveryServiceListenerClass: external-stable
     roleGroups:
       default:
         replicas: 3

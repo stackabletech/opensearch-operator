@@ -75,25 +75,21 @@ kubectl rollout status --watch statefulset/simple-opensearch-nodes-default --tim
 # wait a bit for the port to open
 sleep 10
 
-echo "Starting port-forwarding of port 9200"
-# tag::opensearch-port-forwarding[]
-kubectl port-forward services/simple-opensearch 9200 > /dev/null 2>&1 &
-# end::opensearch-port-forwarding[]
-PORT_FORWARD_PID=$!
-# shellcheck disable=2064 # we want the PID evaluated now, not at the time the trap is
-trap "kill $PORT_FORWARD_PID" EXIT
-sleep 5
-
 echo "Using the REST API"
 # tag::rest-api[]
 export CREDENTIALS=admin:AJVFsGJBbpT6mChn
+
+OPENSEARCH_HOST=$(
+    kubectl get configmap simple-opensearch \
+        --output=jsonpath='{.data.OPENSEARCH_HOSTS}'
+)
 
 curl \
     --insecure \
     --user $CREDENTIALS \
     --request PUT \
     --json '{"name": "Stackable"}' \
-    https://localhost:9200/sample_index/_doc/1
+    $OPENSEARCH_HOST/sample_index/_doc/1
 
 # Output:
 # {"_index":"sample_index","_id":"1","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":0,"_primary_term":1}
@@ -102,7 +98,7 @@ curl \
     --insecure \
     --user $CREDENTIALS \
     --request GET \
-    https://localhost:9200/sample_index/_doc/1
+    $OPENSEARCH_HOST/sample_index/_doc/1
 
 # Output:
 # {"_index":"sample_index","_id":"1","_version":1,"_seq_no":0,"_primary_term":1,"found":true,"_source":{"name": "Stackable"}}
