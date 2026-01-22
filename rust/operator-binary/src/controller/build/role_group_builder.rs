@@ -62,6 +62,7 @@ use crate::{
         },
         role_group_utils::ResourceNames,
         types::{
+            common::Port,
             kubernetes::{
                 PersistentVolumeClaimName, SecretClassName, ServiceAccountName, ServiceName,
                 VolumeName,
@@ -72,9 +73,9 @@ use crate::{
 };
 
 pub const HTTP_PORT_NAME: &str = "http";
-pub const HTTP_PORT: u16 = 9200;
+pub const HTTP_PORT: Port = Port(9200);
 pub const TRANSPORT_PORT_NAME: &str = "transport";
-pub const TRANSPORT_PORT: u16 = 9300;
+pub const TRANSPORT_PORT: Port = Port(9300);
 
 constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
 
