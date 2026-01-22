@@ -620,8 +620,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_name() {
         test_validate_err(
-            |cluster| cluster.metadata.name = None,
-            |_| (),
+            |cluster, _| cluster.metadata.name = None,
             ErrorDiscriminants::GetClusterName,
         );
     }
@@ -629,8 +628,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_namespace() {
         test_validate_err(
-            |cluster| cluster.metadata.namespace = None,
-            |_| (),
+            |cluster, _| cluster.metadata.namespace = None,
             ErrorDiscriminants::GetClusterNamespace,
         );
     }
@@ -638,8 +636,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
-            |cluster| cluster.metadata.uid = None,
-            |_| (),
+            |cluster, _| cluster.metadata.uid = None,
             ErrorDiscriminants::GetClusterUid,
         );
     }
@@ -647,12 +644,11 @@ mod tests {
     #[test]
     fn test_validate_err_resolve_product_image() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.image =
                     serde_json::from_str(r#"{"productVersion": "invalid product version"}"#)
                         .expect("should be a valid ProductImage structure")
             },
-            |_| (),
             ErrorDiscriminants::ResolveProductImage,
         );
     }
@@ -660,7 +656,7 @@ mod tests {
     #[test]
     fn test_validate_err_parse_role_group_name() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 let role_group = cluster
                     .spec
                     .nodes
@@ -673,7 +669,6 @@ mod tests {
                     .role_groups
                     .insert("invalid role-group name".to_owned(), role_group);
             },
-            |_| (),
             ErrorDiscriminants::ParseRoleGroupName,
         );
     }
@@ -681,7 +676,7 @@ mod tests {
     #[test]
     fn test_validate_err_validate_logging_config() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.config.logging.containers = [(
                     v1alpha1::Container::OpenSearch,
                     ContainerLogConfigFragment {
@@ -696,7 +691,6 @@ mod tests {
                 )]
                 .into()
             },
-            |_| (),
             ErrorDiscriminants::ValidateLoggingConfig,
         );
     }
@@ -704,13 +698,12 @@ mod tests {
     #[test]
     fn test_validate_err_get_vector_aggregator_config_map_name() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster
                     .spec
                     .cluster_config
                     .vector_aggregator_config_map_name = None
             },
-            |_| (),
             ErrorDiscriminants::GetVectorAggregatorConfigMapName,
         );
     }
@@ -718,11 +711,10 @@ mod tests {
     #[test]
     fn test_validate_err_termination_grace_period_too_long() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.config.graceful_shutdown_timeout =
                     Some(Duration::from_secs(u64::MAX))
             },
-            |_| (),
             ErrorDiscriminants::TerminationGracePeriodTooLong,
         );
     }
@@ -730,14 +722,13 @@ mod tests {
     #[test]
     fn test_validate_err_parse_environment_variable() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.env_overrides = [(
                     "INVALID_ENVIRONMENT_VARIABLE_WITH_=".to_owned(),
                     "value".to_owned(),
                 )]
                 .into()
             },
-            |_| (),
             ErrorDiscriminants::ParseEnvironmentVariable,
         );
     }
@@ -745,8 +736,7 @@ mod tests {
     #[test]
     fn test_validate_err_parse_listener_status_hostname() {
         test_validate_err(
-            |_| (),
-            |dereferenced_objects| {
+            |_, dereferenced_objects| {
                 dereferenced_objects.maybe_discovery_service_listener =
                     Some(listener::v1alpha1::Listener {
                         metadata: ObjectMeta::default(),
@@ -768,8 +758,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_listener_status_port() {
         test_validate_err(
-            |_| (),
-            |dereferenced_objects| {
+            |_, dereferenced_objects| {
                 dereferenced_objects.maybe_discovery_service_listener =
                     Some(listener::v1alpha1::Listener {
                         metadata: ObjectMeta::default(),
@@ -792,8 +781,7 @@ mod tests {
     #[test]
     fn test_validate_err_parse_listener_status_port() {
         test_validate_err(
-            |_| (),
-            |dereferenced_objects| {
+            |_, dereferenced_objects| {
                 dereferenced_objects.maybe_discovery_service_listener =
                     Some(listener::v1alpha1::Listener {
                         metadata: ObjectMeta::default(),
@@ -813,15 +801,12 @@ mod tests {
     }
 
     fn test_validate_err(
-        change_cluster: fn(&mut v1alpha1::OpenSearchCluster) -> (),
-        change_dereferenced_objects: fn(&mut DereferencedObjects) -> (),
+        change_test_objects: fn(&mut v1alpha1::OpenSearchCluster, &mut DereferencedObjects) -> (),
         expected_err: ErrorDiscriminants,
     ) {
         let mut cluster = cluster();
-        change_cluster(&mut cluster);
-
         let mut dereferenced_objects = dereferenced_objects();
-        change_dereferenced_objects(&mut dereferenced_objects);
+        change_test_objects(&mut cluster, &mut dereferenced_objects);
 
         let result = validate(&context_names(), &cluster, &dereferenced_objects);
 
