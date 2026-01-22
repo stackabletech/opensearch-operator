@@ -3,7 +3,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 
 /// Maximum length of label values
 ///
-/// Duplicates the private constant [`stackable-operator::kvp::label::value::LABEL_VALUE_MAX_LEN`]
+/// Duplicates the private constant [`stackable_operator::kvp::LABEL_VALUE_MAX_LEN`]
 pub const MAX_LABEL_VALUE_LENGTH: usize = 63;
 
 #[derive(Debug, EnumDiscriminants, Snafu)]
@@ -185,7 +185,7 @@ macro_rules! attributed_string_type {
                         None
                     },
                     "pattern": match $name::REGEX {
-                        $crate::framework::macros::attributed_string_type::Regex::Expression(regex) => Some(std::format!("^{regex}$")),
+                        $crate::framework::macros::attributed_string_type::Regex::Expression(regex) => Some(regex),
                         _ => None
                     }
                 })
@@ -377,24 +377,27 @@ macro_rules! attributed_string_type {
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1035_label_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1035_LABEL_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L228
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z]([-a-z0-9]*[a-z0-9])?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1123_dns_subdomain_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_SUBDOMAIN_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L193
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_rfc_1123_label_name $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression(stackable_operator::validation::LOWERCASE_RFC_1123_LABEL_FMT)
+        // see https://github.com/kubernetes/kubernetes/blob/v1.35.0/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L163
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_valid_label_value $($attribute:tt)*) => {
         // regular expression from stackable_operator::kvp::label::LABEL_VALUE_REGEX
-        $crate::framework::macros::attributed_string_type::Regex::Expression("[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?")
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[a-z0-9A-Z]([a-z0-9A-Z-_.]*[a-z0-9A-Z]+)?$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
     (@regex is_uid $($attribute:tt)*) => {
-        $crate::framework::macros::attributed_string_type::Regex::Expression("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+        $crate::framework::macros::attributed_string_type::Regex::Expression("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
             .combine(attributed_string_type!(@regex $($attribute)*))
     };
 
@@ -513,7 +516,7 @@ mod tests {
         "test",
         (min_length = 2), // should set the minimum length to 2
         (max_length = 8), // should not affect the minimum length
-        (regex = ".{4}"), // should not affect the minimum length
+        (regex = "^.{4}$"), // should not affect the minimum length
         is_rfc_1035_label_name, // should be overruled by the greater min_length
         is_valid_label_value // should be overruled by the greater min_length
     }
@@ -550,7 +553,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the maximum length
         (max_length = 8), // should set the maximum length to 8
-        (regex = ".{4}"), // should not affect the maximum length
+        (regex = "^.{4}$"), // should not affect the maximum length
         is_rfc_1035_label_name, // should be overruled by the lower max_length
         is_valid_label_value // should be overruled by the lower max_length
     }
@@ -587,7 +590,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the regular expression
         (max_length = 8), // should not affect the regular expression
-        (regex = "[est]{4}") // should set the regular expression to "[est]{4}"
+        (regex = "^[est]{4}$") // should set the regular expression to "[est]{4}"
     }
 
     #[test]
@@ -595,7 +598,7 @@ mod tests {
         type T = RegexWithOneConstraintTest;
 
         T::test_example();
-        assert_eq!(Regex::Expression("[est]{4}"), T::REGEX);
+        assert_eq!(Regex::Expression("^[est]{4}$"), T::REGEX);
         assert_eq!(
             Err(ErrorDiscriminants::RegexNotMatched),
             T::from_str("t-st").map_err(ErrorDiscriminants::from)
@@ -608,7 +611,7 @@ mod tests {
         "test",
         (min_length = 2), // should not affect the regular expression
         (max_length = 8), // should not affect the regular expression
-        (regex = "[est]{4}"), // should not be combinable with is_rfc_1123_dns_subdomain_name
+        (regex = "^[est]{4}$"), // should not be combinable with is_rfc_1123_dns_subdomain_name
         is_rfc_1123_dns_subdomain_name // should not be combinable with regex
     }
 
@@ -679,7 +682,7 @@ mod tests {
         "test",
         (min_length = 2),
         (max_length = 4),
-        (regex = "[est-]+"),
+        (regex = "^[est-]+$"),
         is_rfc_1035_label_name
     }
 
@@ -785,7 +788,7 @@ mod tests {
         "test",
         (min_length = 4),
         (max_length = 8),
-        (regex = "[est]+")
+        (regex = "^[est]+$")
     }
 
     #[test]

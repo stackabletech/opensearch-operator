@@ -19,7 +19,7 @@ attributed_string_type! {
     (min_length = 1),
     // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
-    (regex = "[-._a-zA-Z0-9]+")
+    (regex = "^[-._a-zA-Z0-9]+$")
 }
 
 attributed_string_type! {
@@ -95,7 +95,7 @@ attributed_string_type! {
     (min_length = 1),
     // see https://github.com/kubernetes/kubernetes/blob/v1.34.1/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L435-L451
     (max_length = RFC_1123_SUBDOMAIN_MAX_LENGTH),
-    (regex = "[-._a-zA-Z0-9]+")
+    (regex = "^[-._a-zA-Z0-9]+$")
 }
 
 attributed_string_type! {
