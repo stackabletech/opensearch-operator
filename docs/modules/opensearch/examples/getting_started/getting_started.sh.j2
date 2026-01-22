@@ -89,7 +89,7 @@ curl \
     --user $CREDENTIALS \
     --request PUT \
     --json '{"name": "Stackable"}' \
-    $OPENSEARCH_HOST/sample_index/_doc/1
+    "$OPENSEARCH_HOST/sample_index/_doc/1"
 
 # Output:
 # {"_index":"sample_index","_id":"1","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":0,"_primary_term":1}
@@ -98,7 +98,7 @@ curl \
     --insecure \
     --user $CREDENTIALS \
     --request GET \
-    $OPENSEARCH_HOST/sample_index/_doc/1
+    "$OPENSEARCH_HOST/sample_index/_doc/1"
 
 # Output:
 # {"_index":"sample_index","_id":"1","_version":1,"_seq_no":0,"_primary_term":1,"found":true,"_source":{"name": "Stackable"}}

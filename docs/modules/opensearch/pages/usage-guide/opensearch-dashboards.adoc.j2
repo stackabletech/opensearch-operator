@@ -10,7 +10,7 @@ A basic `values.yaml` file to deploy OpenSearch Dashboards with this chart might
 
 [source,yaml]
 ----
-opensearchHosts: https://opensearch-nodes-default.<opensearch-namespace>.svc.cluster.local:9200 # <1>
+opensearchHosts: null # <1>
 image: # <2>
   repository: oci.stackable.tech/sdp/opensearch-dashboards
   tag: 3.1.0-stackable{{ versions.opensearch }}
@@ -34,13 +34,18 @@ config:
       cookie:
         secure: true # <10>
 extraEnvs:
+  - name: OPENSEARCH_HOSTS
+    valueFrom:
+      configMapKeyRef:
+        name: opensearch # <11>
+        key: OPENSEARCH_HOSTS
   - name: OPENSEARCH_PASSWORD
     valueFrom:
       secretKeyRef:
         name: opensearch-credentials
-        key: kibanaserver # <11>
+        key: kibanaserver # <12>
 extraVolumes:
-  - name: tls # <12>
+  - name: tls # <13>
     ephemeral:
       volumeClaimTemplate:
         metadata:
@@ -58,13 +63,12 @@ extraVolumeMounts:
   - mountPath: /stackable/opensearch-dashboards/config/tls
     name: tls
   - mountPath: /stackable/opensearch-dashboards/config/opensearch_dashboards.yml
-    name: config # <13>
+    name: config # <14>
     subPath: opensearch_dashboards.yml
 podSecurityContext:
-  fsGroup: 1000 # <14>
+  fsGroup: 1000 # <15>
 ----
-<1> Address of the OpenSearch Service deployed by the operator;
-    This address must be adapted according to your deployment.
+<1> The address of the OpenSearch cluster is provided in `extraEnvs` in the `OPENSEARCH_HOSTS` variable.
 <2> Use the OCI image provided by the Stackable Data Platform
 <3> If running on OpenShift, use the ServiceAccount of OpenSearch because its permissions are already configured to work on OpenShift.
     This ServiceAccount name must probably adapted according to your deployment.
@@ -75,10 +79,12 @@ podSecurityContext:
 <8> OpenSearch Dashboards verifies the certificate of OpenSearch. This is disabled by default.
 <9> The CA certificate which is used to verify the OpenSearch certificate
 <10> Ensure that cookies are not sent via an insecure connection.
-<11> The password for the `kibanaserver` user
-<12> This example uses the secret operator to provide a TLS certificate.
-<13> The Helm chart only adds a volume mount at `/usr/share/opensearch-dashboards/config`, but in the image provided by Stackable, OpenSearch Dashboards is located in `/stackable/opensearch-dashboards`.
-<14> Mount the volumes with the `stackable` group so that the files are accessible by OpenSearch Dashboards.
+<11> Address of the OpenSearch Service taken from the xref:opensearch:reference/discovery.adoc[discovery ConfigMap]
+     The name of the discovery ConfigMap corresponds to the name of the OpenSearch cluster and must be adapted according to your deployment.
+<12> The password for the `kibanaserver` user
+<13> This example uses the secret operator to provide a TLS certificate.
+<14> The Helm chart only adds a volume mount at `/usr/share/opensearch-dashboards/config`, but in the image provided by Stackable, OpenSearch Dashboards is located in `/stackable/opensearch-dashboards`.
+<15> Mount the volumes with the `stackable` group so that the files are accessible by OpenSearch Dashboards.
 
 After the values are adjusted according to your deployment, especially `opensearchHosts` and `serviceAccount.name`, you can deploy the Helm chart as follows:
 
