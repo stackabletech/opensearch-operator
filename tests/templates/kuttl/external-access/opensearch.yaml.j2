@@ -18,6 +18,8 @@ spec:
     config:
       logging:
         enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleConfig:
+      discoveryServiceListenerClass: test-external-stable-$NAMESPACE
     roleGroups:
       cluster-manager:
         config:

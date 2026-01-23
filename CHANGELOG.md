@@ -14,6 +14,17 @@ All notable changes to this project will be documented in this file.
 - Enable the [restart-controller](https://docs.stackable.tech/home/nightly/commons-operator/restarter/), so that the Pods are automatically restarted on config changes ([#97]).
 - Configure OpenSearch to publish the fully-qualified domain names of the nodes instead of the IP
   addresses, so that TLS certificates can be verified ([#100]).
+- Add service discovery and exposition ([#94]):
+  - Service to set up the cluster renamed to `<cluster-name>-seed-nodes`.
+  - Discovery service named `<cluster-name>`, added.
+    The discovery service is used to populate the discovery ConfigMap.
+  - Discovery ConfigMap named `<cluster-name>`, added.
+    The ConfigMap contains the keys `OPENSEARCH_HOSTNAME`, `OPENSEARCH_PORT`, `OPENSEARCH_PROTOCOL`
+    and `OPENSEARCH_HOSTS`. Users should use this information to connect to the cluster.
+  - Configuration parameter `spec.nodes.roleConfig.discoveryServiceListenerClass` added to set the
+    ListenerClass for the discovery service.
+  - Configuration parameter `spec.nodes.roleGroups.<role-group-name>.config.discoveryServiceExposed`
+    added to expose a role-group via the discovery service.
 
 ### Changed
 
@@ -24,6 +35,7 @@ All notable changes to this project will be documented in this file.
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
 [#91]: https://github.com/stackabletech/opensearch-operator/pull/91
 [#93]: https://github.com/stackabletech/opensearch-operator/pull/93
+[#94]: https://github.com/stackabletech/opensearch-operator/pull/94
 [#97]: https://github.com/stackabletech/opensearch-operator/pull/97
 [#100]: https://github.com/stackabletech/opensearch-operator/pull/100
 

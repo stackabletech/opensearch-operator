@@ -9,6 +9,11 @@ serviceAccount:
   # OpenShift.
   name: opensearch-serviceaccount
 extraEnvs:
+  - name: OPENSEARCH_HOSTS
+    valueFrom:
+      configMapKeyRef:
+        name: opensearch
+        key: OPENSEARCH_HOSTS
   - name: OPENSEARCH_PASSWORD
     valueFrom:
       secretKeyRef:

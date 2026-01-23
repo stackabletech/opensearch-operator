@@ -4,7 +4,8 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu};
 use stackable_operator::{
-    product_logging::spec::Logging, role_utils::RoleGroup, shared::time::Duration,
+    crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
+    shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -13,6 +14,7 @@ use super::{
     ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
+    controller::{DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint},
     crd::v1alpha1::{self},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
@@ -21,7 +23,11 @@ use crate::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
-        types::{kubernetes::ConfigMapName, operator::ClusterName},
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, Hostname},
+            operator::ClusterName,
+        },
     },
 };
 
@@ -43,6 +49,9 @@ pub enum Error {
         source: crate::framework::controller_utils::Error,
     },
 
+    #[snafu(display("failed to get the port of the Listener status"))]
+    GetListenerStatusPort {},
+
     #[snafu(display(
         "failed to get vectorAggregatorConfigMapName; It must be set if enableVectorAgent is true."
     ))]
@@ -51,6 +60,16 @@ pub enum Error {
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
         source: crate::framework::builder::pod::container::Error,
+    },
+
+    #[snafu(display("failed to parse the hostname of the Listener status"))]
+    ParseListenerStatusHostname {
+        source: crate::framework::macros::attributed_string_type::Error,
+    },
+
+    #[snafu(display("failed to parse the port of the Listener status"))]
+    ParseListenerStatusPort {
+        source: crate::framework::types::common::Error,
     },
 
     #[snafu(display("failed to set product version"))]
@@ -99,6 +118,7 @@ const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
 pub fn validate(
     context_names: &ContextNames,
     cluster: &v1alpha1::OpenSearchCluster,
+    dereferenced_objects: &DereferencedObjects,
 ) -> Result<ValidatedCluster> {
     let cluster_name = get_cluster_name(cluster).context(GetClusterNameSnafu)?;
     let namespace = get_namespace(cluster).context(GetClusterNamespaceSnafu)?;
@@ -126,6 +146,12 @@ pub fn validate(
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
+    let validated_discovery_endpoint = validate_discovery_endpoint(
+        dereferenced_objects
+            .maybe_discovery_service_listener
+            .as_ref(),
+    )?;
+
     Ok(ValidatedCluster::new(
         product_image,
         product_version,
@@ -136,6 +162,7 @@ pub fn validate(
         role_group_configs,
         cluster.spec.cluster_config.tls.clone(),
         cluster.spec.cluster_config.keystore.clone(),
+        validated_discovery_endpoint,
     ))
 }
 
@@ -176,6 +203,7 @@ fn validate_role_group_config(
 
     let validated_config = ValidatedOpenSearchConfig {
         affinity: merged_role_group.config.config.affinity,
+        discovery_service_exposed: merged_role_group.config.config.discovery_service_exposed,
         listener_class: merged_role_group.config.config.listener_class,
         logging,
         node_roles: merged_role_group.config.config.node_roles,
@@ -235,6 +263,71 @@ fn validate_logging_configuration(
     })
 }
 
+/// Return the validated discovery endpoint if a Listener is given with a status containing the
+/// endpoint
+fn validate_discovery_endpoint(
+    maybe_discovery_service_listener: Option<&listener::v1alpha1::Listener>,
+) -> Result<Option<ValidatedDiscoveryEndpoint>> {
+    let validated_discovery_endpoint = if let Some(discovery_service_listener) =
+        maybe_discovery_service_listener
+    {
+        if let Some((hostname, port)) = extract_listener_ingresses(discovery_service_listener)? {
+            tracing::info!(
+                "The status of the discovery service listener {} contains the discovery endpoint. \
+                The discovery ConfigMap will be created or updated.",
+                discovery_service_listener.name_any()
+            );
+            Some(ValidatedDiscoveryEndpoint { hostname, port })
+        } else {
+            tracing::info!(
+                "The status of the discovery service listener {} does not yet contain the \
+                discovery endpoint. The creation of the discovery ConfigMap will be postponed \
+                until the status is updated.",
+                discovery_service_listener.name_any()
+            );
+            None
+        }
+    } else {
+        tracing::info!(
+            "The discovery service listener is not yet deployed. The creation of the discovery \
+            ConfigMap will be postponed until the discovery service listener is deployed and its \
+            status is set."
+        );
+        None
+    };
+
+    Ok(validated_discovery_endpoint)
+}
+
+/// Return the first address and the HTTP port from the given Listener if it has a status
+fn extract_listener_ingresses(
+    discovery_service_listener: &listener::v1alpha1::Listener,
+) -> Result<Option<(Hostname, Port)>> {
+    let maybe_first_ingress_address = discovery_service_listener
+        .status
+        .as_ref()
+        .and_then(|status| status.ingress_addresses.as_ref())
+        .into_iter()
+        .flatten()
+        .next();
+
+    // It is okay if the status is not set yet. But if it is set, then it must be valid.
+    if let Some(ingress_address) = maybe_first_ingress_address {
+        let hostname = Hostname::from_str(&ingress_address.address)
+            .context(ParseListenerStatusHostnameSnafu)?;
+
+        let raw_port = *ingress_address
+            .ports
+            .get(HTTP_PORT_NAME)
+            .context(GetListenerStatusPortSnafu)?;
+        let port = Port::try_from(raw_port).context(ParseListenerStatusPortSnafu)?;
+
+        Ok(Some((hostname, port)))
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, str::FromStr};
@@ -248,6 +341,7 @@ mod tests {
             product_image_selection::ResolvedProductImage,
             resources::{CpuLimits, MemoryLimits, PvcConfig, Resources},
         },
+        crd::listener::{self},
         deep_merger::ObjectOverrides,
         k8s_openapi::{
             api::core::v1::{
@@ -262,7 +356,7 @@ mod tests {
             ContainerLogConfigChoiceFragment, ContainerLogConfigFragment,
             CustomContainerLogConfigFragment, LogLevel, LoggerConfig, LoggingFragment,
         },
-        role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+        role_utils::{CommonConfiguration, Role, RoleGroup},
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -270,7 +364,10 @@ mod tests {
     use super::{ErrorDiscriminants, validate};
     use crate::{
         built_info,
-        controller::{ContextNames, ValidatedCluster, ValidatedLogging, ValidatedOpenSearchConfig},
+        controller::{
+            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
+            ValidatedLogging, ValidatedOpenSearchConfig,
+        },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
@@ -279,9 +376,10 @@ mod tests {
             },
             role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
             types::{
+                common::Port,
                 kubernetes::{
-                    ConfigMapName, ListenerClassName, NamespaceName, SecretClassName, SecretKey,
-                    SecretName,
+                    ConfigMapName, Hostname, ListenerClassName, NamespaceName, SecretClassName,
+                    SecretKey, SecretName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -293,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let result = validate(&context_names(), &cluster());
+        let result = validate(&context_names(), &cluster(), &dereferenced_objects());
 
         assert_eq!(
             Some(ValidatedCluster::new(
@@ -315,7 +413,7 @@ mod tests {
                 ClusterName::from_str_unsafe("my-opensearch"),
                 NamespaceName::from_str_unsafe("default"),
                 uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
-                GenericRoleConfig::default(),
+                v1alpha1::OpenSearchRoleConfig::default(),
                 [(
                     RoleGroupName::from_str_unsafe("default"),
                     RoleGroupConfig {
@@ -359,6 +457,7 @@ mod tests {
                                 }),
                                 ..StackableAffinity::default()
                             },
+                            discovery_service_exposed: true,
                             listener_class: ListenerClassName::from_str_unsafe(
                                 "listener-class-from-role-group-level"
                             ),
@@ -508,7 +607,11 @@ mod tests {
                         name: SecretName::from_str_unsafe("my-keystore-secret"),
                         key: SecretKey::from_str_unsafe("my-keystore-file")
                     }
-                }]
+                }],
+                Some(ValidatedDiscoveryEndpoint {
+                    hostname: Hostname::from_str_unsafe("my-opensearch.default.svc.cluster.local"),
+                    port: Port(9200),
+                })
             )),
             result.ok()
         );
@@ -517,7 +620,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_name() {
         test_validate_err(
-            |cluster| cluster.metadata.name = None,
+            |cluster, _| cluster.metadata.name = None,
             ErrorDiscriminants::GetClusterName,
         );
     }
@@ -525,7 +628,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_namespace() {
         test_validate_err(
-            |cluster| cluster.metadata.namespace = None,
+            |cluster, _| cluster.metadata.namespace = None,
             ErrorDiscriminants::GetClusterNamespace,
         );
     }
@@ -533,7 +636,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_cluster_uid() {
         test_validate_err(
-            |cluster| cluster.metadata.uid = None,
+            |cluster, _| cluster.metadata.uid = None,
             ErrorDiscriminants::GetClusterUid,
         );
     }
@@ -541,7 +644,7 @@ mod tests {
     #[test]
     fn test_validate_err_resolve_product_image() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.image =
                     serde_json::from_str(r#"{"productVersion": "invalid product version"}"#)
                         .expect("should be a valid ProductImage structure")
@@ -553,7 +656,7 @@ mod tests {
     #[test]
     fn test_validate_err_parse_role_group_name() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 let role_group = cluster
                     .spec
                     .nodes
@@ -573,7 +676,7 @@ mod tests {
     #[test]
     fn test_validate_err_validate_logging_config() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.config.logging.containers = [(
                     v1alpha1::Container::OpenSearch,
                     ContainerLogConfigFragment {
@@ -595,7 +698,7 @@ mod tests {
     #[test]
     fn test_validate_err_get_vector_aggregator_config_map_name() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster
                     .spec
                     .cluster_config
@@ -608,7 +711,7 @@ mod tests {
     #[test]
     fn test_validate_err_termination_grace_period_too_long() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.config.graceful_shutdown_timeout =
                     Some(Duration::from_secs(u64::MAX))
             },
@@ -619,7 +722,7 @@ mod tests {
     #[test]
     fn test_validate_err_parse_environment_variable() {
         test_validate_err(
-            |cluster| {
+            |cluster, _| {
                 cluster.spec.nodes.config.env_overrides = [(
                     "INVALID_ENVIRONMENT_VARIABLE_WITH_=".to_owned(),
                     "value".to_owned(),
@@ -630,14 +733,82 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_validate_err_parse_listener_status_hostname() {
+        test_validate_err(
+            |_, dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "invalid hostname".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                ports: [("http".to_owned(), 9200)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::ParseListenerStatusHostname,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_get_listener_status_port() {
+        test_validate_err(
+            |_, dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                // Validation should fail because the http port is expected.
+                                ports: [("transport".to_owned(), 9300)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::GetListenerStatusPort,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_parse_listener_status_port() {
+        test_validate_err(
+            |_, dereferenced_objects| {
+                dereferenced_objects.maybe_discovery_service_listener =
+                    Some(listener::v1alpha1::Listener {
+                        metadata: ObjectMeta::default(),
+                        spec: listener::v1alpha1::ListenerSpec::default(),
+                        status: Some(listener::v1alpha1::ListenerStatus {
+                            ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                                address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                                address_type: listener::v1alpha1::AddressType::Hostname,
+                                ports: [("http".to_owned(), -1)].into(),
+                            }]),
+                            ..listener::v1alpha1::ListenerStatus::default()
+                        }),
+                    });
+            },
+            ErrorDiscriminants::ParseListenerStatusPort,
+        );
+    }
+
     fn test_validate_err(
-        f: fn(&mut v1alpha1::OpenSearchCluster) -> (),
+        change_test_objects: fn(&mut v1alpha1::OpenSearchCluster, &mut DereferencedObjects) -> (),
         expected_err: ErrorDiscriminants,
     ) {
         let mut cluster = cluster();
-        f(&mut cluster);
+        let mut dereferenced_objects = dereferenced_objects();
+        change_test_objects(&mut cluster, &mut dereferenced_objects);
 
-        let result = validate(&context_names(), &cluster);
+        let result = validate(&context_names(), &cluster, &dereferenced_objects);
 
         assert_eq!(Err(expected_err), result.map_err(ErrorDiscriminants::from));
     }
@@ -726,7 +897,7 @@ mod tests {
                         product_specific_common_config: GenericProductSpecificCommonConfig::default(
                         ),
                     },
-                    role_config: GenericRoleConfig::default(),
+                    role_config: v1alpha1::OpenSearchRoleConfig::default(),
                     role_groups: [(
                         "default".to_owned(),
                         RoleGroup {
@@ -797,6 +968,23 @@ mod tests {
                 },
             },
             status: None,
+        }
+    }
+
+    fn dereferenced_objects() -> DereferencedObjects {
+        DereferencedObjects {
+            maybe_discovery_service_listener: Some(listener::v1alpha1::Listener {
+                metadata: ObjectMeta::default(),
+                spec: listener::v1alpha1::ListenerSpec::default(),
+                status: Some(listener::v1alpha1::ListenerStatus {
+                    ingress_addresses: Some(vec![listener::v1alpha1::ListenerIngress {
+                        address: "my-opensearch.default.svc.cluster.local".to_owned(),
+                        address_type: listener::v1alpha1::AddressType::Hostname,
+                        ports: [("http".to_owned(), 9200)].into(),
+                    }]),
+                    ..listener::v1alpha1::ListenerStatus::default()
+                }),
+            }),
         }
     }
 }

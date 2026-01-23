@@ -1,7 +1,12 @@
 = Service exposition with ListenerClasses
 :description: Configure OpenSearch service exposure with ListenerClasses: cluster-internal, external-unstable, or external-stable.
 
-The operator deploys a xref:listener-operator:listener.adoc[Listener] for OpenSearch role-groups.
+[NOTE]
+====
+While the listeners described here provide access to individual role groups, the xref:opensearch:reference/discovery.adoc[Discovery ConfigMap] is the recommended approach for general access to the OpenSearch cluster.
+====
+
+The operator deploys a xref:listener-operator:listener.adoc[Listener] for each OpenSearch role group.
 The listener defaults to only being accessible from within the Kubernetes cluster, but this can be changed by setting `.spec.nodes.roleGroups.\{role-group-name}.config.listenerClass`:
 
 [source,yaml]
@@ -13,5 +18,5 @@ spec:
         config:
           listenerClass: external-stable  # <1>
 ----
-<1> Specify a ListenerClass, such as `external-stable`, `external-unstable`, or `cluster-internal` (the default setting is `cluster-internal`) at role-group level.
-This can be set for all role-groups individually.
+<1> Specify a ListenerClass, such as `external-stable`, `external-unstable`, or `cluster-internal` (the default setting is `cluster-internal`) at role group level.
+This can be set for all role groups individually.

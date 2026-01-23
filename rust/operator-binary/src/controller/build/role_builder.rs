@@ -1,11 +1,14 @@
 //! Builder for role resources
 
+use std::str::FromStr;
+
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
+    crd::listener,
     k8s_openapi::{
         Resource,
         api::{
-            core::v1::{Service, ServiceAccount, ServicePort, ServiceSpec},
+            core::v1::{ConfigMap, Service, ServiceAccount, ServicePort, ServiceSpec},
             policy::v1::PodDisruptionBudget,
             rbac::v1::{ClusterRole, RoleBinding, RoleRef, Subject},
         },
@@ -17,17 +20,21 @@ use stackable_operator::{
     },
 };
 
-use super::role_group_builder::{
-    HTTP_PORT, HTTP_PORT_NAME, RoleGroupBuilder, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-};
 use crate::{
-    controller::{ContextNames, ValidatedCluster},
+    controller::{
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
+        ValidatedCluster, build::role_group_builder::RoleGroupBuilder,
+    },
     framework::{
         NameIsValidLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
         role_utils::ResourceNames,
+        types::{
+            kubernetes::{ConfigMapName, ListenerName, ServiceName},
+            operator::ClusterName,
+        },
     },
 };
 
@@ -64,7 +71,8 @@ impl<'a> RoleBuilder<'a> {
                     role_group_name.clone(),
                     role_group_config.clone(),
                     self.context_names,
-                    self.resource_names.discovery_service_name(),
+                    seed_nodes_service_name(&self.cluster.name),
+                    discovery_service_listener_name(&self.cluster.name),
                 )
             })
             .collect()
@@ -101,28 +109,14 @@ impl<'a> RoleBuilder<'a> {
     }
 
     /// Builds a Service that references all nodes with the cluster_manager node role
-    ///
-    /// Initially, this service was meant to be used by
-    /// [`super::node_config::NodeConfig::initial_cluster_manager_nodes`], but the function uses now another approach.
-    /// Afterwards, it was meant to be used as an entry point to OpenSearch, but it could also make
-    /// sense to use coordinating only nodes as entry points and not cluster manager nodes.
-    /// Therefore, this service will bei either adapted or removed. There is already an according
-    /// task entry in <https://github.com/stackabletech/opensearch-operator/issues/1>.
-    pub fn build_cluster_manager_service(&self) -> Service {
-        let ports = vec![
-            ServicePort {
-                name: Some(HTTP_PORT_NAME.to_owned()),
-                port: HTTP_PORT.into(),
-                ..ServicePort::default()
-            },
-            ServicePort {
-                name: Some(TRANSPORT_PORT_NAME.to_owned()),
-                port: TRANSPORT_PORT.into(),
-                ..ServicePort::default()
-            },
-        ];
+    pub fn build_seed_nodes_service(&self) -> Service {
+        let ports = vec![ServicePort {
+            name: Some(TRANSPORT_PORT_NAME.to_owned()),
+            port: TRANSPORT_PORT.into(),
+            ..ServicePort::default()
+        }];
 
-        let metadata = self.common_metadata(self.resource_names.discovery_service_name());
+        let metadata = self.common_metadata(seed_nodes_service_name(&self.cluster.name));
 
         let service_selector =
             RoleGroupBuilder::cluster_manager_labels(&self.cluster, self.context_names);
@@ -144,9 +138,75 @@ impl<'a> RoleBuilder<'a> {
         }
     }
 
+    /// Builds a Listener whose status is used to populate the discovery ConfigMap.
+    pub fn build_discovery_service_listener(&self) -> listener::v1alpha1::Listener {
+        let metadata = self.common_metadata(discovery_service_listener_name(&self.cluster.name));
+
+        let listener_class = &self.cluster.role_config.discovery_service_listener_class;
+
+        let ports = vec![listener::v1alpha1::ListenerPort {
+            name: HTTP_PORT_NAME.to_owned(),
+            port: HTTP_PORT.into(),
+            protocol: Some("TCP".to_owned()),
+        }];
+
+        listener::v1alpha1::Listener {
+            metadata,
+            spec: listener::v1alpha1::ListenerSpec {
+                class_name: Some(listener_class.to_string()),
+                ports: Some(ports),
+                ..listener::v1alpha1::ListenerSpec::default()
+            },
+            status: None,
+        }
+    }
+
+    /// Builds the discovery ConfigMap if the discovery endpoint is already known.
+    ///
+    /// The discovery endpoint is derived from the status of the discovery service Listener. If the
+    /// status is not set yet, the reconciliation process will occur again once the Listener status
+    /// is updated, leading to the eventual creation of the discovery ConfigMap.
+    pub fn build_discovery_config_map(&self) -> Option<ConfigMap> {
+        let discovery_endpoint = self.cluster.discovery_endpoint.as_ref()?;
+
+        let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
+
+        let protocol = if self.cluster.tls_config.server_secret_class.is_some() {
+            "https"
+        } else {
+            "http"
+        };
+
+        let data = [
+            ("OPENSEARCH_PROTOCOL".to_owned(), protocol.to_owned()),
+            (
+                "OPENSEARCH_HOSTNAME".to_owned(),
+                discovery_endpoint.hostname.to_string(),
+            ),
+            (
+                "OPENSEARCH_PORT".to_owned(),
+                discovery_endpoint.port.to_string(),
+            ),
+            (
+                "OPENSEARCH_HOSTS".to_owned(),
+                format!(
+                    "{protocol}://{hostname}:{port}",
+                    hostname = discovery_endpoint.hostname,
+                    port = discovery_endpoint.port
+                ),
+            ),
+        ];
+
+        Some(ConfigMap {
+            metadata,
+            data: Some(data.into()),
+            ..ConfigMap::default()
+        })
+    }
+
     /// Builds a [`PodDisruptionBudget`] used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
-        let pdb_config = &self.cluster.role_config.pod_disruption_budget;
+        let pdb_config = &self.cluster.role_config.common.pod_disruption_budget;
 
         if pdb_config.enabled {
             let max_unavailable = pdb_config
@@ -211,6 +271,43 @@ impl<'a> RoleBuilder<'a> {
     }
 }
 
+fn seed_nodes_service_name(cluster_name: &ClusterName) -> ServiceName {
+    const SUFFIX: &str = "-seed-nodes";
+
+    // compile-time checks
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH + SUFFIX.len() <= ServiceName::MAX_LENGTH,
+        "The string `<cluster_name>-seed-nodes` must not exceed the limit of Service names."
+    );
+    let _ = ClusterName::IS_RFC_1035_LABEL_NAME;
+    let _ = ClusterName::IS_VALID_LABEL_VALUE;
+
+    ServiceName::from_str(&format!("{}{SUFFIX}", cluster_name.as_ref()))
+        .expect("should be a valid Service name")
+}
+
+fn discovery_config_map_name(cluster_name: &ClusterName) -> ConfigMapName {
+    // compile-time checks
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH <= ConfigMapName::MAX_LENGTH,
+        "The string `<cluster_name>` must not exceed the limit of ConfigMap names."
+    );
+    let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+    ConfigMapName::from_str(cluster_name.as_ref()).expect("should be a valid ConfigMap name")
+}
+
+pub fn discovery_service_listener_name(cluster_name: &ClusterName) -> ListenerName {
+    // compile-time checks
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH <= ListenerName::MAX_LENGTH,
+        "The string `<cluster_name>` must not exceed the limit of Listener names."
+    );
+    let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+    ListenerName::from_str(cluster_name.as_ref()).expect("should be a valid Listener name")
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -230,7 +327,6 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -239,14 +335,22 @@ mod tests {
     use crate::{
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
+            ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
+            ValidatedOpenSearchConfig,
+            build::role_builder::{
+                discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
+            },
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                common::Port,
+                kubernetes::{
+                    ConfigMapName, Hostname, ListenerClassName, ListenerName, NamespaceName,
+                    ServiceName,
+                },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                     RoleGroupName,
@@ -273,6 +377,7 @@ mod tests {
             replicas: 1,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
@@ -311,7 +416,12 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig {
+                discovery_service_listener_class: ListenerClassName::from_str_unsafe(
+                    "external-stable",
+                ),
+                ..v1alpha1::OpenSearchRoleConfig::default()
+            },
             [(
                 RoleGroupName::from_str_unsafe("default"),
                 role_group_config.clone(),
@@ -319,6 +429,10 @@ mod tests {
             .into(),
             v1alpha1::OpenSearchTls::default(),
             vec![],
+            Some(ValidatedDiscoveryEndpoint {
+                hostname: Hostname::from_str_unsafe("1.2.3.4"),
+                port: Port(12345),
+            }),
         );
 
         RoleBuilder::new(cluster, context_names)
@@ -414,13 +528,12 @@ mod tests {
     }
 
     #[test]
-    fn test_build_cluster_manager_service() {
+    fn test_build_seed_nodes_service() {
         let context_names = context_names();
         let role_builder = role_builder(&context_names);
 
-        let cluster_manager_service =
-            serde_json::to_value(role_builder.build_cluster_manager_service())
-                .expect("should be serializable");
+        let seed_nodes_service = serde_json::to_value(role_builder.build_seed_nodes_service())
+            .expect("should be serializable");
 
         assert_eq!(
             json!({
@@ -435,7 +548,7 @@ mod tests {
                         "app.kubernetes.io/version": "3.1.0",
                         "stackable.tech/vendor": "Stackable"
                     },
-                    "name": "my-opensearch-cluster",
+                    "name": "my-opensearch-cluster-seed-nodes",
                     "namespace": "default",
                     "ownerReferences": [
                         {
@@ -451,10 +564,6 @@ mod tests {
                     "clusterIP": "None",
                     "ports": [
                         {
-                            "name": "http",
-                            "port": 9200
-                        },
-                        {
                             "name": "transport",
                             "port": 9300
                         }
@@ -469,7 +578,103 @@ mod tests {
                     "type": "ClusterIP"
                 }
             }),
-            cluster_manager_service
+            seed_nodes_service
+        );
+    }
+
+    #[test]
+    fn test_build_discovery_service_listener() {
+        let context_names = context_names();
+        let role_builder = role_builder(&context_names);
+
+        let discovery_service_listener =
+            serde_json::to_value(role_builder.build_discovery_service_listener())
+                .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "listeners.stackable.tech/v1alpha1",
+                "kind": "Listener",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "stackable.tech/vendor": "Stackable",
+                    },
+                    "name": "my-opensearch-cluster",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b",
+                        },
+                    ],
+                },
+                "spec": {
+                    "className": "external-stable",
+                    "extraPodSelectorLabels": {},
+                    "objectOverrides": [],
+                    "ports": [
+                        {
+                            "name": "http",
+                            "port": 9200,
+                            "protocol": "TCP",
+                        },
+                    ],
+                    "publishNotReadyAddresses": null,
+                },
+            }),
+            discovery_service_listener
+        );
+    }
+
+    #[test]
+    fn test_build_discovery_config_map() {
+        let context_names = context_names();
+        let role_builder = role_builder(&context_names);
+
+        let discovery_config_map = serde_json::to_value(role_builder.build_discovery_config_map())
+            .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/version": "3.1.0",
+                        "stackable.tech/vendor": "Stackable",
+                    },
+                    "name": "my-opensearch-cluster",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b",
+                        },
+                    ],
+                },
+                "data": {
+                    "OPENSEARCH_HOSTNAME": "1.2.3.4",
+                    "OPENSEARCH_PORT": "12345",
+                    "OPENSEARCH_PROTOCOL": "https",
+                    "OPENSEARCH_HOSTS": "https://1.2.3.4:12345",
+                },
+            }),
+            discovery_config_map
         );
     }
 
@@ -515,6 +720,36 @@ mod tests {
                 }
             }),
             pdb
+        );
+    }
+
+    #[test]
+    fn test_seed_nodes_service_name() {
+        let cluster_name = ClusterName::from_str_unsafe("test-cluster");
+
+        assert_eq!(
+            ServiceName::from_str_unsafe("test-cluster-seed-nodes"),
+            seed_nodes_service_name(&cluster_name)
+        );
+    }
+
+    #[test]
+    fn test_discovery_config_map_name() {
+        let cluster_name = ClusterName::from_str_unsafe("test-cluster");
+
+        assert_eq!(
+            ConfigMapName::from_str_unsafe("test-cluster"),
+            discovery_config_map_name(&cluster_name)
+        );
+    }
+
+    #[test]
+    fn test_discovery_service_listener_name() {
+        let cluster_name = ClusterName::from_str_unsafe("test-cluster");
+
+        assert_eq!(
+            ListenerName::from_str_unsafe("test-cluster"),
+            discovery_service_listener_name(&cluster_name)
         );
     }
 }

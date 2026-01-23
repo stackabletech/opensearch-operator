@@ -58,17 +58,6 @@ You can do so with this command:
 include::example$getting_started/getting_started.sh[tag=await-cluster]
 ----
 
-== Connecting to the HTTP endpoint
-
-Once the OpenSearch nodes are created, you can use the REST API of OpenSearch.
-
-To forward the HTTP port (`9200`) to localhost, run:
-
-[source,bash]
-----
-include::example$getting_started/getting_started.sh[tag=opensearch-port-forwarding]
-----
-
 == Using the REST API
 
 You can use the REST API as follows:

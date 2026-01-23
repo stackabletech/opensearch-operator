@@ -121,7 +121,7 @@ pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
-    pub discovery_service_name: ServiceName,
+    pub seed_nodes_service_name: ServiceName,
     cluster_domain_name: DomainName,
     headless_service_name: ServiceName,
 }
@@ -133,7 +133,7 @@ impl NodeConfig {
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
-        discovery_service_name: ServiceName,
+        seed_nodes_service_name: ServiceName,
         cluster_domain_name: DomainName,
         headless_service_name: ServiceName,
     ) -> Self {
@@ -141,7 +141,7 @@ impl NodeConfig {
             cluster,
             role_group_name,
             role_group_config,
-            discovery_service_name,
+            seed_nodes_service_name,
             cluster_domain_name,
             headless_service_name,
         }
@@ -286,7 +286,7 @@ impl NodeConfig {
             self.headless_service_name, self.cluster.namespace, self.cluster_domain_name
         );
 
-        EnvVarSet::new()
+        let mut env_vars = EnvVarSet::new()
             .with_field_path(
                 // Prefix with an underscore, so that it occurs before the other environment
                 // variables which depend on it.
@@ -313,11 +313,10 @@ impl NodeConfig {
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
-                &self.discovery_service_name,
-            )
-            .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
-                self.initial_cluster_manager_nodes(),
+                format!(
+                    "{}.{}.svc.{}",
+                    self.seed_nodes_service_name, self.cluster.namespace, self.cluster_domain_name
+                ),
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
@@ -330,8 +329,16 @@ impl NodeConfig {
                     // Node roles cannot contain commas, therefore creating a comma-separated list
                     // is safe.
                     .join(","),
-            )
-            .merge(self.role_group_config.env_overrides.clone())
+            );
+
+        if let Some(initial_cluster_manager_nodes) = self.initial_cluster_manager_nodes() {
+            env_vars = env_vars.with_value(
+                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
+                initial_cluster_manager_nodes,
+            );
+        }
+
+        env_vars.merge(self.role_group_config.env_overrides.clone())
     }
 
     fn to_yaml(kv: serde_json::Map<String, Value>) -> String {
@@ -357,33 +364,70 @@ impl NodeConfig {
         }
     }
 
-    /// Configuration for `cluster.initial_cluster_manager_nodes` which replaces
-    /// `cluster.initial_master_nodes`, see
-    /// <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93>.
+    /// Configuration for `cluster.initial_cluster_manager_nodes`
     ///
-    /// According to
-    /// <https://docs.opensearch.org/docs/3.0/install-and-configure/configuring-opensearch/discovery-gateway-settings/>,
-    /// it contains "a list of cluster-manager-eligible nodes used to bootstrap the cluster."
+    /// Returns the node names of the initial cluster-manager nodes if
+    /// * this is a multi-node cluster and
+    /// * this node has the cluster-manager node role.
     ///
-    /// However, the documentation for Elasticsearch is more detailed and contains the following
-    /// notes (see <https://www.elastic.co/guide/en/elasticsearch/reference/9.0/modules-discovery-settings.html>):
+    /// Please read the following sections for an explanation of these restrictions.
+    ///
+    /// This configuration setting replaces the setting `cluster.initial_master_nodes`, see
+    /// <https://github.com/opensearch-project/OpenSearch/blob/3.1.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93>.
+    ///
+    /// This setting is required on nodes with the cluster-manager node role on a multi-node
+    /// cluster. Otherwise the bootstrapping of the cluster fails and all pods report:
+    /// > Wait for cluster to be available ...
+    ///
+    /// This setting must not be set on a single-node cluster, because otherwise the following
+    /// error is thrown:
+    ///  > setting [cluster.initial_cluster_manager_nodes] is not allowed when [discovery.type] is set to [single-node]
+    ///
+    /// see <https://github.com/opensearch-project/OpenSearch/blob/3.1.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136>
+    ///
+    /// This setting does not seem to have an effect on nodes without the cluster-manager node
+    /// role. However, as it is recommended (see the Elasticsearch documentation below) to not set
+    /// it on master-ineligible nodes, it is not set.
+    ///
+    /// This setting seems to be ignored when the cluster has already formed. It is recommended in
+    /// the Elasticsearch documentation to remove it once the cluster has formed, but as it is hard
+    /// to determine if the bootstrapping was successfully completed, this setting is still set.
+    /// Adding a new cluster-manager node and updating this setting also seems to be okay.
+    ///
+    /// # OpenSearch documentation
+    ///
+    /// > This setting is required when bootstrapping a cluster for the first time and should
+    /// > contain the node names (as defined by `node.name`) of the initial cluster-manager-eligible
+    /// > nodes. This list should be empty for nodes joining an existing cluster.
+    ///
+    /// see <https://docs.opensearch.org/3.3/install-and-configure/configuring-opensearch/discovery-gateway-settings/#static-discovery-settings>
+    ///
+    /// # Elasticsearch documentation
+    ///
+    /// The documentation for Elasticsearch is more detailed and contains the following
+    /// notes:
     /// * Remove this setting once the cluster has formed, and never set it again for this cluster.
     /// * Do not configure this setting on master-ineligible nodes.
     /// * Do not configure this setting on nodes joining an existing cluster.
     /// * Do not configure this setting on nodes which are restarting.
     /// * Do not configure this setting when performing a full-cluster restart.
     ///
-    /// The OpenSearch Helm chart only sets master nodes but does not handle the other cases (see
-    /// <https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/templates/statefulset.yaml#L414-L415>),
-    /// so they are also ignored here for the moment.
-    fn initial_cluster_manager_nodes(&self) -> String {
-        if !self.cluster.is_single_node()
-            && self
+    /// see <https://www.elastic.co/docs/reference/elasticsearch/configuration-reference/discovery-cluster-formation-settings>
+    ///
+    /// # Implementation in the OpenSearch Helm chart
+    ///
+    /// The OpenSearch Helm chart sets this setting on master nodes on multi-node clusters, see
+    /// see </home/sigi/projects/stackable/workspace/opensearch-operator/target/doc/stackable_opensearch_operator/index.html>.
+    fn initial_cluster_manager_nodes(&self) -> Option<String> {
+        if self.cluster.is_single_node()
+            || !self
                 .role_group_config
                 .config
                 .node_roles
                 .contains(&v1alpha1::NodeRole::ClusterManager)
         {
+            None
+        } else {
             let cluster_manager_configs = self
                 .cluster
                 .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
@@ -406,11 +450,7 @@ impl NodeConfig {
                 );
             }
             // Pod names cannot contain commas, therefore creating a comma-separated list is safe.
-            pod_names.join(",")
-        } else {
-            // This setting is not allowed on single node cluster, see
-            // <https://github.com/opensearch-project/OpenSearch/blob/3.0.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136>
-            String::new()
+            Some(pod_names.join(","))
         }
     }
 
@@ -436,6 +476,7 @@ impl NodeConfig {
 mod tests {
     use std::collections::BTreeMap;
 
+    use pretty_assertions::assert_eq;
     use stackable_operator::{
         commons::{
             affinity::StackableAffinity,
@@ -445,7 +486,6 @@ mod tests {
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
-        role_utils::GenericRoleConfig,
         shared::time::Duration,
     };
     use uuid::uuid;
@@ -490,6 +530,7 @@ mod tests {
             replicas: test_config.replicas,
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
                     opensearch_container: ValidatedContainerLogConfigChoice::Automatic(
@@ -541,7 +582,7 @@ mod tests {
             ClusterName::from_str_unsafe("my-opensearch-cluster"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("0b1e30e6-326e-4c1a-868d-ad6598b49e8b"),
-            GenericRoleConfig::default(),
+            v1alpha1::OpenSearchRoleConfig::default(),
             [(
                 RoleGroupName::from_str_unsafe("default"),
                 role_group_config.clone(),
@@ -549,13 +590,14 @@ mod tests {
             .into(),
             v1alpha1::OpenSearchTls::default(),
             vec![],
+            None,
         );
 
         NodeConfig::new(
             cluster,
             role_group_name,
             role_group_config,
-            ServiceName::from_str_unsafe("my-opensearch-cluster-manager"),
+            ServiceName::from_str_unsafe("my-opensearch-seed-nodes"),
             DomainName::from_str("cluster.local").expect("should be a valid domain name"),
             ServiceName::from_str_unsafe("my-opensearch-cluster-default-headless"),
         )
@@ -667,7 +709,7 @@ mod tests {
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("discovery.seed_hosts"),
-                    "my-opensearch-cluster-manager",
+                    "my-opensearch-seed-nodes.default.svc.cluster.local",
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("http.publish_host"),
@@ -728,11 +770,11 @@ mod tests {
         });
 
         assert_eq!(
-            "".to_owned(),
+            None,
             node_config_single_node.initial_cluster_manager_nodes()
         );
         assert_eq!(
-            "my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned(),
+            Some("my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned()),
             node_config_multiple_nodes.initial_cluster_manager_nodes()
         );
     }

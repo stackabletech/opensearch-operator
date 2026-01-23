@@ -21,5 +21,6 @@
 * xref:opensearch:reference/index.adoc[]
 ** xref:opensearch:reference/crds.adoc[]
 *** {crd-docs}/opensearch.stackable.tech/opensearchcluster/v1alpha1/[OpenSearchCluster {external-link-icon}^]
+** xref:opensearch:reference/discovery.adoc[]
 ** xref:opensearch:reference/commandline-parameters.adoc[]
 ** xref:opensearch:reference/environment-variables.adoc[]
