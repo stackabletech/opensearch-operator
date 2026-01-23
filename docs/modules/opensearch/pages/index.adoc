@@ -41,17 +41,18 @@ It helps you tune your cluster to your needs by configuring xref:usage-guide/sto
 
 === Kubernetes resources
 
-Based on the custom resources you define, the operator creates ConfigMaps, StatefulSets and Services.
+Based on the custom resources you define, the operator creates ConfigMaps, StatefulSets, Services and so on.
 
 image::opensearch_overview.drawio.svg[A diagram depicting the Kubernetes resources created by the operator]
 
 The diagram above depicts all the Kubernetes resources created by the operator, and how they relate to each other.
 
-For every xref:concepts:roles-and-role-groups.adoc#role-groups[role group] you define, the operator creates a StatefulSet with the amount of replicas defined in the role group.
-For every role group, a Service is created, as well as one for the whole cluster that references the cluster manager nodes.
+What should be highlighted, is the xref:reference/discovery.adoc[discovery ConfigMap] which is named the same as the OpenSearchCluster.
+It references the Service that should be used to connect to the cluster.
 
-Additionally, a ConfigMap is created for each role group.
-These ConfigMaps contain configuration files like `opensearch.yml`.
+For every xref:concepts:roles-and-role-groups.adoc#role-groups[role group] you define, the operator deploys OpenSearch as a StatefulSet with the amount of replicas defined in the role group.
+The pods of a StatefulSet use the configuration from the role group ConfigMap, i.e. they all use the same OpenSearch node roles, e.g. `cluster-manager` or `data`, and xref:opensearch:usage-guide/storage-resource-configuration.adoc[resource configurations].
+If you want dedicated `cluster-manager` and `data` nodes, you just define two role groups with according configurations as described in xref:opensearch:usage-guide/node-roles.adoc[].
 
 == Supported versions
 
