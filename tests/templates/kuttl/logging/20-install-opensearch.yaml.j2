@@ -13,6 +13,34 @@ data:
     appender.FILE.layout.type = OpenSearchJsonLayout
     appender.FILE.layout.type_name = server
 ---
+# Expose the API of the Vector agent
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-api-config
+data:
+  vector-api-config.yaml: |
+    api:
+      address: 0.0.0.0:8686
+      enabled: true
+---
+# Expose the API of the Vector agent of the pod opensearch-nodes-automatic-0
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch-nodes-automatic-vector
+spec:
+  ports:
+    - name: vector
+      port: 8686
+      protocol: TCP
+  selector:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/role-group: automatic
+  type: ClusterIP
+---
 apiVersion: opensearch.stackable.tech/v1alpha1
 kind: OpenSearchCluster
 metadata:
@@ -37,10 +65,10 @@ spec:
                 console:
                   level: INFO
                 file:
-                  level: INFO
+                  level: TRACE
                 loggers:
                   ROOT:
-                    level: INFO
+                    level: TRACE
               vector:
                 console:
                   level: INFO
@@ -78,10 +106,26 @@ spec:
               - name: security-config
                 mountPath: /stackable/opensearch/config/opensearch-security
                 readOnly: true
+          - name: vector
+            env:
+              - name: VECTOR_CONFIG_YAML
+                value: /stackable/config/vector.yaml,/stackable/config/vector-api-config.yaml
+            ports:
+              - name: vector
+                containerPort: 8686
+                protocol: TCP
+            volumeMounts:
+              - name: vector-api-config
+                mountPath: /stackable/config/vector-api-config.yaml
+                readOnly: true
+                subPath: vector-api-config.yaml
         volumes:
           - name: security-config
             secret:
               secretName: opensearch-security-config
+          - name: vector-api-config
+            configMap:
+              name: vector-api-config
 ---
 apiVersion: v1
 kind: Secret

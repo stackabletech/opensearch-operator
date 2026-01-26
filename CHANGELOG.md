@@ -30,6 +30,10 @@ All notable changes to this project will be documented in this file.
 
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#91]).
 
+### Fixed
+
+- Log file rollover fixed ([#107]).
+
 [#55]: https://github.com/stackabletech/opensearch-operator/pull/55
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
 [#76]: https://github.com/stackabletech/opensearch-operator/pull/76
@@ -38,6 +42,7 @@ All notable changes to this project will be documented in this file.
 [#94]: https://github.com/stackabletech/opensearch-operator/pull/94
 [#97]: https://github.com/stackabletech/opensearch-operator/pull/97
 [#100]: https://github.com/stackabletech/opensearch-operator/pull/100
+[#107]: https://github.com/stackabletech/opensearch-operator/pull/107
 
 ## [25.11.0] - 2025-11-07
 

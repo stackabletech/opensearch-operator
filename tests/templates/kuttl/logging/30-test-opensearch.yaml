@@ -37,6 +37,7 @@ spec:
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+    backoffLimit: 10
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -88,6 +89,50 @@ data:
                        f'No events were sent in "{componentId}".'
 
 
+    def check_log_file_rollover():
+        response = requests.post(
+            'http://opensearch-nodes-automatic-vector:8686/graphql',
+            json={
+                'query': """
+                    {
+                        sources {
+                            nodes {
+                                componentId
+                                metrics {
+                                    receivedBytesTotal {
+                                        receivedBytesTotal
+                                    }
+                                }
+                            }
+                        }
+                    }
+                """
+            }
+        )
+
+        assert response.status_code == 200, \
+            'Cannot access the API of the vector agent.'
+
+        result = response.json()
+
+        sources = result['data']['sources']['nodes']
+        for source in sources:
+            receivedBytes = source['metrics']['receivedBytesTotal']
+            componentId = source['componentId']
+
+            if componentId == 'files_opensearch_server':
+                assert receivedBytes is not None
+                receivedBytes = receivedBytes['receivedBytesTotal']
+                MAX_LOG_FILE_SIZE = 5_500_000
+                expectedBytes = 2 * MAX_LOG_FILE_SIZE
+                assert receivedBytes >= expectedBytes, \
+                       'Log file rollover did not yet happen twice ' \
+                       f'({receivedBytes:,.0f} Bytes of {expectedBytes:,d} Bytes received). ' \
+                       'The first rollover requires write permission to rename the log file, ' \
+                       'the second rollover additionally requires delete permission to remove the old log file.'
+
+
     if __name__ == '__main__':
         check_sent_events()
+        check_log_file_rollover()
         print('Test successful!')

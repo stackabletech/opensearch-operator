@@ -13,6 +13,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
     },
@@ -64,6 +65,13 @@ pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 /// Defines one or more roles for an OpenSearch node.
 /// Type: (comma-separated) list of strings
 pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
+
+/// Defines the path for the logs
+/// OpenSearch grants the required access rights, see
+/// https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369
+/// The permissions "write" and "delete" are required for the log file rollover.
+/// Type: string
+pub const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";
 
 /// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
 /// Type: (comma-separated) list of strings
@@ -202,6 +210,13 @@ impl NodeConfig {
         config.insert(
             CONFIG_OPTION_NODE_ATTR_ROLE_GROUP.to_owned(),
             json!(self.role_group_name),
+        );
+        config.insert(
+            CONFIG_OPTION_PATH_LOGS.to_owned(),
+            json!(format!(
+                "{STACKABLE_LOG_DIR}/{container}",
+                container = v1alpha1::Container::OpenSearch.to_container_name()
+            )),
         );
 
         config
