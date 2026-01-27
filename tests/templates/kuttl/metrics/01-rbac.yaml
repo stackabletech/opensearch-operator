@@ -7,11 +7,12 @@ commands:
       PROMETHEUS_HELM_CHART_NAME=kube-prometheus-stack
 
       # `kube-prometheus-stack.fullname` in the Prometheus Helm Chart is used to create the
-      # ServiceAccount names. It is set to `<.Release.Name>-<.Chart.Name>` and  truncated to
-      # 26 characters, see
+      # ServiceAccount names. It is set to `<.Release.Name>-<.Chart.Name>` and truncated to
+      # 26 characters without dashes at the end, see
       # https://github.com/prometheus-community/helm-charts/blob/kube-prometheus-stack-81.2.2/charts/kube-prometheus-stack/templates/_helpers.tpl#L22
       KUBE_PROMETHEUS_STACK_FULLNAME=$PROMETHEUS_HELM_RELEASE_NAME-$PROMETHEUS_HELM_CHART_NAME
-      export KUBE_PROMETHEUS_STACK_FULLNAME=${KUBE_PROMETHEUS_STACK_FULLNAME:0:26}
+      KUBE_PROMETHEUS_STACK_FULLNAME=$(echo -n $KUBE_PROMETHEUS_STACK_FULLNAME | head --bytes=26)
+      export KUBE_PROMETHEUS_STACK_FULLNAME=$(echo -n $KUBE_PROMETHEUS_STACK_FULLNAME | sed 's/-*$//')
 
       envsubst '$KUBE_PROMETHEUS_STACK_FULLNAME' < 01_rbac.yaml | \
         kubectl apply --namespace=$NAMESPACE --filename=-
