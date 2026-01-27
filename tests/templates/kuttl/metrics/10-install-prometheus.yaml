@@ -2,13 +2,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  # Append the namespace to the Helm release name so that cluster-wide
-  # resources get unique names.
-  - script: >
-      helm install prometheus-$NAMESPACE
-      --namespace $NAMESPACE
-      --version 80.14.2
-      --values 10_kube-prometheus-stack-values.yaml
-      --wait
-      oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
+  # Append the namespace to the Helm release name so that cluster-wide resources get unique names.
+  - script: |
+      PROMETHEUS_HELM_RELEASE_NAME=prometheus-$NAMESPACE
+
+      helm install $PROMETHEUS_HELM_RELEASE_NAME \
+        --namespace $NAMESPACE \
+        --version 81.2.2 \
+        --values 10_kube-prometheus-stack-values.yaml \
+        --wait \
+        oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
     timeout: 600

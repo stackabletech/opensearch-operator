@@ -13,6 +13,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
     },
@@ -23,96 +24,101 @@ pub const CONFIGURATION_FILE_OPENSEARCH_YML: &str = "opensearch.yml";
 
 /// The cluster name.
 /// Type: string
-pub const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
+const CONFIG_OPTION_CLUSTER_NAME: &str = "cluster.name";
 
 /// The list of hosts that perform discovery when a node is started.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
+const CONFIG_OPTION_DISCOVERY_SEED_HOSTS: &str = "discovery.seed_hosts";
 
 /// By default, OpenSearch forms a multi-node cluster. Set `discovery.type` to `single-node` to
 /// form a single-node cluster.
 /// Type: string
-pub const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
+const CONFIG_OPTION_DISCOVERY_TYPE: &str = "discovery.type";
 
 /// Specifies an address or addresses that an OpenSearch node publishes to other nodes for HTTP
 /// communication.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_HTTP_PUBLISH_HOST: &str = "http.publish_host";
+const CONFIG_OPTION_HTTP_PUBLISH_HOST: &str = "http.publish_host";
 
 /// A list of cluster-manager-eligible nodes used to bootstrap the cluster.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str =
-    "cluster.initial_cluster_manager_nodes";
+const CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES: &str = "cluster.initial_cluster_manager_nodes";
 
 /// Binds an OpenSearch node to an address.
 /// Type: string
-pub const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
+const CONFIG_OPTION_NETWORK_HOST: &str = "network.host";
 
 /// Specifies an address or addresses that an OpenSearch node publishes to other nodes in the
 /// cluster so that they can connect to it.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_NETWORK_PUBLISH_HOST: &str = "network.publish_host";
+const CONFIG_OPTION_NETWORK_PUBLISH_HOST: &str = "network.publish_host";
 
 /// The custom node attribute "role-group"
 /// Type: string
-pub const CONFIG_OPTION_NODE_ATTR_ROLE_GROUP: &str = "node.attr.role-group";
+const CONFIG_OPTION_NODE_ATTR_ROLE_GROUP: &str = "node.attr.role-group";
 
 /// A descriptive name for the node.
 /// Type: string
-pub const CONFIG_OPTION_NODE_NAME: &str = "node.name";
+const CONFIG_OPTION_NODE_NAME: &str = "node.name";
 
 /// Defines one or more roles for an OpenSearch node.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
+const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
+
+/// Defines the path for the logs
+/// OpenSearch grants the required access rights, see
+/// https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369
+/// The permissions "write" and "delete" are required for the log file rollover.
+/// Type: string
+const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";
 
 /// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
+const CONFIG_OPTION_PLUGINS_SECURITY_NODES_DN: &str = "plugins.security.nodes_dn";
 
 /// Whether to enable TLS on the REST layer. If enabled, only HTTPS is allowed.
 /// Type: boolean
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str =
-    "plugins.security.ssl.http.enabled";
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED: &str = "plugins.security.ssl.http.enabled";
 
 /// Path to the cert PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMCERT_FILEPATH: &str =
     "plugins.security.ssl.http.pemcert_filepath";
 
 /// Path to the key PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMKEY_FILEPATH: &str =
     "plugins.security.ssl.http.pemkey_filepath";
 
 /// Path to the trusted CAs PEM file used for TLS on the HTTP PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_PEMTRUSTEDCAS_FILEPATH: &str =
     "plugins.security.ssl.http.pemtrustedcas_filepath";
 
 /// Whether to enable TLS on internal node-to-node communication using the transport port.
 /// type: boolean
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED: &str =
     "plugins.security.ssl.transport.enabled";
 
 /// Path to the cert PEM file used for TLS on the transport PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH: &str =
     "plugins.security.ssl.transport.pemcert_filepath";
 
 /// Path to the key PEM file used for TLS on the transport PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH: &str =
     "plugins.security.ssl.transport.pemkey_filepath";
 
 /// Path to the trusted CAs PEM file used for TLS on the transport PORT.
 /// type: string
-pub const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
+const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str =
     "plugins.security.ssl.transport.pemtrustedcas_filepath";
 
 /// Specifies an address or addresses that an OpenSearch node publishes to other nodes for
 /// transport communication.
 /// Type: (comma-separated) list of strings
-pub const CONFIG_OPTION_TRANSPORT_PUBLISH_HOST: &str = "transport.publish_host";
+const CONFIG_OPTION_TRANSPORT_PUBLISH_HOST: &str = "transport.publish_host";
 
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
@@ -202,6 +208,13 @@ impl NodeConfig {
         config.insert(
             CONFIG_OPTION_NODE_ATTR_ROLE_GROUP.to_owned(),
             json!(self.role_group_name),
+        );
+        config.insert(
+            CONFIG_OPTION_PATH_LOGS.to_owned(),
+            json!(format!(
+                "{STACKABLE_LOG_DIR}/{container}",
+                container = v1alpha1::Container::OpenSearch.to_container_name()
+            )),
         );
 
         config
@@ -616,6 +629,7 @@ mod tests {
                 "discovery.type: \"zen\"\n",
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
+                "path.logs: \"/stackable/log/opensearch\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: true\n",
                 "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
