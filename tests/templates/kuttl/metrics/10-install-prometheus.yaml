@@ -2,13 +2,15 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
-  # Append the namespace to the Helm release name so that cluster-wide
-  # resources get unique names.
+  # Append the namespace to the Helm release name so that cluster-wide resources get unique names.
+  # `fullnameOverride` is set to `prometheus-$NAMESPACE`, so that the ServiceAccounts are created
+  # with the names that are defined in `test-role-binding`.
   - script: >
       helm install prometheus-$NAMESPACE
       --namespace $NAMESPACE
       --version 80.14.2
       --values 10_kube-prometheus-stack-values.yaml
+      --set fullnameOverride=prometheus-$NAMESPACE
       --wait
       oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
     timeout: 600
