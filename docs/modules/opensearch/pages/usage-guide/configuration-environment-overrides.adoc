@@ -91,7 +91,7 @@ plugins:
 <1> Commas in list entries cannot be escaped.
 <2> The brackets must be escaped in `configOverrides` as follows: `"[\"role1\", \"role2\", \"role3\"]"`
 <3> Indexed flat lists are considered "legacy" in the OpenSearch code.
-// see https://github.com/opensearch-project/OpenSearch/blob/3.1.0/server/src/main/java/org/opensearch/common/settings/Settings.java#L1049
+// see https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/common/settings/Settings.java#L1049
 
 Other types can be set as strings in `configOverrides` because OpenSearch parses them:
 

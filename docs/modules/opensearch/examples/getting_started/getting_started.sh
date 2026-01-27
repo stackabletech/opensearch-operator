@@ -112,7 +112,7 @@ kubectl create secret generic opensearch-credentials \
 
 helm install opensearch-dashboards opensearch-dashboards \
     --repo https://opensearch-project.github.io/helm-charts \
-    --version 3.1.0 \
+    --version 3.4.0 \
     --values opensearch-dashboards-values.yaml \
     --wait
 # end::opensearch-dashboards[]

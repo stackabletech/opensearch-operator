@@ -396,20 +396,20 @@ mod tests {
         assert_eq!(
             Some(ValidatedCluster::new(
                 ResolvedProductImage {
-                    product_version: "3.1.0".to_owned(),
+                    product_version: "3.4.0".to_owned(),
                     app_version_label_value: LabelValue::from_str(&format!(
-                        "3.1.0-stackable{pkg_version}",
+                        "3.4.0-stackable{pkg_version}",
                         pkg_version = built_info::PKG_VERSION
                     ))
                     .expect("should be a valid label value"),
                     image: format!(
-                        "oci.stackable.tech/sdp/opensearch:3.1.0-stackable{pkg_version}",
+                        "oci.stackable.tech/sdp/opensearch:3.4.0-stackable{pkg_version}",
                         pkg_version = built_info::PKG_VERSION
                     ),
                     image_pull_policy: "Always".to_owned(),
                     pull_secrets: None,
                 },
-                ProductVersion::from_str_unsafe("3.1.0"),
+                ProductVersion::from_str_unsafe("3.4.0"),
                 ClusterName::from_str_unsafe("my-opensearch"),
                 NamespaceName::from_str_unsafe("default"),
                 uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),
@@ -832,7 +832,7 @@ mod tests {
                 ..ObjectMeta::default()
             },
             spec: v1alpha1::OpenSearchClusterSpec {
-                image: serde_json::from_str(r#"{"productVersion": "3.1.0"}"#)
+                image: serde_json::from_str(r#"{"productVersion": "3.4.0"}"#)
                     .expect("should be a valid ProductImage structure"),
                 cluster_config: v1alpha1::OpenSearchClusterConfig {
                     tls: v1alpha1::OpenSearchTls::default(),

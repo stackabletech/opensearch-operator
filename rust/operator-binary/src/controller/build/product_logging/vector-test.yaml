@@ -45,14 +45,14 @@ tests:
             {"type": "server", "timestamp": "2025-10-01T12:47:28,363Z", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}",
             "stacktrace": ["org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]",
             "Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower",
-            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]",
             "at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]",
-            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]",
-            "at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.1.0.jar:3.1.0]",
-            "at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.1.0.jar:3.1.0]",
-            "at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.1.0.jar:3.1.0]",
-            "at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.1.0.jar:3.1.0]",
-            "at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.1.0.jar:3.1.0]",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.4.0.jar:3.4.0]",
             "at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]",
             "at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]",
             "at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]"] }
@@ -75,14 +75,14 @@ tests:
                   \n\
                   org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]\n\
                   Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower\n\
-                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]\n\
                   at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]\n\
-                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.1.0.jar:3.1.0]\n\
-                  at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.1.0.jar:3.1.0]\n\
-                  at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.1.0.jar:3.1.0]\n\
-                  at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.1.0.jar:3.1.0]\n\
-                  at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.1.0.jar:3.1.0]\n\
-                  at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.1.0.jar:3.1.0]\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.4.0.jar:3.4.0]\n\
                   at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]\n\
                   at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]\n\
                   at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]",

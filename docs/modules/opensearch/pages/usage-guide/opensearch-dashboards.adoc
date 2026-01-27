@@ -13,7 +13,7 @@ A basic `values.yaml` file to deploy OpenSearch Dashboards with this chart might
 opensearchHosts: null # <1>
 image: # <2>
   repository: oci.stackable.tech/sdp/opensearch-dashboards
-  tag: 3.1.0-stackable0.0.0-dev
+  tag: 3.4.0-stackable0.0.0-dev
 serviceAccount:
   create: false
   name: opensearch-serviceaccount # <3>
@@ -92,7 +92,7 @@ After the values are adjusted according to your deployment, especially `opensear
 ----
 helm install opensearch-dashboards opensearch-dashboards \
     --repo https://opensearch-project.github.io/helm-charts \
-    --version 3.1.0 \
+    --version 3.4.0 \
     --values opensearch-dashboards-values.yaml \
     --wait
 ----
