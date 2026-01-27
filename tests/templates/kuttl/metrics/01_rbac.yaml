@@ -18,8 +18,6 @@ rules:
     verbs:
       - use
 ---
-# `fullnameOverride` in the Prometheus Helm values must be set to `prometheus-$NAMESPACE`, so that
-# the ServiceAccounts are created with the names listed in this RoleBinding.
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -28,11 +26,11 @@ subjects:
   - kind: ServiceAccount
     name: test-service-account
   - kind: ServiceAccount
-    name: prometheus-$NAMESPACE-admission
+    name: $KUBE_PROMETHEUS_STACK_FULLNAME-admission
   - kind: ServiceAccount
-    name: prometheus-$NAMESPACE-operator
+    name: $KUBE_PROMETHEUS_STACK_FULLNAME-operator
   - kind: ServiceAccount
-    name: prometheus-$NAMESPACE-prometheus
+    name: $KUBE_PROMETHEUS_STACK_FULLNAME-prometheus
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
