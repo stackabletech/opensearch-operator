@@ -91,7 +91,7 @@ fn log4j2_console_appender_config(
             "PatternLayout".to_owned(),
         ),
         // Same as the default layout pattern of the console appender
-        // see https://github.com/opensearch-project/OpenSearch/blob/3.1.0/distribution/src/config/log4j2.properties#L17
+        // see https://github.com/opensearch-project/OpenSearch/blob/3.4.0/distribution/src/config/log4j2.properties#L17
         (
             "appender.CONSOLE.layout.pattern".to_owned(),
             "[%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n".to_owned(),

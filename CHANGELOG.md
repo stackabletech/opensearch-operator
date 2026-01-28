@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
     ListenerClass for the discovery service.
   - Configuration parameter `spec.nodes.roleGroups.<role-group-name>.config.discoveryServiceExposed`
     added to expose a role-group via the discovery service.
+- Add support for OpenSearch 3.4.0 ([#108]).
 
 ### Changed
 
@@ -43,6 +44,7 @@ All notable changes to this project will be documented in this file.
 [#97]: https://github.com/stackabletech/opensearch-operator/pull/97
 [#100]: https://github.com/stackabletech/opensearch-operator/pull/100
 [#107]: https://github.com/stackabletech/opensearch-operator/pull/107
+[#108]: https://github.com/stackabletech/opensearch-operator/pull/108
 
 ## [25.11.0] - 2025-11-07
 

@@ -175,14 +175,14 @@ mod tests {
     fn validated_cluster() -> ValidatedCluster {
         ValidatedCluster::new(
             ResolvedProductImage {
-                product_version: "3.1.0".to_owned(),
-                app_version_label_value: LabelValue::from_str("3.1.0-stackable0.0.0-dev")
+                product_version: "3.4.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.4.0-stackable0.0.0-dev")
                     .expect("should be a valid label value"),
-                image: "oci.stackable.tech/sdp/opensearch:3.1.0-stackable0.0.0-dev".to_string(),
+                image: "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev".to_string(),
                 image_pull_policy: "Always".to_owned(),
                 pull_secrets: None,
             },
-            ProductVersion::from_str_unsafe("3.1.0"),
+            ProductVersion::from_str_unsafe("3.4.0"),
             ClusterName::from_str_unsafe("my-opensearch"),
             NamespaceName::from_str_unsafe("default"),
             uuid!("e6ac237d-a6d4-43a1-8135-f36506110912"),

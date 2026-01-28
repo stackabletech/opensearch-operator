@@ -1,7 +1,7 @@
 ---
 image:
   repository: oci.stackable.tech/sdp/opensearch-dashboards
-  tag: 3.1.0-stackable0.0.0-dev
+  tag: 3.4.0-stackable0.0.0-dev
 serviceAccount:
   create: false
   name: simple-opensearch-serviceaccount
