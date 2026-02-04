@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#110]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#91]).
 
 ### Fixed
@@ -45,6 +46,7 @@ All notable changes to this project will be documented in this file.
 [#100]: https://github.com/stackabletech/opensearch-operator/pull/100
 [#107]: https://github.com/stackabletech/opensearch-operator/pull/107
 [#108]: https://github.com/stackabletech/opensearch-operator/pull/108
+[#110]: https://github.com/stackabletech/opensearch-operator/pull/110
 
 ## [25.11.0] - 2025-11-07
 
