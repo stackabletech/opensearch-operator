@@ -27,6 +27,7 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
+    utils::signal::SignalWatcher,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -67,6 +68,11 @@ pub enum Error {
     #[snafu(display("failed to create Kubernetes client"))]
     CreateClient {
         source: stackable_operator::client::Error,
+    },
+
+    #[snafu(display("failed to create SIGTERM signal watcher"))]
+    CreateSignalWatcher {
+        source: stackable_operator::utils::signal::SignalError,
     },
 }
 
@@ -109,10 +115,14 @@ async fn main() -> Result<()> {
                 description = built_info::PKG_DESCRIPTION
             );
 
+            // Watches for the SIGTERM signal and sends a signal to all receivers, which gracefully
+            // shuts down all concurrent tasks below (EoS checker, controller).
+            let sigterm_watcher = SignalWatcher::sigterm().context(CreateSignalWatcherSnafu)?;
+
             let eos_checker =
                 EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)
                     .context(InitEndOfSupportCheckerSnafu)?
-                    .run()
+                    .run(sigterm_watcher.handle())
                     .map(Ok);
 
             let operator_name = OperatorName::from_str("opensearch.stackable.tech")
@@ -168,7 +178,7 @@ async fn main() -> Result<()> {
                 watch_namespace.get_api::<DeserializeGuard<StatefulSet>>(&client),
                 watcher::Config::default(),
             )
-            .shutdown_on_signal()
+            .graceful_shutdown_on(sigterm_watcher.handle())
             .run(
                 controller::reconcile,
                 controller::error_policy,
