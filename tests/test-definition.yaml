@@ -55,6 +55,11 @@ tests:
       - opensearch
       - release
       - s3-use-tls
+  - name: security-config
+    dimensions:
+      - opensearch
+      - opensearch_home
+      - release
 suites:
   - name: nightly
     patch:
@@ -81,6 +86,7 @@ suites:
       - external-access
       - ldap
       - opensearch-dashboards
+      - security-config
     patch:
       - dimensions:
           - name: opensearch

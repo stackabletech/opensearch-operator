@@ -1,0 +1,245 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  image:
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% endif %}
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleConfig:
+      discoveryServiceListenerClass: external-unstable
+    roleGroups:
+      cluster-manager:
+        config:
+          discoveryServiceExposed: true
+          nodeRoles:
+            - cluster_manager
+          resources:
+            storage:
+              data:
+                capacity: 100Mi
+        replicas: 3
+      data:
+        config:
+          discoveryServiceExposed: false
+          nodeRoles:
+            - ingest
+            - data
+            - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 2Gi
+        replicas: 2
+      security-config:
+        config:
+          discoveryServiceExposed: false
+          nodeRoles: []
+          resources:
+            storage:
+              data:
+                capacity: 100Mi
+        replicas: 1
+        configOverrides:
+          opensearch.yml:
+            plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt
+        podOverrides:
+          spec:
+            initContainers:
+              - name: create-admin-certificate
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+                image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+                image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+                command:
+                  - /bin/bash
+                  - -euxo
+                  - pipefail
+                  - -c
+                args:
+                  - |
+                    openssl req \
+                        -x509 \
+                        -nodes \
+                        -subj=/CN=update-security-config.localhost \
+                        -out=/stackable/tls-admin/tls.crt \
+                        -keyout=/stackable/tls-admin/tls.key
+
+                    cat \
+                        /stackable/tls-server/ca.crt \
+                        /stackable/tls-admin/tls.crt > \
+                        /stackable/pemtrustedcas/ca.crt
+                volumeMounts:
+                  - mountPath: /stackable/tls-server
+                    name: tls-server
+                    readOnly: true
+                  - mountPath: /stackable/tls-admin
+                    name: admin-certificate
+                    readOnly: false
+                  - mountPath: /stackable/pemtrustedcas
+                    name: pemtrustedcas
+                    readOnly: false
+            containers:
+              - name: opensearch
+                volumeMounts:
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
+                    name: pemtrustedcas
+                    readOnly: true
+              - name: update-security-config
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+                image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+                image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
+                command:
+                  - /bin/bash
+                  - -uo
+                  - pipefail
+                  - -c
+                args:
+                  - |
+                    function wait_seconds () {
+                        seconds="$1"
+
+                        if test "$seconds" = 0
+                        then
+                            echo "Wait until pod is restarted..."
+                        else
+                            echo "Wait for $seconds seconds..."
+                        fi
+
+                        if test ! -e /stackable/log/_vector/shutdown
+                        then
+                            mkdir --parents /stackable/log/_vector
+                            inotifywait \
+                                --quiet --quiet \
+                                --timeout $seconds \
+                                --event create \
+                                /stackable/log/_vector
+                        fi
+
+                        if test -e /stackable/log/_vector/shutdown
+                        then
+                            echo "Shut down"
+                            exit 0
+                        fi
+                    }
+
+                    function update_config () {
+                        filetype="$1"
+                        filename="$2"
+
+                        file="{{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security/$filename"
+
+                        if test -e "$file"
+                        then
+                            echo "Update managed configuration type \"$filetype\"."
+
+                            until plugins/opensearch-security/tools/securityadmin.sh \
+                                --type "$filetype" \
+                                --file "$file" \
+                                --disable-host-name-verification \
+                                -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt \
+                                -cert /stackable/tls-admin/tls.crt \
+                                -key /stackable/tls-admin/tls.key
+                            do
+                                echo "Updating \"$filetype\" in the security index failed."
+                                wait_seconds 10
+                            done
+                        else
+                            echo "Skip unmanaged configuration type \"$filetype\"."
+                        fi
+                    }
+
+                    update_config actiongroups action_groups.yml
+                    update_config allowlist allowlist.yml
+                    update_config audit audit.yml
+                    update_config config config.yml
+                    update_config internalusers internal_users.yml
+                    update_config nodesdn nodes_dn.yml
+                    update_config roles roles.yml
+                    update_config rolesmapping roles_mapping.yml
+                    update_config tenants tenants.yml
+
+                    echo "Wait for security configuration changes..."
+                    # Wait until the pod is restarted due to a change of the Secret.
+                    wait_seconds 0
+                volumeMounts:
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security
+                    name: managed-security-config
+                    readOnly: true
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
+                    name: pemtrustedcas
+                    readOnly: true
+                  - mountPath: /stackable/tls-admin
+                    name: admin-certificate
+                    readOnly: true
+                  - mountPath: /stackable/log
+                    name: log
+                    readOnly: false
+            volumes:
+              - name: admin-certificate
+                emptyDir:
+                  sizeLimit: 1Mi
+              - name: pemtrustedcas
+                emptyDir:
+                  sizeLimit: 1Mi
+    envOverrides:
+      # Only required for the official image
+      # The official image (built with https://github.com/opensearch-project/opensearch-build)
+      # installs a demo configuration if not disabled explicitly.
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
+    configOverrides:
+      opensearch.yml:
+        # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
+        # vm.max_map_count would have to be increased to 262144 on the node.
+        node.store.allow_mmap: "false"
+        # Disable the disk allocation decider in this test; Otherwise the test depends on the disk
+        # usage of the node and if the relative watermark set in
+        # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
+        # not be created even if enough disk space would be available.
+        cluster.routing.allocation.disk.threshold_enabled: "false"
+        plugins.security.allow_default_init_securityindex: "true"
+        plugins.security.authcz.admin_dn: CN=update-security-config.localhost
+        plugins.security.restapi.roles_enabled: all_access
+    podOverrides:
+      spec:
+        containers:
+          - name: opensearch
+            volumeMounts:
+              - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
+                name: initial-security-config
+                readOnly: true
+        volumes:
+          - name: initial-security-config
+            secret:
+              secretName: initial-security-config
+              defaultMode: 0o660
+  objectOverrides:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: opensearch-nodes-security-config
+        namespace: $NAMESPACE
+      spec:
+        template:
+          spec:
+            volumes:
+              - name: managed-security-config
+                secret:
+                  secretName: managed-security-config
+                  defaultMode: 0o660

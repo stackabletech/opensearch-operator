@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+timeout: 600
+commands:
+  - script: >
+      envsubst '$NAMESPACE' < 11_install-opensearch.yaml |
+      kubectl apply --namespace=$NAMESPACE --filename=-
