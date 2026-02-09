@@ -161,6 +161,7 @@ pub fn validate(
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
         cluster.spec.cluster_config.tls.clone(),
+        cluster.spec.cluster_config.security_config.clone(),
         cluster.spec.cluster_config.keystore.clone(),
         validated_discovery_endpoint,
     ))
@@ -601,6 +602,7 @@ mod tests {
                     server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                     internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
+                v1alpha1::SecurityConfig::default(),
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                     secret_key_ref: v1alpha1::SecretKeyRef {
@@ -843,6 +845,7 @@ mod tests {
                             key: SecretKey::from_str_unsafe("my-keystore-file"),
                         },
                     }],
+                    security_config: v1alpha1::SecurityConfig::default(),
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

@@ -602,6 +602,7 @@ mod tests {
             )]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            v1alpha1::SecurityConfig::default(),
             vec![],
             None,
         );

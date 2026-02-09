@@ -200,6 +200,7 @@ pub struct ValidatedCluster {
     pub role_config: v1alpha1::OpenSearchRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
     pub tls_config: v1alpha1::OpenSearchTls,
+    pub security_config: v1alpha1::SecurityConfig,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
     pub discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
 }
@@ -215,6 +216,7 @@ impl ValidatedCluster {
         role_config: v1alpha1::OpenSearchRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
         tls_config: v1alpha1::OpenSearchTls,
+        security_config: v1alpha1::SecurityConfig,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
         discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
     ) -> Self {
@@ -234,6 +236,7 @@ impl ValidatedCluster {
             role_config,
             role_group_configs,
             tls_config,
+            security_config,
             keystores,
             discovery_endpoint,
         }
@@ -552,6 +555,7 @@ mod tests {
             ]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            v1alpha1::SecurityConfig::default(),
             vec![],
             None,
         )

@@ -11,6 +11,51 @@ spec:
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
+    securityConfig:
+      config:
+        managedBy: operator
+        content:
+          value:
+            _meta:
+              type: config
+              config_version: 2
+            config:
+              dynamic:
+                authc:
+                  basic_internal_auth_domain:
+                    description: Authenticate via HTTP Basic against internal users database
+                    http_enabled: true
+                    transport_enabled: true
+                    order: 1
+                    http_authenticator:
+                      type: basic
+                      challenge: true
+                    authentication_backend:
+                      type: intern
+                authz: {}
+                http:
+                  anonymous_auth_enabled: true
+      internalUsers:
+        managedBy: API
+        content:
+          valueFrom:
+            secretKeyRef:
+              name: security-config-internal-users
+              key: internal_users.yml
+      roles:
+        managedBy: API
+        content:
+          valueFrom:
+            configMapKeyRef:
+              name: security-config
+              key: roles.yml
+      rolesMapping:
+        managedBy: API
+        content:
+          valueFrom:
+            configMapKeyRef:
+              name: security-config
+              key: roles_mapping.yml
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -178,9 +223,10 @@ spec:
                     # Wait until the pod is restarted due to a change of the Secret.
                     wait_seconds 0
                 volumeMounts:
-                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security
-                    name: managed-security-config
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security/config.yml
+                    name: initial-security-config-config
                     readOnly: true
+                    subPath: config.yml
                   - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
                     name: pemtrustedcas
                     readOnly: true
@@ -216,19 +262,6 @@ spec:
         plugins.security.allow_default_init_securityindex: "true"
         plugins.security.authcz.admin_dn: CN=update-security-config.localhost
         plugins.security.restapi.roles_enabled: all_access
-    podOverrides:
-      spec:
-        containers:
-          - name: opensearch
-            volumeMounts:
-              - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-                name: initial-security-config
-                readOnly: true
-        volumes:
-          - name: initial-security-config
-            secret:
-              secretName: initial-security-config
-              defaultMode: 0o660
   objectOverrides:
     - apiVersion: apps/v1
       kind: StatefulSet

@@ -428,6 +428,7 @@ mod tests {
             )]
             .into(),
             v1alpha1::OpenSearchTls::default(),
+            v1alpha1::SecurityConfig::default(),
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),

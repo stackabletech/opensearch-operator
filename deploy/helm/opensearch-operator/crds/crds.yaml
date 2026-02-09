@@ -31,6 +31,80 @@ spec:
                 clusterConfig:
                   default:
                     keystore: []
+                    securityConfig:
+                      actionGroups:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: actiongroups
+                        managedBy: API
+                      allowList:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: allowlist
+                            config:
+                              enabled: false
+                        managedBy: API
+                      audit:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: audit
+                            config:
+                              enabled: false
+                        managedBy: API
+                      config:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: config
+                            config:
+                              dynamic:
+                                authc: {}
+                                authz: {}
+                                http: {}
+                        managedBy: API
+                      enabled: true
+                      internalUsers:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: internalusers
+                        managedBy: API
+                      nodesDn:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: nodesdn
+                        managedBy: API
+                      roles:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: roles
+                        managedBy: API
+                      rolesMapping:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: rolesmapping
+                        managedBy: API
+                      tenants:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: tenants
+                        managedBy: API
                     tls:
                       internalSecretClass: tls
                       serverSecretClass: tls
@@ -70,6 +144,762 @@ spec:
                           - secretKeyRef
                         type: object
                       type: array
+                    securityConfig:
+                      default:
+                        actionGroups:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: actiongroups
+                          managedBy: API
+                        allowList:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: allowlist
+                              config:
+                                enabled: false
+                          managedBy: API
+                        audit:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: audit
+                              config:
+                                enabled: false
+                          managedBy: API
+                        config:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: config
+                              config:
+                                dynamic:
+                                  authc: {}
+                                  authz: {}
+                                  http: {}
+                          managedBy: API
+                        enabled: true
+                        internalUsers:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: internalusers
+                          managedBy: API
+                        nodesDn:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: nodesdn
+                          managedBy: API
+                        roles:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: roles
+                          managedBy: API
+                        rolesMapping:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: rolesmapping
+                          managedBy: API
+                        tenants:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: tenants
+                          managedBy: API
+                      description: TODO Add description
+                      properties:
+                        actionGroups:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: actiongroups
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        allowList:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: allowlist
+                                config:
+                                  enabled: false
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        audit:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: audit
+                                config:
+                                  enabled: false
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        config:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: config
+                                config:
+                                  dynamic:
+                                    authc: {}
+                                    authz: {}
+                                    http: {}
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        enabled:
+                          default: true
+                          type: boolean
+                        internalUsers:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: internalusers
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        nodesDn:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: nodesdn
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        roles:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: roles
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        rolesMapping:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: rolesmapping
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                        tenants:
+                          default:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: tenants
+                            managedBy: API
+                          properties:
+                            content:
+                              oneOf:
+                                - required:
+                                    - value
+                                - required:
+                                    - valueFrom
+                              properties:
+                                value:
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                valueFrom:
+                                  oneOf:
+                                    - required:
+                                        - configMapKeyRef
+                                    - required:
+                                        - secretKeyRef
+                                  properties:
+                                    configMapKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the ConfigMap that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the ConfigMap
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                    secretKeyRef:
+                                      properties:
+                                        key:
+                                          description: Key in the Secret that contains the value
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[-._a-zA-Z0-9]+$
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          maxLength: 253
+                                          minLength: 1
+                                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                          type: string
+                                      required:
+                                        - key
+                                        - name
+                                      type: object
+                                  type: object
+                              type: object
+                            managedBy:
+                              description: No default, so that the user is aware!
+                              enum:
+                                - API
+                                - operator
+                              type: string
+                          required:
+                            - content
+                            - managedBy
+                          type: object
+                      type: object
                     tls:
                       default:
                         internalSecretClass: tls
