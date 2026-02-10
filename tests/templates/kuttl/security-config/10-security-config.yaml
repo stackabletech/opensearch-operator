@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: security-config-internal-users
+  name: security-config-file-internal-users
 stringData:
   internal_users.yml: |
     ---

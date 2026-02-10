@@ -176,6 +176,7 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
+        // TODO Deploy only for the security-config role group
         for file_type in SecurityConfigFileType::iter() {
             if let Some(value) = self.cluster.security_config.value(file_type) {
                 data.insert(file_type.filename(), value.to_string());
@@ -378,57 +379,8 @@ impl<'a> RoleGroupBuilder<'a> {
             ))
         };
 
-        for file_type in SecurityConfigFileType::iter() {
-            if self.cluster.security_config.value(file_type).is_some() {
-                let volume = Volume {
-                    name: format!("initial-security-config-{}", file_type.volume_name()),
-                    config_map: Some(ConfigMapVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: file_type.filename(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        name: self.resource_names.role_group_config_map().to_string(),
-                        ..Default::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
-                self.cluster.security_config.config_map_key_ref(file_type)
-            {
-                let volume = Volume {
-                    name: format!("initial-security-config-{}", file_type.volume_name()),
-                    config_map: Some(ConfigMapVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: key.to_string(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        name: name.to_string(),
-                        ..ConfigMapVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
-                self.cluster.security_config.secret_key_ref(file_type)
-            {
-                let volume = Volume {
-                    name: format!("initial-security-config-{}", file_type.volume_name()),
-                    secret: Some(SecretVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: key.to_string(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        secret_name: Some(name.to_string()),
-                        ..SecretVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            }
+        if self.cluster.security_config.is_only_managed_by_api() {
+            volumes.extend(self.security_config_volumes());
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -672,17 +624,8 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             });
         }
 
-        for file_type in SecurityConfigFileType::iter() {
-            volume_mounts.push(VolumeMount {
-                mount_path: format!(
-                    "{opensearch_path_conf}/opensearch-security/{filename}",
-                    filename = file_type.filename()
-                ),
-                name: format!("initial-security-config-{}", file_type.volume_name()),
-                read_only: Some(true),
-                sub_path: Some(file_type.filename()),
-                ..VolumeMount::default()
-            });
+        if self.cluster.security_config.is_only_managed_by_api() {
+            volume_mounts.extend(self.security_config_volume_mounts());
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -912,6 +855,88 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                     .expect("volume should be built without parse errors"),
             )
             .build()
+    }
+
+    fn security_config_volumes(&self) -> Vec<Volume> {
+        let mut volumes = vec![];
+
+        for file_type in SecurityConfigFileType::iter() {
+            let volume_name = format!("security-config-file-{}", file_type.volume_name());
+            if self.cluster.security_config.value(file_type).is_some() {
+                let volume = Volume {
+                    name: volume_name,
+                    config_map: Some(ConfigMapVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: file_type.filename(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        name: self.resource_names.role_group_config_map().to_string(),
+                        ..Default::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
+                self.cluster.security_config.config_map_key_ref(file_type)
+            {
+                let volume = Volume {
+                    name: volume_name,
+                    config_map: Some(ConfigMapVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: key.to_string(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        name: name.to_string(),
+                        ..ConfigMapVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
+                self.cluster.security_config.secret_key_ref(file_type)
+            {
+                let volume = Volume {
+                    name: volume_name,
+                    secret: Some(SecretVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: key.to_string(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        secret_name: Some(name.to_string()),
+                        ..SecretVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            }
+        }
+
+        volumes
+    }
+
+    fn security_config_volume_mounts(&self) -> Vec<VolumeMount> {
+        let mut volume_mounts = vec![];
+
+        let opensearch_path_conf = self.node_config.opensearch_path_conf();
+
+        for file_type in SecurityConfigFileType::iter() {
+            let volume_name = format!("security-config-file-{}", file_type.volume_name());
+            volume_mounts.push(VolumeMount {
+                mount_path: format!(
+                    "{opensearch_path_conf}/opensearch-security/{filename}",
+                    filename = file_type.filename()
+                ),
+                name: volume_name,
+                read_only: Some(true),
+                sub_path: Some(file_type.filename()),
+                ..VolumeMount::default()
+            });
+        }
+
+        volume_mounts
     }
 }
 

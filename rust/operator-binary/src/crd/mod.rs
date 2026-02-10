@@ -27,7 +27,7 @@ use stackable_operator::{
     utils::crds::raw_object_schema,
     versioned::versioned,
 };
-use strum::{Display, EnumIter};
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{
     attributed_string_type, constant,
@@ -638,6 +638,12 @@ impl v1alpha1::SecurityConfig {
             SecurityConfigFileType::RolesMapping => &self.roles_mapping,
             SecurityConfigFileType::Tenants => &self.tenants,
         }
+    }
+
+    pub fn is_only_managed_by_api(&self) -> bool {
+        SecurityConfigFileType::iter()
+            .map(|file_type| self.security_config(file_type))
+            .all(|config| config.managed_by == v1alpha1::SecurityConfigFileTypeManagedBy::Api)
     }
 
     pub fn value(&self, file_type: SecurityConfigFileType) -> Option<String> {

@@ -183,11 +183,50 @@ spec:
                         fi
                     }
 
+                    function initialize_security_index() {
+                        echo "Initialize the security index."
+
+                        until plugins/opensearch-security/tools/securityadmin.sh \
+                            --configdir {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security \
+                            --disable-host-name-verification \
+                            -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt \
+                            -cert /stackable/tls-admin/tls.crt \
+                            -key /stackable/tls-admin/tls.key
+                        do
+                            echo "Initializing the security index failed."
+                            wait_seconds 10
+                        done
+                    }
+
+                    function check_security_index() {
+                        echo "Check the status of the security index."
+
+                        STATUS_CODE=$(curl \
+                            --insecure \
+                            --cert /stackable/tls-admin/tls.crt \
+                            --key /stackable/tls-admin/tls.key \
+                            --silent \
+                            --output /dev/null \
+                            --write-out "%{http_code}" \
+                            https://localhost:9200/.opendistro_security)
+                        if test "$STATUS_CODE" = "200"
+                        then
+                            echo "The security index is already initialized."
+                        elif test "$STATUS_CODE" = "404"
+                        then
+                            initialize_security_index
+                        else
+                            echo "Checking the security index failed."
+                            wait_seconds 10
+                            check_security_index
+                        fi
+                    }
+
                     function update_config () {
                         filetype="$1"
                         filename="$2"
 
-                        file="{{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security/$filename"
+                        file="{{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/$filename"
 
                         if test -e "$file"
                         then
@@ -209,6 +248,8 @@ spec:
                         fi
                     }
 
+                    check_security_index
+
                     update_config actiongroups action_groups.yml
                     update_config allowlist allowlist.yml
                     update_config audit audit.yml
@@ -223,10 +264,42 @@ spec:
                     # Wait until the pod is restarted due to a change of the Secret.
                     wait_seconds 0
                 volumeMounts:
-                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/new-opensearch-security/config.yml
-                    name: initial-security-config-config
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/action_groups.yml
+                    name: security-config-file-actiongroups
+                    readOnly: true
+                    subPath: action_groups.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allow_list.yml
+                    name: security-config-file-allowlist
+                    readOnly: true
+                    subPath: allow_list.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/audit.yml
+                    name: security-config-file-audit
+                    readOnly: true
+                    subPath: audit.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/config.yml
+                    name: security-config-file-config
                     readOnly: true
                     subPath: config.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/internal_users.yml
+                    name: security-config-file-internalusers
+                    readOnly: true
+                    subPath: internal_users.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/nodes_dn.yml
+                    name: security-config-file-nodesdn
+                    readOnly: true
+                    subPath: nodes_dn.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles.yml
+                    name: security-config-file-roles
+                    readOnly: true
+                    subPath: roles.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles_mapping.yml
+                    name: security-config-file-rolesmapping
+                    readOnly: true
+                    subPath: roles_mapping.yml
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/tenants.yml
+                    name: security-config-file-tenants
+                    readOnly: true
+                    subPath: tenants.yml
                   - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
                     name: pemtrustedcas
                     readOnly: true
@@ -259,7 +332,6 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.allow_default_init_securityindex: "true"
         plugins.security.authcz.admin_dn: CN=update-security-config.localhost
         plugins.security.restapi.roles_enabled: all_access
   objectOverrides:
@@ -272,7 +344,66 @@ spec:
         template:
           spec:
             volumes:
-              - name: managed-security-config
-                secret:
-                  secretName: managed-security-config
+              - name: security-config-file-actiongroups
+                configMap:
                   defaultMode: 0o660
+                  items:
+                  - key: action_groups.yml
+                    path: action_groups.yml
+                  name: opensearch-nodes-security-config
+              - name: security-config-file-allowlist
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: allow_list.yml
+                    path: allow_list.yml
+                  name: opensearch-nodes-security-config
+              - name: security-config-file-audit
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: audit.yml
+                    path: audit.yml
+                  name: opensearch-nodes-security-config
+              - name: security-config-file-config
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: config.yml
+                    path: config.yml
+                  name: opensearch-nodes-security-config
+              - name: security-config-file-internalusers
+                secret:
+                  defaultMode: 0o660
+                  items:
+                  - key: internal_users.yml
+                    path: internal_users.yml
+                  secretName: security-config-file-internal-users
+              - name: security-config-file-nodesdn
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: nodes_dn.yml
+                    path: nodes_dn.yml
+                  name: opensearch-nodes-security-config
+              - name: security-config-file-roles
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: roles.yml
+                    path: roles.yml
+                  name: security-config
+              - name: security-config-file-rolesmapping
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: roles_mapping.yml
+                    path: roles_mapping.yml
+                  name: security-config
+              - name: security-config-file-tenants
+                configMap:
+                  defaultMode: 0o660
+                  items:
+                  - key: tenants.yml
+                    path: tenants.yml
+                  name: opensearch-nodes-security-config
