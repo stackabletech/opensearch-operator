@@ -627,7 +627,7 @@ impl SecurityConfigFileType {
 }
 
 impl v1alpha1::SecurityConfig {
-    fn security_config(
+    pub fn security_config(
         &self,
         file_type: SecurityConfigFileType,
     ) -> &v1alpha1::SecurityConfigFileType {

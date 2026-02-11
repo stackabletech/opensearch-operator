@@ -54,7 +54,7 @@ use crate::{
         builder::{
             meta::ownerreference_from_resource,
             pod::{
-                container::new_container_builder,
+                container::{EnvVarName, EnvVarSet, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
         },
@@ -148,10 +148,9 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    fn needs_security_config(&self) -> bool {
+    fn initializes_security_config(&self) -> bool {
         self.cluster.security_config.enabled
-            && (self.cluster.security_config.is_only_managed_by_api()
-                || self.cluster.security_config.managing_role_group == self.role_group_name)
+            && self.cluster.security_config.is_only_managed_by_api()
     }
 
     fn manages_security_config(&self) -> bool {
@@ -200,7 +199,7 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if self.needs_security_config() {
+        if self.initializes_security_config() || self.manages_security_config() {
             for file_type in SecurityConfigFileType::iter() {
                 if let Some(value) = self.cluster.security_config.value(file_type) {
                     data.insert(file_type.filename(), value.to_string());
@@ -322,6 +321,7 @@ impl<'a> RoleGroupBuilder<'a> {
                     vector_config_file_extra_env_vars(),
                 )
             });
+        let security_config_container = self.build_maybe_security_config_container();
 
         let mut init_containers = vec![];
         if let Some(keystore_init_container) = self.build_maybe_keystore_init_container() {
@@ -421,7 +421,7 @@ impl<'a> RoleGroupBuilder<'a> {
             });
         }
 
-        if self.needs_security_config() {
+        if self.initializes_security_config() || self.manages_security_config() {
             volumes.extend(self.security_config_volumes());
         }
 
@@ -481,10 +481,14 @@ impl<'a> RoleGroupBuilder<'a> {
                         .pod_anti_affinity
                         .clone(),
                 }),
-                containers: [Some(opensearch_container), vector_container]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                containers: [
+                    Some(opensearch_container),
+                    vector_container,
+                    security_config_container,
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
                 init_containers: Some(init_containers),
                 node_selector: self
                     .role_group_config
@@ -655,6 +659,87 @@ cat \
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
+    fn build_maybe_security_config_container(&self) -> Option<Container> {
+        if !self.manages_security_config() {
+            return None;
+        }
+
+        let opensearch_path_conf = self.node_config.opensearch_path_conf();
+
+        let mut volume_mounts = vec![
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/tls.crt"),
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("tls.crt".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/tls.key"),
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("tls.key".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/ca.crt"),
+                name: TLS_SERVER_CA_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("ca.crt".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: LOG_VOLUME_DIR.to_owned(),
+                name: LOG_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            },
+        ];
+        volume_mounts.extend(self.security_config_volume_mounts());
+
+        let mut env_vars = EnvVarSet::new().with_value(
+            &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
+            opensearch_path_conf,
+        );
+
+        for file_type in SecurityConfigFileType::iter() {
+            let managed_by_operator = self
+                .cluster
+                .security_config
+                .security_config(file_type)
+                .managed_by
+                == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
+
+            env_vars = env_vars.with_value(
+                &EnvVarName::from_str_unsafe(&format!(
+                    "MANAGE_{}",
+                    file_type.volume_name().to_uppercase()
+                )),
+                managed_by_operator.to_string(),
+            );
+        }
+
+        let container = new_container_builder(
+            &ContainerName::from_str("update-security-config")
+                .expect("should be a valid container name"),
+        )
+        .image_from_product_image(&self.cluster.image)
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-uo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![include_str!("update-security-config.sh").to_owned()])
+        .add_env_vars(env_vars.into())
+        .add_volume_mounts(volume_mounts)
+        .expect("The mount paths are statically defined and there should be no duplicates.")
+        .resources(self.role_group_config.config.resources.clone().into())
+        .build();
+
+        Some(container)
+    }
+
+    /// Builds the container for the [`PodTemplateSpec`]
     fn build_opensearch_container(&self) -> Container {
         // Probe values taken from the official Helm chart
         let startup_probe = Probe {
@@ -750,7 +835,7 @@ cat \
             });
         }
 
-        if self.needs_security_config() {
+        if self.initializes_security_config() {
             volume_mounts.extend(self.security_config_volume_mounts());
         }
 
