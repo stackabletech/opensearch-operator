@@ -65,8 +65,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
-                ServiceName, VolumeName,
+                ContainerName, ListenerName, PersistentVolumeClaimName, SecretClassName,
+                ServiceAccountName, ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -87,7 +87,11 @@ constant!(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME: PersistentVolumeClaimName = "d
 const DISCOVERY_SERVICE_LISTENER_VOLUME_DIR: &str = "/stackable/listeners/discovery-service";
 
 constant!(TLS_SERVER_VOLUME_NAME: VolumeName = "tls-server");
+constant!(TLS_SERVER_CA_VOLUME_NAME: VolumeName = "tls-server-ca");
 constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
+const TLS_SERVER_CA_VOLUME_SIZE: &str = "1Mi";
+constant!(TLS_ADMIN_CERT_VOLUME_NAME: VolumeName = "tls-admin-cert");
+const TLS_ADMIN_CERT_VOLUME_SIZE: &str = "1Mi";
 
 constant!(LOG_VOLUME_NAME: VolumeName = "log");
 const LOG_VOLUME_DIR: &str = "/stackable/log";
@@ -144,10 +148,24 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    fn manages_security_config(&self) -> bool {
+    fn needs_security_config(&self) -> bool {
         self.cluster.security_config.enabled
             && (self.cluster.security_config.is_only_managed_by_api()
                 || self.cluster.security_config.managing_role_group == self.role_group_name)
+    }
+
+    fn manages_security_config(&self) -> bool {
+        self.cluster.security_config.enabled
+            && !self.cluster.security_config.is_only_managed_by_api()
+            && self.cluster.security_config.managing_role_group == self.role_group_name
+    }
+
+    fn server_ca_volume(&self) -> VolumeName {
+        if self.manages_security_config() {
+            TLS_SERVER_CA_VOLUME_NAME.to_owned()
+        } else {
+            TLS_SERVER_VOLUME_NAME.to_owned()
+        }
     }
 
     /// Builds the [`ConfigMap`] containing the configuration files of the role-group
@@ -182,7 +200,7 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if self.manages_security_config() {
+        if self.needs_security_config() {
             for file_type in SecurityConfigFileType::iter() {
                 if let Some(value) = self.cluster.security_config.value(file_type) {
                     data.insert(file_type.filename(), value.to_string());
@@ -309,6 +327,11 @@ impl<'a> RoleGroupBuilder<'a> {
         if let Some(keystore_init_container) = self.build_maybe_keystore_init_container() {
             init_containers.push(keystore_init_container);
         }
+        if let Some(admin_certificate_init_container) =
+            self.build_maybe_admin_certificate_init_container()
+        {
+            init_containers.push(admin_certificate_init_container);
+        }
 
         let log_config_volume_config_map =
             if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
@@ -386,8 +409,31 @@ impl<'a> RoleGroupBuilder<'a> {
             ))
         };
 
-        if self.manages_security_config() {
+        if self.server_ca_volume() != TLS_SERVER_VOLUME_NAME.to_owned() {
+            // An init container is responsible for creating the file ca.crt.
+            volumes.push(Volume {
+                name: self.server_ca_volume().to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            });
+        }
+
+        if self.needs_security_config() {
             volumes.extend(self.security_config_volumes());
+        }
+
+        if self.manages_security_config() {
+            volumes.push(Volume {
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            });
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -549,6 +595,66 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
+    fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
+        if !self.manages_security_config() {
+            return None;
+        }
+
+        let volume_mounts = vec![
+            VolumeMount {
+                mount_path: "/stackable/tls-server/ca.crt".to_owned(),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
+                sub_path: Some("ca.crt".to_owned()),
+                read_only: Some(true),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: "/stackable/tls-admin-cert".to_owned(),
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                read_only: Some(false),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: "/stackable/tls-server-ca".to_owned(),
+                name: TLS_SERVER_CA_VOLUME_NAME.to_string(),
+                read_only: Some(false),
+                ..VolumeMount::default()
+            },
+        ];
+
+        let container = new_container_builder(
+            &ContainerName::from_str("create-admin-certificate")
+                .expect("should be a valid container name"),
+        )
+        .image_from_product_image(&self.cluster.image)
+        .command(vec![
+            "/bin/bash".to_string(),
+            "-euxo".to_string(),
+            "pipefail".to_string(),
+            "-c".to_string(),
+        ])
+        .args(vec![format!(
+            "openssl req \
+    -x509 \
+    -nodes \
+    -subj=/CN=update-security-config.localhost \
+    -out=/stackable/tls-admin-cert/tls.crt \
+    -keyout=/stackable/tls-admin-cert/tls.key
+
+cat \
+    /stackable/tls-server/ca.crt \
+    /stackable/tls-admin-cert/tls.crt > \
+    /stackable/tls-server-ca/ca.crt",
+        )])
+        .add_volume_mounts(volume_mounts)
+        .expect("The mount paths are statically defined and there should be no duplicates.")
+        .resources(self.role_group_config.config.resources.clone().into())
+        .build();
+
+        Some(container)
+    }
+
+    /// Builds the container for the [`PodTemplateSpec`]
     fn build_opensearch_container(&self) -> Container {
         // Probe values taken from the official Helm chart
         let startup_probe = Probe {
@@ -625,13 +731,26 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
         if self.cluster.tls_config.server_secret_class.is_some() {
             volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/server"),
+                mount_path: format!("{opensearch_path_conf}/tls/server/tls.crt"),
                 name: TLS_SERVER_VOLUME_NAME.to_string(),
+                sub_path: Some("tls.crt".to_owned()),
+                ..VolumeMount::default()
+            });
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server/tls.key"),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
+                sub_path: Some("tls.key".to_owned()),
+                ..VolumeMount::default()
+            });
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
+                name: self.server_ca_volume().to_string(),
+                sub_path: Some("ca.crt".to_owned()),
                 ..VolumeMount::default()
             });
         }
 
-        if self.manages_security_config() {
+        if self.needs_security_config() {
             volume_mounts.extend(self.security_config_volume_mounts());
         }
 

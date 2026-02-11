@@ -97,52 +97,9 @@ spec:
               data:
                 capacity: 100Mi
         replicas: 1
-        configOverrides:
-          opensearch.yml:
-            plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt
         podOverrides:
           spec:
-            initContainers:
-              - name: create-admin-certificate
-{% if test_scenario['values']['opensearch'].find(",") > 0 %}
-                image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
-{% else %}
-                image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
-{% endif %}
-                command:
-                  - /bin/bash
-                  - -euxo
-                  - pipefail
-                  - -c
-                args:
-                  - |
-                    openssl req \
-                        -x509 \
-                        -nodes \
-                        -subj=/CN=update-security-config.localhost \
-                        -out=/stackable/tls-admin/tls.crt \
-                        -keyout=/stackable/tls-admin/tls.key
-
-                    cat \
-                        /stackable/tls-server/ca.crt \
-                        /stackable/tls-admin/tls.crt > \
-                        /stackable/pemtrustedcas/ca.crt
-                volumeMounts:
-                  - mountPath: /stackable/tls-server
-                    name: tls-server
-                    readOnly: true
-                  - mountPath: /stackable/tls-admin
-                    name: admin-certificate
-                    readOnly: false
-                  - mountPath: /stackable/pemtrustedcas
-                    name: pemtrustedcas
-                    readOnly: false
             containers:
-              - name: opensearch
-                volumeMounts:
-                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
-                    name: pemtrustedcas
-                    readOnly: true
               - name: update-security-config
 {% if test_scenario['values']['opensearch'].find(",") > 0 %}
                 image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
@@ -189,9 +146,9 @@ spec:
                         until plugins/opensearch-security/tools/securityadmin.sh \
                             --configdir {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security \
                             --disable-host-name-verification \
-                            -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt \
-                            -cert /stackable/tls-admin/tls.crt \
-                            -key /stackable/tls-admin/tls.key
+                            -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt \
+                            -cert {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt \
+                            -key {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
                         do
                             echo "Initializing the security index failed."
                             wait_seconds 10
@@ -203,8 +160,8 @@ spec:
 
                         STATUS_CODE=$(curl \
                             --insecure \
-                            --cert /stackable/tls-admin/tls.crt \
-                            --key /stackable/tls-admin/tls.key \
+                            --cert {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt \
+                            --key {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key \
                             --silent \
                             --output /dev/null \
                             --write-out "%{http_code}" \
@@ -236,9 +193,9 @@ spec:
                                 --type "$filetype" \
                                 --file "$file" \
                                 --disable-host-name-verification \
-                                -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas/ca.crt \
-                                -cert /stackable/tls-admin/tls.crt \
-                                -key /stackable/tls-admin/tls.key
+                                -cacert {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt \
+                                -cert {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt \
+                                -key {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
                             do
                                 echo "Updating \"$filetype\" in the security index failed."
                                 wait_seconds 10
@@ -300,22 +257,21 @@ spec:
                     name: security-config-file-tenants
                     readOnly: true
                     subPath: tenants.yml
-                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/pemtrustedcas
-                    name: pemtrustedcas
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/ca.crt
+                    name: tls-server-ca
                     readOnly: true
-                  - mountPath: /stackable/tls-admin
-                    name: admin-certificate
+                    subPath: ca.crt
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.crt
+                    name: tls-admin-cert
                     readOnly: true
+                    subPath: tls.crt
+                  - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/tls.key
+                    name: tls-admin-cert
+                    readOnly: true
+                    subPath: tls.key
                   - mountPath: /stackable/log
                     name: log
                     readOnly: false
-            volumes:
-              - name: admin-certificate
-                emptyDir:
-                  sizeLimit: 1Mi
-              - name: pemtrustedcas
-                emptyDir:
-                  sizeLimit: 1Mi
     envOverrides:
       # Only required for the official image
       # The official image (built with https://github.com/opensearch-project/opensearch-build)
