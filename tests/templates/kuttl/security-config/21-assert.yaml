@@ -1,21 +1,12 @@
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: opensearch-nodes-cluster-manager
-data:
-  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allow_list.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
-  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
-  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate
-    via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{},"http":{"anonymous_auth_enabled":false}}}}'
-  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
-  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 120
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: opensearch-nodes-data
+  name: opensearch-nodes-security-config
 data:
   action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
   allow_list.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
@@ -24,4 +15,3 @@ data:
     via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{},"http":{"anonymous_auth_enabled":false}}}}'
   nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
   tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
-

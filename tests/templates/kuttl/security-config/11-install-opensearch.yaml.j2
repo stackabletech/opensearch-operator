@@ -40,7 +40,7 @@ spec:
         content:
           valueFrom:
             secretKeyRef:
-              name: security-config-internal-users
+              name: security-config-file-internal-users
               key: internal_users.yml
       roles:
         managedBy: API
@@ -334,76 +334,3 @@ spec:
         cluster.routing.allocation.disk.threshold_enabled: "false"
         plugins.security.authcz.admin_dn: CN=update-security-config.localhost
         plugins.security.restapi.roles_enabled: all_access
-  objectOverrides:
-    - apiVersion: apps/v1
-      kind: StatefulSet
-      metadata:
-        name: opensearch-nodes-security-config
-        namespace: $NAMESPACE
-      spec:
-        template:
-          spec:
-            volumes:
-              - name: security-config-file-actiongroups
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: action_groups.yml
-                    path: action_groups.yml
-                  name: opensearch-nodes-security-config
-              - name: security-config-file-allowlist
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: allow_list.yml
-                    path: allow_list.yml
-                  name: opensearch-nodes-security-config
-              - name: security-config-file-audit
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: audit.yml
-                    path: audit.yml
-                  name: opensearch-nodes-security-config
-              - name: security-config-file-config
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: config.yml
-                    path: config.yml
-                  name: opensearch-nodes-security-config
-              - name: security-config-file-internalusers
-                secret:
-                  defaultMode: 0o660
-                  items:
-                  - key: internal_users.yml
-                    path: internal_users.yml
-                  secretName: security-config-file-internal-users
-              - name: security-config-file-nodesdn
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: nodes_dn.yml
-                    path: nodes_dn.yml
-                  name: opensearch-nodes-security-config
-              - name: security-config-file-roles
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: roles.yml
-                    path: roles.yml
-                  name: security-config
-              - name: security-config-file-rolesmapping
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: roles_mapping.yml
-                    path: roles_mapping.yml
-                  name: security-config
-              - name: security-config-file-tenants
-                configMap:
-                  defaultMode: 0o660
-                  items:
-                  - key: tenants.yml
-                    path: tenants.yml
-                  name: opensearch-nodes-security-config

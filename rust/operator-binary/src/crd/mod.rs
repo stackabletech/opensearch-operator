@@ -39,7 +39,7 @@ use crate::{
                 ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName, SecretClassName,
                 SecretKey, SecretName,
             },
-            operator::{ClusterName, ProductName, RoleName},
+            operator::{ClusterName, ProductName, RoleGroupName, RoleName},
         },
     },
 };
@@ -135,6 +135,9 @@ pub mod versioned {
     pub struct SecurityConfig {
         #[serde(default = "security_config_enabled_default")]
         pub enabled: bool,
+
+        #[serde(default = "security_config_managing_role_group")]
+        pub managing_role_group: RoleGroupName,
 
         #[serde(default = "security_config_file_type_actiongroups_default")]
         pub action_groups: SecurityConfigFileType,
@@ -494,6 +497,7 @@ impl Default for v1alpha1::SecurityConfig {
     fn default() -> Self {
         v1alpha1::SecurityConfig {
             enabled: security_config_enabled_default(),
+            managing_role_group: security_config_managing_role_group(),
             action_groups: security_config_file_type_actiongroups_default(),
             allow_list: security_config_file_type_allowlist_default(),
             audit: security_config_file_type_audit_default(),
@@ -708,6 +712,10 @@ impl v1alpha1::SecurityConfig {
 
 fn security_config_enabled_default() -> bool {
     true
+}
+
+fn security_config_managing_role_group() -> RoleGroupName {
+    RoleGroupName::from_str("security-config").expect("should be a valid role group name")
 }
 
 fn security_config_file_type_actiongroups_default() -> v1alpha1::SecurityConfigFileType {

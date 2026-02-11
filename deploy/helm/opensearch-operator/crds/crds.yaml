@@ -77,6 +77,7 @@ spec:
                               config_version: 2
                               type: internalusers
                         managedBy: API
+                      managingRoleGroup: security-config
                       nodesDn:
                         content:
                           value:
@@ -191,6 +192,7 @@ spec:
                                 config_version: 2
                                 type: internalusers
                           managedBy: API
+                        managingRoleGroup: security-config
                         nodesDn:
                           content:
                             value:
@@ -603,6 +605,11 @@ spec:
                             - content
                             - managedBy
                           type: object
+                        managingRoleGroup:
+                          default: security-config
+                          maxLength: 16
+                          minLength: 1
+                          type: string
                         nodesDn:
                           default:
                             content:

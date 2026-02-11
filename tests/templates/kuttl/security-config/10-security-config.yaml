@@ -6,8 +6,6 @@ metadata:
 stringData:
   internal_users.yml: |
     ---
-    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
-
     _meta:
       type: internalusers
       config_version: 2
@@ -18,11 +16,6 @@ stringData:
       backend_roles:
         - admin
       description: OpenSearch admin user
-
-    kibanaserver:
-      hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
-      reserved: true
-      description: OpenSearch Dashboards user
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -49,11 +42,6 @@ data:
       reserved: false
       backend_roles:
         - admin
-
-    kibana_server:
-      reserved: true
-      users:
-        - kibanaserver
 
     monitoring:
       backend_roles:

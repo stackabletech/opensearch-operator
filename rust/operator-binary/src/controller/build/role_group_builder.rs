@@ -144,6 +144,12 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
+    fn manages_security_config(&self) -> bool {
+        self.cluster.security_config.enabled
+            && (self.cluster.security_config.is_only_managed_by_api()
+                || self.cluster.security_config.managing_role_group == self.role_group_name)
+    }
+
     /// Builds the [`ConfigMap`] containing the configuration files of the role-group
     /// [`StatefulSet`]
     pub fn build_config_map(&self) -> ConfigMap {
@@ -176,10 +182,11 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        // TODO Deploy only for the security-config role group
-        for file_type in SecurityConfigFileType::iter() {
-            if let Some(value) = self.cluster.security_config.value(file_type) {
-                data.insert(file_type.filename(), value.to_string());
+        if self.manages_security_config() {
+            for file_type in SecurityConfigFileType::iter() {
+                if let Some(value) = self.cluster.security_config.value(file_type) {
+                    data.insert(file_type.filename(), value.to_string());
+                }
             }
         }
 
@@ -379,7 +386,7 @@ impl<'a> RoleGroupBuilder<'a> {
             ))
         };
 
-        if self.cluster.security_config.is_only_managed_by_api() {
+        if self.manages_security_config() {
             volumes.extend(self.security_config_volumes());
         }
 
@@ -624,7 +631,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             });
         }
 
-        if self.cluster.security_config.is_only_managed_by_api() {
+        if self.manages_security_config() {
             volume_mounts.extend(self.security_config_volume_mounts());
         }
 

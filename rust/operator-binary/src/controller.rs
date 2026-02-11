@@ -31,6 +31,7 @@ use update_status::update_status;
 use validate::validate;
 
 use crate::{
+    controller::preprocess::preprocess,
     crd::{NodeRoles, v1alpha1},
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
@@ -50,6 +51,7 @@ use crate::{
 mod apply;
 mod build;
 mod dereference;
+mod preprocess;
 mod update_status;
 mod validate;
 
@@ -119,6 +121,9 @@ pub enum Error {
 
     #[snafu(display("failed to dereference resources"))]
     Dereference { source: dereference::Error },
+
+    #[snafu(display("failed to preprocess cluster"))]
+    Preprocess { source: preprocess::Error },
 
     #[snafu(display("failed to validate cluster"))]
     ValidateCluster { source: validate::Error },
@@ -378,9 +383,12 @@ pub async fn reconcile(
         .await
         .context(DereferenceSnafu)?;
 
+    // preprocess (no client required)
+    let preprocessed_cluster = preprocess(cluster.clone()).context(PreprocessSnafu)?;
+
     // validate (no client required)
-    let validated_cluster =
-        validate(&context.names, cluster, &dereferenced_objects).context(ValidateClusterSnafu)?;
+    let validated_cluster = validate(&context.names, &preprocessed_cluster, &dereferenced_objects)
+        .context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());
