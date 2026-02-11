@@ -104,5 +104,5 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.authcz.admin_dn: CN=update-security-config.localhost
+        # Allows the test jobs to access the security REST API.
         plugins.security.restapi.roles_enabled: all_access

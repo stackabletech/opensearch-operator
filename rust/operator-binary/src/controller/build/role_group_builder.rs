@@ -604,6 +604,8 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             return None;
         }
 
+        let admin_dn = self.node_config.admin_dn().expect("");
+
         let volume_mounts = vec![
             VolumeMount {
                 mount_path: "/stackable/tls-server/ca.crt".to_owned(),
@@ -637,19 +639,8 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             "pipefail".to_string(),
             "-c".to_string(),
         ])
-        .args(vec![format!(
-            "openssl req \
-    -x509 \
-    -nodes \
-    -subj=/CN=update-security-config.localhost \
-    -out=/stackable/tls-admin-cert/tls.crt \
-    -keyout=/stackable/tls-admin-cert/tls.key
-
-cat \
-    /stackable/tls-server/ca.crt \
-    /stackable/tls-admin-cert/tls.crt > \
-    /stackable/tls-server-ca/ca.crt",
-        )])
+        .args(vec![include_str!("create-admin-certificate.sh").to_owned()])
+        .add_env_var("ADMIN_DN", admin_dn)
         .add_volume_mounts(volume_mounts)
         .expect("The mount paths are statically defined and there should be no duplicates.")
         .resources(self.role_group_config.config.resources.clone().into())
