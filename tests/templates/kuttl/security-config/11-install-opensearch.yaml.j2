@@ -56,6 +56,8 @@ spec:
             configMapKeyRef:
               name: security-config
               key: roles_mapping.yml
+    tls:
+      serverSecretClass: null
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}

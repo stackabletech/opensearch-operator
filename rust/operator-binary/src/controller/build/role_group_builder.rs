@@ -1399,8 +1399,17 @@ mod tests {
                     ]
                 },
                 "data": {
-                    "log4j2.properties": null,
-                    "opensearch.yml": null,
+                   "action_groups.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
+                   "allow_list.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
+                   "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
+                   "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
+                   "internal_users.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"internalusers\"}}",
+                   "log4j2.properties": null,
+                   "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
+                   "opensearch.yml": null,
+                   "roles.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"roles\"}}",
+                   "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
+                   "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
                     "vector.yaml": null
                 }
             }),
@@ -1633,13 +1642,79 @@ mod tests {
                                         },
                                         {
                                             "mountPath": "/stackable/opensearch/config/tls/server",
+                                            "mountPath": "/stackable/opensearch/config/tls/server/tls.crt",
                                             "name": "tls-server",
+                                            "subPath": "tls.crt"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/tls/server/tls.key",
+                                            "name": "tls-server",
+                                            "subPath": "tls.key"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/tls/server/ca.crt",
+                                            "name": "tls-server",
+                                            "subPath": "ca.crt"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/action_groups.yml",
+                                            "name": "security-config-file-actiongroups",
+                                            "readOnly": true,
+                                            "subPath": "action_groups.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
+                                            "name": "security-config-file-allowlist",
+                                            "readOnly": true,
+                                            "subPath": "allow_list.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
+                                            "name": "security-config-file-audit",
+                                            "readOnly": true,
+                                            "subPath": "audit.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/config.yml",
+                                            "name": "security-config-file-config",
+                                            "readOnly": true,
+                                            "subPath": "config.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/internal_users.yml",
+                                            "name": "security-config-file-internalusers",
+                                            "readOnly": true,
+                                            "subPath": "internal_users.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/nodes_dn.yml",
+                                            "name": "security-config-file-nodesdn",
+                                            "readOnly": true,
+                                            "subPath": "nodes_dn.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/roles.yml",
+                                            "name": "security-config-file-roles",
+                                            "readOnly": true,
+                                            "subPath": "roles.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/roles_mapping.yml",
+                                            "name": "security-config-file-rolesmapping",
+                                            "readOnly": true,
+                                            "subPath": "roles_mapping.yml"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/opensearch-security/tenants.yml",
+                                            "name": "security-config-file-tenants",
+                                            "readOnly": true,
+                                            "subPath": "tenants.yml"
                                         },
                                         {
                                             "mountPath": "/stackable/opensearch/config/opensearch.keystore",
                                             "name": "keystore",
                                             "readOnly": true,
-                                            "subPath": "opensearch.keystore",
+                                            "subPath": "opensearch.keystore"
                                         }
                                     ]
                                 },
@@ -1855,7 +1930,125 @@ mod tests {
                                         }
                                     },
                                     "name": "tls-server"
-                                 },
+                                },
+                                {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "action_groups.yml",
+                                               "mode": 0o660,
+                                               "path": "action_groups.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-actiongroups"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "allow_list.yml",
+                                               "mode": 0o660,
+                                               "path": "allow_list.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-allowlist"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "audit.yml",
+                                               "mode": 0o660,
+                                               "path": "audit.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-audit"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "config.yml",
+                                               "mode": 0o660,
+                                               "path": "config.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-config"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "internal_users.yml",
+                                               "mode": 0o660,
+                                               "path": "internal_users.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-internalusers"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "nodes_dn.yml",
+                                               "mode": 0o660,
+                                               "path": "nodes_dn.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-nodesdn"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "roles.yml",
+                                               "mode": 0o660,
+                                               "path": "roles.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-roles"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "roles_mapping.yml",
+                                               "mode": 0o660,
+                                               "path": "roles_mapping.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-rolesmapping"
+                               },
+                               {
+                                   "configMap": {
+                                       "items": [
+                                           {
+                                               "key": "tenants.yml",
+                                               "mode": 0o660,
+                                               "path": "tenants.yml"
+                                           }
+                                       ],
+                                       "name": "my-opensearch-cluster-nodes-default"
+                                   },
+                                   "name": "security-config-file-tenants"
+                               },
+
                                 {
                                     "emptyDir": {
                                         "sizeLimit": "1Mi"

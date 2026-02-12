@@ -669,6 +669,7 @@ mod tests {
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
                 "path.logs: \"/stackable/log/opensearch\"\n",
+                "plugins.security.allow_default_init_securityindex: true\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: true\n",
                 "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",

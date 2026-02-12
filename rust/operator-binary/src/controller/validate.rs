@@ -2,7 +2,7 @@
 
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
     crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
     shared::time::Duration,
@@ -34,6 +34,18 @@ use crate::{
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
+    #[snafu(display(
+        "The role group that is defined to manage the security configuration, is not specified."
+    ))]
+    CheckSecurityConfigManagingRoleGroup {
+        security_config_managing_role_group: RoleGroupName,
+    },
+
+    #[snafu(display(
+        "A TLS server SecretClass must be set if the security configuration is managed by the operator."
+    ))]
+    CheckSecurityConfigTlsSettings {},
+
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {
         source: crate::framework::controller_utils::Error,
@@ -87,6 +99,12 @@ pub enum Error {
         source: stackable_operator::commons::product_image_selection::Error,
     },
 
+    #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
+    TerminationGracePeriodTooLong {
+        source: std::num::TryFromIntError,
+        duration: Duration,
+    },
+
     #[snafu(display("failed to validate the logging configuration"))]
     ValidateLoggingConfig {
         source: crate::framework::product_logging::framework::Error,
@@ -95,12 +113,6 @@ pub enum Error {
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
-    },
-
-    #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
-    TerminationGracePeriodTooLong {
-        source: std::num::TryFromIntError,
-        duration: Duration,
     },
 }
 
@@ -145,6 +157,8 @@ pub fn validate(
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
+
+    validate_security_config(&cluster.spec)?;
 
     let validated_discovery_endpoint = validate_discovery_endpoint(
         dereferenced_objects
@@ -262,6 +276,31 @@ fn validate_logging_configuration(
         opensearch_container,
         vector_container,
     })
+}
+
+fn validate_security_config(spec: &v1alpha1::OpenSearchClusterSpec) -> Result<()> {
+    if spec.cluster_config.security_config.enabled {
+        let security_config_managing_role_group = spec
+            .cluster_config
+            .security_config
+            .managing_role_group
+            .clone();
+        ensure!(
+            spec.nodes
+                .role_groups
+                .contains_key(&security_config_managing_role_group.to_string()),
+            CheckSecurityConfigManagingRoleGroupSnafu {
+                security_config_managing_role_group
+            }
+        );
+
+        ensure!(
+            spec.cluster_config.security_config.is_only_managed_by_api()
+                || spec.cluster_config.tls.server_secret_class.is_some(),
+            CheckSecurityConfigTlsSettingsSnafu {}
+        );
+    }
+    Ok(())
 }
 
 /// Return the validated discovery endpoint if a Listener is given with a status containing the
@@ -602,7 +641,11 @@ mod tests {
                     server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                     internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
-                v1alpha1::SecurityConfig::default(),
+                v1alpha1::SecurityConfig {
+                    enabled: true,
+                    managing_role_group: RoleGroupName::from_str_unsafe("default"),
+                    ..v1alpha1::SecurityConfig::default()
+                },
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                     secret_key_ref: v1alpha1::SecretKeyRef {
@@ -802,6 +845,36 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_validate_err_check_security_config_managing_role_group() {
+        test_validate_err(
+            |cluster, _| {
+                cluster
+                    .spec
+                    .cluster_config
+                    .security_config
+                    .managing_role_group = RoleGroupName::from_str_unsafe("non-existent");
+            },
+            ErrorDiscriminants::CheckSecurityConfigManagingRoleGroup,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_check_security_config_tls_settings() {
+        test_validate_err(
+            |cluster, _| {
+                cluster
+                    .spec
+                    .cluster_config
+                    .security_config
+                    .config
+                    .managed_by = v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
+                cluster.spec.cluster_config.tls.server_secret_class = None;
+            },
+            ErrorDiscriminants::CheckSecurityConfigTlsSettings,
+        );
+    }
+
     fn test_validate_err(
         change_test_objects: fn(&mut v1alpha1::OpenSearchCluster, &mut DereferencedObjects) -> (),
         expected_err: ErrorDiscriminants,
@@ -845,7 +918,11 @@ mod tests {
                             key: SecretKey::from_str_unsafe("my-keystore-file"),
                         },
                     }],
-                    security_config: v1alpha1::SecurityConfig::default(),
+                    security_config: v1alpha1::SecurityConfig {
+                        enabled: true,
+                        managing_role_group: RoleGroupName::from_str_unsafe("default"),
+                        ..v1alpha1::SecurityConfig::default()
+                    },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

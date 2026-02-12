@@ -1,3 +1,6 @@
+// Increase the recursion limit because some unit tests use large JSON structures.
+#![recursion_limit = "256"]
+
 use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
