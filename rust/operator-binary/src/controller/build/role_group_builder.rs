@@ -5,8 +5,12 @@ use std::{collections::BTreeMap, str::FromStr};
 use stackable_operator::{
     builder::{
         meta::ObjectMetaBuilder,
-        pod::volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+        pod::{
+            container::FieldPathEnvVar,
+            volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
+        },
     },
+    commons::resources::{CpuLimits, MemoryLimits, Resources},
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     crd::listener::{self},
     k8s_openapi::{
@@ -606,6 +610,13 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
         let admin_dn = self.node_config.admin_dn().expect("");
 
+        let env_vars = EnvVarSet::new()
+            .with_value(&EnvVarName::from_str_unsafe("ADMIN_DN"), admin_dn)
+            .with_field_path(
+                &EnvVarName::from_str_unsafe("POD_NAME"),
+                FieldPathEnvVar::Name,
+            );
+
         let volume_mounts = vec![
             VolumeMount {
                 mount_path: "/stackable/tls-server/ca.crt".to_owned(),
@@ -635,15 +646,28 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         .image_from_product_image(&self.cluster.image)
         .command(vec![
             "/bin/bash".to_string(),
-            "-euxo".to_string(),
+            "-euo".to_string(),
             "pipefail".to_string(),
             "-c".to_string(),
         ])
         .args(vec![include_str!("create-admin-certificate.sh").to_owned()])
-        .add_env_var("ADMIN_DN", admin_dn)
+        .add_env_vars(env_vars.into())
         .add_volume_mounts(volume_mounts)
         .expect("The mount paths are statically defined and there should be no duplicates.")
-        .resources(self.role_group_config.config.resources.clone().into())
+        .resources(
+            Resources::<()> {
+                memory: MemoryLimits {
+                    limit: Some(Quantity("128Mi".to_owned())),
+                    ..MemoryLimits::default()
+                },
+                cpu: CpuLimits {
+                    min: Some(Quantity("100m".to_owned())),
+                    max: Some(Quantity("400m".to_owned())),
+                },
+                ..Resources::default()
+            }
+            .into(),
+        )
         .build();
 
         Some(container)
@@ -687,10 +711,15 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         ];
         volume_mounts.extend(self.security_config_volume_mounts());
 
-        let mut env_vars = EnvVarSet::new().with_value(
-            &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
-            opensearch_path_conf,
-        );
+        let mut env_vars = EnvVarSet::new()
+            .with_value(
+                &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
+                opensearch_path_conf,
+            )
+            .with_field_path(
+                &EnvVarName::from_str_unsafe("POD_NAME"),
+                FieldPathEnvVar::Name,
+            );
 
         for file_type in SecurityConfigFileType::iter() {
             let managed_by_operator = self
@@ -724,7 +753,20 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         .add_env_vars(env_vars.into())
         .add_volume_mounts(volume_mounts)
         .expect("The mount paths are statically defined and there should be no duplicates.")
-        .resources(self.role_group_config.config.resources.clone().into())
+        .resources(
+            Resources::<()> {
+                memory: MemoryLimits {
+                    limit: Some(Quantity("512Mi".to_owned())),
+                    ..MemoryLimits::default()
+                },
+                cpu: CpuLimits {
+                    min: Some(Quantity("100m".to_owned())),
+                    max: Some(Quantity("400m".to_owned())),
+                },
+                ..Resources::default()
+            }
+            .into(),
+        )
         .build();
 
         Some(container)
