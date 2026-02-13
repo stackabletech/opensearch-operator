@@ -152,16 +152,23 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    fn initializes_security_config(security: &ValidatedSecurity) -> bool {
-        security.managing_role_group.is_none()
-    }
-
-    fn manages_security_config(&self, security: &ValidatedSecurity) -> bool {
-        security.managing_role_group.as_ref() == Some(&self.role_group_name)
+    /// Returns the container of this role group that manages the security or None if security is
+    /// not managed by this role group.
+    fn security_managing_container(
+        &self,
+        security: &ValidatedSecurity,
+    ) -> Option<v1alpha1::Container> {
+        match &security.managing_role_group {
+            None => Some(v1alpha1::Container::OpenSearch),
+            Some(managing_role_group) if managing_role_group == &self.role_group_name => {
+                Some(v1alpha1::Container::UpdateSecurityConfig)
+            }
+            _ => None,
+        }
     }
 
     fn server_ca_volume(&self, security: &ValidatedSecurity) -> VolumeName {
-        if self.manages_security_config(security) {
+        if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
             TLS_SERVER_CA_VOLUME_NAME.to_owned()
         } else {
             TLS_SERVER_VOLUME_NAME.to_owned()
@@ -200,14 +207,12 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if let Some(security) = &self.cluster.security {
-            if security.managing_role_group.is_none()
-                || security.managing_role_group.as_ref() == Some(&self.role_group_name)
-            {
-                for file_type in SecurityConfigFileType::iter() {
-                    if let Some(value) = security.config.value(file_type) {
-                        data.insert(file_type.filename(), value.to_string());
-                    }
+        if let Some(security) = &self.cluster.security
+            && self.security_managing_container(security).is_some()
+        {
+            for file_type in SecurityConfigFileType::iter() {
+                if let Some(value) = security.config.value(file_type) {
+                    data.insert(file_type.filename(), value.to_string());
                 }
             }
         }
@@ -326,7 +331,15 @@ impl<'a> RoleGroupBuilder<'a> {
                     vector_config_file_extra_env_vars(),
                 )
             });
-        let security_config_container = self.build_maybe_security_config_container();
+
+        let security_config_container = if let Some(security) = &self.cluster.security
+            && self.security_managing_container(security)
+                == Some(v1alpha1::Container::UpdateSecurityConfig)
+        {
+            Some(self.build_security_config_container(security))
+        } else {
+            None
+        };
 
         let mut init_containers = vec![];
         if let Some(keystore_init_container) = self.build_maybe_keystore_init_container() {
@@ -427,9 +440,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 });
             }
 
-            if security.managing_role_group.is_none()
-                || security.managing_role_group.as_ref() == Some(&self.role_group_name)
-            {
+            if self.security_managing_container(security).is_some() {
                 volumes.extend(RoleGroupBuilder::security_config_volumes(
                     &security.config,
                     self.resource_names.role_group_config_map(),
@@ -684,13 +695,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
-    fn build_maybe_security_config_container(&self) -> Option<Container> {
-        let security = self.cluster.security.as_ref()?;
-
-        if security.managing_role_group.as_ref() != Some(&self.role_group_name) {
-            return None;
-        }
-
+    fn build_security_config_container(&self, security: &ValidatedSecurity) -> Container {
         let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
         let mut volume_mounts = vec![
@@ -746,38 +751,33 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             );
         }
 
-        let container = new_container_builder(
-            &ContainerName::from_str("update-security-config")
-                .expect("should be a valid container name"),
-        )
-        .image_from_product_image(&self.cluster.image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-uo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
-        ])
-        .args(vec![include_str!("update-security-config.sh").to_owned()])
-        .add_env_vars(env_vars.into())
-        .add_volume_mounts(volume_mounts)
-        .expect("The mount paths are statically defined and there should be no duplicates.")
-        .resources(
-            Resources::<()> {
-                memory: MemoryLimits {
-                    limit: Some(Quantity("512Mi".to_owned())),
-                    ..MemoryLimits::default()
-                },
-                cpu: CpuLimits {
-                    min: Some(Quantity("100m".to_owned())),
-                    max: Some(Quantity("400m".to_owned())),
-                },
-                ..Resources::default()
-            }
-            .into(),
-        )
-        .build();
-
-        Some(container)
+        new_container_builder(&v1alpha1::Container::UpdateSecurityConfig.to_container_name())
+            .image_from_product_image(&self.cluster.image)
+            .command(vec![
+                "/bin/bash".to_string(),
+                "-uo".to_string(),
+                "pipefail".to_string(),
+                "-c".to_string(),
+            ])
+            .args(vec![include_str!("update-security-config.sh").to_owned()])
+            .add_env_vars(env_vars.into())
+            .add_volume_mounts(volume_mounts)
+            .expect("The mount paths are statically defined and there should be no duplicates.")
+            .resources(
+                Resources::<()> {
+                    memory: MemoryLimits {
+                        limit: Some(Quantity("512Mi".to_owned())),
+                        ..MemoryLimits::default()
+                    },
+                    cpu: CpuLimits {
+                        min: Some(Quantity("100m".to_owned())),
+                        max: Some(Quantity("400m".to_owned())),
+                    },
+                    ..Resources::default()
+                }
+                .into(),
+            )
+            .build()
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
@@ -878,7 +878,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                 });
             }
 
-            if security.managing_role_group.is_none() {
+            if self.security_managing_container(security) == Some(v1alpha1::Container::OpenSearch) {
                 volume_mounts.extend(self.security_config_volume_mounts());
             }
         }
@@ -1651,12 +1651,12 @@ mod tests {
                                             "name": "log"
                                         },
                                         {
-                                            "mountPath": "/stackable/opensearch/config/tls/internal",
-                                            "name": "tls-internal"
-                                        },
-                                        {
                                             "mountPath": "/stackable/listeners/discovery-service",
                                             "name": "discovery-service-listener"
+                                        },
+                                        {
+                                            "mountPath": "/stackable/opensearch/config/tls/internal",
+                                            "name": "tls-internal"
                                         },
                                         {
                                             "mountPath": "/stackable/opensearch/config/tls/server",

@@ -375,6 +375,12 @@ pub mod versioned {
         #[serde(rename = "vector")]
         Vector,
 
+        #[serde(rename = "create-admin-certificate")]
+        CreateAdminCertificate,
+
+        #[serde(rename = "update-security-config")]
+        UpdateSecurityConfig,
+
         #[serde(rename = "init-keystore")]
         InitKeystore,
     }
@@ -828,6 +834,8 @@ impl v1alpha1::Container {
         ContainerName::from_str(match self {
             v1alpha1::Container::OpenSearch => "opensearch",
             v1alpha1::Container::Vector => "vector",
+            v1alpha1::Container::CreateAdminCertificate => "create-admin-certificate",
+            v1alpha1::Container::UpdateSecurityConfig => "update-security-config",
             v1alpha1::Container::InitKeystore => "init-keystore",
         })
         .expect("should be a valid container name")
