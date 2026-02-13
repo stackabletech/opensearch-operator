@@ -171,7 +171,9 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
-        let protocol = if self.cluster.tls_config.server_secret_class.is_some() {
+        let protocol = if self.cluster.security_config.enabled
+            && self.cluster.tls_config.server_secret_class.is_some()
+        {
             "https"
         } else {
             "http"

@@ -60,6 +60,11 @@ tests:
       - opensearch
       - opensearch_home
       - release
+  - name: security-disabled
+    dimensions:
+      - opensearch
+      - opensearch_home
+      - release
 suites:
   - name: nightly
     patch:
@@ -87,6 +92,7 @@ suites:
       - ldap
       - opensearch-dashboards
       - security-config
+      - security-disabled
     patch:
       - dimensions:
           - name: opensearch

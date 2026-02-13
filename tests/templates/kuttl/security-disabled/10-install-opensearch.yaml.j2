@@ -12,50 +12,7 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     securityConfig:
-      config:
-        managedBy: operator
-        content:
-          value:
-            _meta:
-              type: config
-              config_version: 2
-            config:
-              dynamic:
-                authc:
-                  basic_internal_auth_domain:
-                    description: Authenticate via HTTP Basic against internal users database
-                    http_enabled: true
-                    transport_enabled: true
-                    order: 1
-                    http_authenticator:
-                      type: basic
-                      challenge: true
-                    authentication_backend:
-                      type: intern
-                authz: {}
-                http:
-                  anonymous_auth_enabled: true
-      internalUsers:
-        managedBy: API
-        content:
-          valueFrom:
-            secretKeyRef:
-              name: security-config-file-internal-users
-              key: internal_users.yml
-      roles:
-        managedBy: API
-        content:
-          valueFrom:
-            configMapKeyRef:
-              name: security-config
-              key: roles.yml
-      rolesMapping:
-        managedBy: API
-        content:
-          valueFrom:
-            configMapKeyRef:
-              name: security-config
-              key: roles_mapping.yml
+      enabled: false
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -66,28 +23,13 @@ spec:
     roleConfig:
       discoveryServiceListenerClass: external-unstable
     roleGroups:
-      cluster-manager:
+      default:
         config:
-          discoveryServiceExposed: true
-          nodeRoles:
-            - cluster_manager
           resources:
             storage:
               data:
                 capacity: 100Mi
         replicas: 3
-      data:
-        config:
-          discoveryServiceExposed: false
-          nodeRoles:
-            - ingest
-            - data
-            - remote_cluster_client
-          resources:
-            storage:
-              data:
-                capacity: 2Gi
-        replicas: 2
     envOverrides:
       # Only required for the official image
       # The official image (built with https://github.com/opensearch-project/opensearch-build)
@@ -104,5 +46,3 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        # Allows the test jobs to access the security REST API.
-        plugins.security.restapi.roles_enabled: all_access

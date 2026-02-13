@@ -16,7 +16,7 @@ spec:
             - -c
           args:
             - |
-              pip install opensearch-py==3.0.0
+              pip install opensearch-py==3.1.0
               python scripts/test.py
           env:
             # required for pip install
@@ -48,18 +48,8 @@ spec:
           configMap:
             name: test-opensearch
         - name: tls
-          ephemeral:
-            volumeClaimTemplate:
-              metadata:
-                annotations:
-                  secrets.stackable.tech/class: tls
-              spec:
-                storageClassName: secrets.stackable.tech
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: "1"
+          configMap:
+            name: truststore-pem
       serviceAccountName: test-service-account
       securityContext:
         fsGroup: 1000
@@ -80,7 +70,6 @@ data:
 
     client = OpenSearch(
       hosts=[{'host': host, 'port': port}],
-      http_auth=('integrationtest', 'integrationtest'),
       http_compress=True,
       use_ssl=http_use_tls,
       verify_certs=True,
