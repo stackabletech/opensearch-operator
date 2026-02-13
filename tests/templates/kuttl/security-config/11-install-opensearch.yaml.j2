@@ -11,51 +11,52 @@ spec:
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
-    securityConfig:
+    security:
       config:
-        managedBy: operator
-        content:
-          value:
-            _meta:
-              type: config
-              config_version: 2
-            config:
-              dynamic:
-                authc:
-                  basic_internal_auth_domain:
-                    description: Authenticate via HTTP Basic against internal users database
-                    http_enabled: true
-                    transport_enabled: true
-                    order: 1
-                    http_authenticator:
-                      type: basic
-                      challenge: true
-                    authentication_backend:
-                      type: intern
-                authz: {}
-                http:
-                  anonymous_auth_enabled: true
-      internalUsers:
-        managedBy: API
-        content:
-          valueFrom:
-            secretKeyRef:
-              name: security-config-file-internal-users
-              key: internal_users.yml
-      roles:
-        managedBy: API
-        content:
-          valueFrom:
-            configMapKeyRef:
-              name: security-config
-              key: roles.yml
-      rolesMapping:
-        managedBy: API
-        content:
-          valueFrom:
-            configMapKeyRef:
-              name: security-config
-              key: roles_mapping.yml
+        config:
+          managedBy: operator
+          content:
+            value:
+              _meta:
+                type: config
+                config_version: 2
+              config:
+                dynamic:
+                  authc:
+                    basic_internal_auth_domain:
+                      description: Authenticate via HTTP Basic against internal users database
+                      http_enabled: true
+                      transport_enabled: true
+                      order: 1
+                      http_authenticator:
+                        type: basic
+                        challenge: true
+                      authentication_backend:
+                        type: intern
+                  authz: {}
+                  http:
+                    anonymous_auth_enabled: true
+        internalUsers:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: security-config-file-internal-users
+                key: internal_users.yml
+        roles:
+          managedBy: API
+          content:
+            valueFrom:
+              configMapKeyRef:
+                name: security-config
+                key: roles.yml
+        rolesMapping:
+          managedBy: API
+          content:
+            valueFrom:
+              configMapKeyRef:
+                name: security-config
+                key: roles_mapping.yml
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}

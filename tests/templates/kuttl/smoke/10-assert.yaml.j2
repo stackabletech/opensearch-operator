@@ -182,13 +182,20 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
-          name: tls-internal
         - mountPath: /stackable/listeners/discovery-service
           name: discovery-service-listener
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
+          name: tls-internal
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
+          subPath: tls.crt
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+          name: tls-server
+          subPath: tls.key
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
+          name: tls-server
+          subPath: ca.crt
 {% endif %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/action_groups.yml
           name: security-config-file-actiongroups
@@ -650,11 +657,18 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
           name: tls-internal
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
+          subPath: tls.crt
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+          name: tls-server
+          subPath: tls.key
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
+          name: tls-server
+          subPath: ca.crt
 {% endif %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/action_groups.yml
           name: security-config-file-actiongroups
@@ -951,6 +965,7 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
+    plugins.security.disabled: false
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
@@ -1001,6 +1016,7 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
+    plugins.security.disabled: false
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true

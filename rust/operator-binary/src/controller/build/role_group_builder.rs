@@ -48,7 +48,7 @@ use crate::{
     constant,
     controller::{
         ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
-        TRANSPORT_PORT_NAME, ValidatedCluster,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedSecurity,
         build::product_logging::config::{
             MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
         },
@@ -69,8 +69,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ContainerName, ListenerName, PersistentVolumeClaimName, SecretClassName,
-                ServiceAccountName, ServiceName, VolumeName,
+                ConfigMapName, ContainerName, ListenerName, PersistentVolumeClaimName,
+                SecretClassName, ServiceAccountName, ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -152,19 +152,16 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    fn initializes_security_config(&self) -> bool {
-        self.cluster.security_config.enabled
-            && self.cluster.security_config.is_only_managed_by_api()
+    fn initializes_security_config(security: &ValidatedSecurity) -> bool {
+        security.managing_role_group.is_none()
     }
 
-    fn manages_security_config(&self) -> bool {
-        self.cluster.security_config.enabled
-            && !self.cluster.security_config.is_only_managed_by_api()
-            && self.cluster.security_config.managing_role_group == self.role_group_name
+    fn manages_security_config(&self, security: &ValidatedSecurity) -> bool {
+        security.managing_role_group.as_ref() == Some(&self.role_group_name)
     }
 
-    fn server_ca_volume(&self) -> VolumeName {
-        if self.manages_security_config() {
+    fn server_ca_volume(&self, security: &ValidatedSecurity) -> VolumeName {
+        if self.manages_security_config(security) {
             TLS_SERVER_CA_VOLUME_NAME.to_owned()
         } else {
             TLS_SERVER_VOLUME_NAME.to_owned()
@@ -203,10 +200,14 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if self.initializes_security_config() || self.manages_security_config() {
-            for file_type in SecurityConfigFileType::iter() {
-                if let Some(value) = self.cluster.security_config.value(file_type) {
-                    data.insert(file_type.filename(), value.to_string());
+        if let Some(security) = &self.cluster.security {
+            if security.managing_role_group.is_none()
+                || security.managing_role_group.as_ref() == Some(&self.role_group_name)
+            {
+                for file_type in SecurityConfigFileType::iter() {
+                    if let Some(value) = security.config.value(file_type) {
+                        data.insert(file_type.filename(), value.to_string());
+                    }
                 }
             }
         }
@@ -346,25 +347,6 @@ impl<'a> RoleGroupBuilder<'a> {
                 self.resource_names.role_group_config_map()
             };
 
-        let mut internal_tls_volume_service_scopes = vec![];
-        if self
-            .role_group_config
-            .config
-            .node_roles
-            .contains(&v1alpha1::NodeRole::ClusterManager)
-        {
-            internal_tls_volume_service_scopes
-                .push(self.node_config.seed_nodes_service_name.clone());
-        }
-        let internal_tls_volume = self.build_tls_volume(
-            &TLS_INTERNAL_VOLUME_NAME,
-            &self.cluster.tls_config.internal_secret_class,
-            internal_tls_volume_service_scopes,
-            SecretFormat::TlsPem,
-            &self.role_group_config.config.requested_secret_lifetime,
-            vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
-        );
-
         let mut volumes = vec![
             Volume {
                 name: CONFIG_VOLUME_NAME.to_string(),
@@ -394,50 +376,76 @@ impl<'a> RoleGroupBuilder<'a> {
                 }),
                 ..Volume::default()
             },
-            internal_tls_volume,
         ];
 
-        if let Some(tls_http_secret_class_name) = &self.cluster.tls_config.server_secret_class {
-            let mut listener_scopes = vec![ROLE_GROUP_LISTENER_VOLUME_NAME.to_owned()];
-            if self.role_group_config.config.discovery_service_exposed {
-                listener_scopes.push(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_owned());
+        if let Some(security) = &self.cluster.security {
+            let mut internal_tls_volume_service_scopes = vec![];
+            if self
+                .role_group_config
+                .config
+                .node_roles
+                .contains(&v1alpha1::NodeRole::ClusterManager)
+            {
+                internal_tls_volume_service_scopes
+                    .push(self.node_config.seed_nodes_service_name.clone());
             }
-
-            volumes.push(self.build_tls_volume(
-                &TLS_SERVER_VOLUME_NAME,
-                tls_http_secret_class_name,
-                vec![],
+            let internal_tls_volume = self.build_tls_volume(
+                &TLS_INTERNAL_VOLUME_NAME,
+                &security.tls.internal_secret_class,
+                internal_tls_volume_service_scopes,
                 SecretFormat::TlsPem,
                 &self.role_group_config.config.requested_secret_lifetime,
-                listener_scopes,
-            ))
-        };
+                vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
+            );
+            volumes.push(internal_tls_volume);
 
-        if self.server_ca_volume() != TLS_SERVER_VOLUME_NAME.to_owned() {
-            // An init container is responsible for creating the file ca.crt.
-            volumes.push(Volume {
-                name: self.server_ca_volume().to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            });
-        }
+            if let Some(tls_http_secret_class_name) = &security.tls.server_secret_class {
+                let mut listener_scopes = vec![ROLE_GROUP_LISTENER_VOLUME_NAME.to_owned()];
+                if self.role_group_config.config.discovery_service_exposed {
+                    listener_scopes.push(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_owned());
+                }
 
-        if self.initializes_security_config() || self.manages_security_config() {
-            volumes.extend(self.security_config_volumes());
-        }
+                volumes.push(self.build_tls_volume(
+                    &TLS_SERVER_VOLUME_NAME,
+                    tls_http_secret_class_name,
+                    vec![],
+                    SecretFormat::TlsPem,
+                    &self.role_group_config.config.requested_secret_lifetime,
+                    listener_scopes,
+                ))
+            };
 
-        if self.manages_security_config() {
-            volumes.push(Volume {
-                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            });
+            if self.server_ca_volume(security) != TLS_SERVER_VOLUME_NAME.to_owned() {
+                // An init container is responsible for creating the file ca.crt.
+                volumes.push(Volume {
+                    name: self.server_ca_volume(security).to_string(),
+                    empty_dir: Some(EmptyDirVolumeSource {
+                        size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
+                        ..EmptyDirVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                });
+            }
+
+            if security.managing_role_group.is_none()
+                || security.managing_role_group.as_ref() == Some(&self.role_group_name)
+            {
+                volumes.extend(RoleGroupBuilder::security_config_volumes(
+                    &security.config,
+                    self.resource_names.role_group_config_map(),
+                ));
+            }
+
+            if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
+                volumes.push(Volume {
+                    name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                    empty_dir: Some(EmptyDirVolumeSource {
+                        size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
+                        ..EmptyDirVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                });
+            }
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -604,7 +612,9 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
     /// Builds the container for the [`PodTemplateSpec`]
     fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
-        if !self.manages_security_config() {
+        let security = self.cluster.security.as_ref()?;
+
+        if security.managing_role_group.as_ref() != Some(&self.role_group_name) {
             return None;
         }
 
@@ -675,7 +685,9 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
     /// Builds the container for the [`PodTemplateSpec`]
     fn build_maybe_security_config_container(&self) -> Option<Container> {
-        if !self.manages_security_config() {
+        let security = self.cluster.security.as_ref()?;
+
+        if security.managing_role_group.as_ref() != Some(&self.role_group_name) {
             return None;
         }
 
@@ -722,11 +734,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             );
 
         for file_type in SecurityConfigFileType::iter() {
-            let managed_by_operator = self
-                .cluster
-                .security_config
-                .security_config(file_type)
-                .managed_by
+            let managed_by_operator = security.config.security_config(file_type).managed_by
                 == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
 
             env_vars = env_vars.with_value(
@@ -832,11 +840,6 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                 name: LOG_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
-            VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/internal"),
-                name: TLS_INTERNAL_VOLUME_NAME.to_string(),
-                ..VolumeMount::default()
-            },
         ];
 
         if self.role_group_config.config.discovery_service_exposed {
@@ -847,29 +850,37 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             });
         }
 
-        if self.cluster.tls_config.server_secret_class.is_some() {
+        if let Some(security) = &self.cluster.security {
             volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/server/tls.crt"),
-                name: TLS_SERVER_VOLUME_NAME.to_string(),
-                sub_path: Some("tls.crt".to_owned()),
+                mount_path: format!("{opensearch_path_conf}/tls/internal"),
+                name: TLS_INTERNAL_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             });
-            volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/server/tls.key"),
-                name: TLS_SERVER_VOLUME_NAME.to_string(),
-                sub_path: Some("tls.key".to_owned()),
-                ..VolumeMount::default()
-            });
-            volume_mounts.push(VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
-                name: self.server_ca_volume().to_string(),
-                sub_path: Some("ca.crt".to_owned()),
-                ..VolumeMount::default()
-            });
-        }
 
-        if self.initializes_security_config() {
-            volume_mounts.extend(self.security_config_volume_mounts());
+            if security.tls.server_secret_class.is_some() {
+                volume_mounts.push(VolumeMount {
+                    mount_path: format!("{opensearch_path_conf}/tls/server/tls.crt"),
+                    name: TLS_SERVER_VOLUME_NAME.to_string(),
+                    sub_path: Some("tls.crt".to_owned()),
+                    ..VolumeMount::default()
+                });
+                volume_mounts.push(VolumeMount {
+                    mount_path: format!("{opensearch_path_conf}/tls/server/tls.key"),
+                    name: TLS_SERVER_VOLUME_NAME.to_string(),
+                    sub_path: Some("tls.key".to_owned()),
+                    ..VolumeMount::default()
+                });
+                volume_mounts.push(VolumeMount {
+                    mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
+                    name: self.server_ca_volume(security).to_string(),
+                    sub_path: Some("ca.crt".to_owned()),
+                    ..VolumeMount::default()
+                });
+            }
+
+            if security.managing_role_group.is_none() {
+                volume_mounts.extend(self.security_config_volume_mounts());
+            }
         }
 
         if !self.cluster.keystores.is_empty() {
@@ -1101,12 +1112,15 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             .build()
     }
 
-    fn security_config_volumes(&self) -> Vec<Volume> {
+    fn security_config_volumes(
+        security_config: &v1alpha1::SecurityConfig,
+        role_group_config_map_name: ConfigMapName,
+    ) -> Vec<Volume> {
         let mut volumes = vec![];
 
         for file_type in SecurityConfigFileType::iter() {
             let volume_name = format!("security-config-file-{}", file_type.volume_name());
-            if self.cluster.security_config.value(file_type).is_some() {
+            if security_config.value(file_type).is_some() {
                 let volume = Volume {
                     name: volume_name,
                     config_map: Some(ConfigMapVolumeSource {
@@ -1115,14 +1129,14 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                             mode: Some(0o660),
                             path: file_type.filename(),
                         }]),
-                        name: self.resource_names.role_group_config_map().to_string(),
+                        name: role_group_config_map_name.to_string(),
                         ..Default::default()
                     }),
                     ..Volume::default()
                 };
                 volumes.push(volume);
             } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
-                self.cluster.security_config.config_map_key_ref(file_type)
+                security_config.config_map_key_ref(file_type)
             {
                 let volume = Volume {
                     name: volume_name,
@@ -1139,7 +1153,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                 };
                 volumes.push(volume);
             } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
-                self.cluster.security_config.secret_key_ref(file_type)
+                security_config.secret_key_ref(file_type)
             {
                 let volume = Volume {
                     name: volume_name,
@@ -1214,6 +1228,7 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
+            ValidatedSecurity,
             build::role_group_builder::{
                 DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
                 TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
@@ -1320,8 +1335,11 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
-            v1alpha1::SecurityConfig::default(),
+            Some(ValidatedSecurity {
+                managing_role_group: None,
+                config: v1alpha1::SecurityConfig::default(),
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
             vec![v1alpha1::OpenSearchKeystore {
                 key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                 secret_key_ref: v1alpha1::SecretKeyRef {

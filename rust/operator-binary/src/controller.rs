@@ -181,6 +181,13 @@ impl ValidatedLogging {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ValidatedSecurity {
+    pub managing_role_group: Option<RoleGroupName>,
+    pub config: v1alpha1::SecurityConfig,
+    pub tls: v1alpha1::OpenSearchTls,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedDiscoveryEndpoint {
     pub hostname: Hostname,
     pub port: Port,
@@ -204,8 +211,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: v1alpha1::OpenSearchRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-    pub tls_config: v1alpha1::OpenSearchTls,
-    pub security_config: v1alpha1::SecurityConfig,
+    pub security: Option<ValidatedSecurity>,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
     pub discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
 }
@@ -220,8 +226,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: v1alpha1::OpenSearchRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-        tls_config: v1alpha1::OpenSearchTls,
-        security_config: v1alpha1::SecurityConfig,
+        security: Option<ValidatedSecurity>,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
         discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
     ) -> Self {
@@ -240,8 +245,7 @@ impl ValidatedCluster {
             uid,
             role_config,
             role_group_configs,
-            tls_config,
-            security_config,
+            security,
             keystores,
             discovery_endpoint,
         }
@@ -439,7 +443,7 @@ mod tests {
 
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
-        controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
+        controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig, ValidatedSecurity},
         crd::{NodeRoles, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
@@ -562,8 +566,11 @@ mod tests {
                 ),
             ]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
-            v1alpha1::SecurityConfig::default(),
+            Some(ValidatedSecurity {
+                managing_role_group: None,
+                config: v1alpha1::SecurityConfig::default(),
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
             vec![],
             None,
         )

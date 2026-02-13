@@ -14,7 +14,9 @@ use super::{
     ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
-    controller::{DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint},
+    controller::{
+        DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedSecurity,
+    },
     crd::v1alpha1::{self},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
@@ -158,7 +160,7 @@ pub fn validate(
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
-    validate_security_config(&cluster.spec)?;
+    let validated_security = validate_security_config(&cluster.spec)?;
 
     let validated_discovery_endpoint = validate_discovery_endpoint(
         dereferenced_objects
@@ -174,8 +176,7 @@ pub fn validate(
         uid,
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
-        cluster.spec.cluster_config.tls.clone(),
-        cluster.spec.cluster_config.security_config.clone(),
+        validated_security,
         cluster.spec.cluster_config.keystore.clone(),
         validated_discovery_endpoint,
     ))
@@ -278,29 +279,43 @@ fn validate_logging_configuration(
     })
 }
 
-fn validate_security_config(spec: &v1alpha1::OpenSearchClusterSpec) -> Result<()> {
-    if spec.cluster_config.security_config.enabled {
-        let security_config_managing_role_group = spec
-            .cluster_config
-            .security_config
-            .managing_role_group
-            .clone();
-        ensure!(
-            spec.nodes
-                .role_groups
-                .contains_key(&security_config_managing_role_group.to_string()),
-            CheckSecurityConfigManagingRoleGroupSnafu {
-                security_config_managing_role_group
-            }
-        );
+fn validate_security_config(
+    spec: &v1alpha1::OpenSearchClusterSpec,
+) -> Result<Option<ValidatedSecurity>> {
+    let security = if spec.cluster_config.security.enabled {
+        let managing_role_group = if !spec.cluster_config.security.config.is_only_managed_by_api() {
+            let managing_role_group = spec.cluster_config.security.managing_role_group.clone();
 
-        ensure!(
-            spec.cluster_config.security_config.is_only_managed_by_api()
-                || spec.cluster_config.tls.server_secret_class.is_some(),
-            CheckSecurityConfigTlsSettingsSnafu {}
-        );
-    }
-    Ok(())
+            ensure!(
+                spec.nodes
+                    .role_groups
+                    .contains_key(&managing_role_group.to_string()),
+                CheckSecurityConfigManagingRoleGroupSnafu {
+                    security_config_managing_role_group: managing_role_group
+                }
+            );
+
+            // The role group requires server TLS to communicate with the cluster.
+            ensure!(
+                spec.cluster_config.tls.server_secret_class.is_some(),
+                CheckSecurityConfigTlsSettingsSnafu {}
+            );
+
+            Some(managing_role_group)
+        } else {
+            None
+        };
+
+        Some(ValidatedSecurity {
+            managing_role_group,
+            config: spec.cluster_config.security.config.clone(),
+            tls: spec.cluster_config.tls.clone(),
+        })
+    } else {
+        None
+    };
+
+    Ok(security)
 }
 
 /// Return the validated discovery endpoint if a Listener is given with a status containing the
@@ -406,7 +421,7 @@ mod tests {
         built_info,
         controller::{
             ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
-            ValidatedLogging, ValidatedOpenSearchConfig,
+            ValidatedLogging, ValidatedOpenSearchConfig, ValidatedSecurity,
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
@@ -418,8 +433,8 @@ mod tests {
             types::{
                 common::Port,
                 kubernetes::{
-                    ConfigMapName, Hostname, ListenerClassName, NamespaceName, SecretClassName,
-                    SecretKey, SecretName,
+                    ConfigMapKey, ConfigMapName, Hostname, ListenerClassName, NamespaceName,
+                    SecretClassName, SecretKey, SecretName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -637,15 +652,27 @@ mod tests {
                     }
                 )]
                 .into(),
-                v1alpha1::OpenSearchTls {
-                    server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
-                    internal_secret_class: SecretClassName::from_str_unsafe("tls")
-                },
-                v1alpha1::SecurityConfig {
-                    enabled: true,
-                    managing_role_group: RoleGroupName::from_str_unsafe("default"),
-                    ..v1alpha1::SecurityConfig::default()
-                },
+                Some(ValidatedSecurity {
+                    managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
+                    config: v1alpha1::SecurityConfig {
+                        config: v1alpha1::SecurityConfigFileType {
+                            managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
+                            content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
+                                v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                                    v1alpha1::ConfigMapKeyRef {
+                                        name: ConfigMapName::from_str_unsafe("security-config"),
+                                        key: ConfigMapKey::from_str_unsafe("config.yml")
+                                    }
+                                )
+                            )
+                        },
+                        ..v1alpha1::SecurityConfig::default()
+                    },
+                    tls: v1alpha1::OpenSearchTls {
+                        server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                        internal_secret_class: SecretClassName::from_str_unsafe("tls")
+                    },
+                }),
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                     secret_key_ref: v1alpha1::SecretKeyRef {
@@ -849,11 +876,8 @@ mod tests {
     fn test_validate_err_check_security_config_managing_role_group() {
         test_validate_err(
             |cluster, _| {
-                cluster
-                    .spec
-                    .cluster_config
-                    .security_config
-                    .managing_role_group = RoleGroupName::from_str_unsafe("non-existent");
+                cluster.spec.cluster_config.security.managing_role_group =
+                    RoleGroupName::from_str_unsafe("non-existent");
             },
             ErrorDiscriminants::CheckSecurityConfigManagingRoleGroup,
         );
@@ -866,7 +890,8 @@ mod tests {
                 cluster
                     .spec
                     .cluster_config
-                    .security_config
+                    .security
+                    .config
                     .config
                     .managed_by = v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
                 cluster.spec.cluster_config.tls.server_secret_class = None;
@@ -918,10 +943,23 @@ mod tests {
                             key: SecretKey::from_str_unsafe("my-keystore-file"),
                         },
                     }],
-                    security_config: v1alpha1::SecurityConfig {
+                    security: v1alpha1::Security {
                         enabled: true,
                         managing_role_group: RoleGroupName::from_str_unsafe("default"),
-                        ..v1alpha1::SecurityConfig::default()
+                        config: v1alpha1::SecurityConfig {
+                            config: v1alpha1::SecurityConfigFileType {
+                                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
+                                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
+                                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                                        v1alpha1::ConfigMapKeyRef {
+                                            name: ConfigMapName::from_str_unsafe("security-config"),
+                                            key: ConfigMapKey::from_str_unsafe("config.yml")
+                                        }
+                                    )
+                                ),
+                            },
+                            ..v1alpha1::SecurityConfig::default()
+                        },
                     },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",

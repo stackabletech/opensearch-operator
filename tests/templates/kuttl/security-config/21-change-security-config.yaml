@@ -5,11 +5,12 @@ metadata:
   name: opensearch
 spec:
   clusterConfig:
-    securityConfig:
+    security:
       config:
-        content:
-          value:
-            config:
-              dynamic:
-                http:
-                  anonymous_auth_enabled: false
+        config:
+          content:
+            value:
+              config:
+                dynamic:
+                  http:
+                    anonymous_auth_enabled: false

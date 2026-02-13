@@ -171,9 +171,14 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
-        let protocol = if self.cluster.security_config.enabled
-            && self.cluster.tls_config.server_secret_class.is_some()
-        {
+        let tls_server_secret_class_defined = self
+            .cluster
+            .security
+            .as_ref()
+            .and_then(|security| security.tls.server_secret_class.as_ref())
+            .is_some();
+
+        let protocol = if tls_server_secret_class_defined {
             "https"
         } else {
             "http"
@@ -338,7 +343,7 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedOpenSearchConfig,
+            ValidatedOpenSearchConfig, ValidatedSecurity,
             build::role_builder::{
                 discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
             },
@@ -429,8 +434,11 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
-            v1alpha1::SecurityConfig::default(),
+            Some(ValidatedSecurity {
+                managing_role_group: None,
+                config: v1alpha1::SecurityConfig::default(),
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),

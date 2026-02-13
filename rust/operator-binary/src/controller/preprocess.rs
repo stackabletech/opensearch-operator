@@ -24,18 +24,19 @@ pub enum Error {
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn preprocess(mut cluster: v1alpha1::OpenSearchCluster) -> Result<v1alpha1::OpenSearchCluster> {
-    let security_config = &cluster.spec.cluster_config.security_config;
-    if !security_config.is_only_managed_by_api()
+    let security = &cluster.spec.cluster_config.security;
+    if security.enabled
+        && !security.config.is_only_managed_by_api()
         && !cluster
             .spec
             .nodes
             .role_groups
-            .contains_key(&security_config.managing_role_group.to_string())
+            .contains_key(&security.managing_role_group.to_string())
     {
         info!(
             "The security configuration is managed by the role group \"{role_group}\". \
             This role group was not specified explicitly and will be created.",
-            role_group = security_config.managing_role_group
+            role_group = security.managing_role_group
         );
 
         let role_group =
@@ -64,7 +65,7 @@ pub fn preprocess(mut cluster: v1alpha1::OpenSearchCluster) -> Result<v1alpha1::
             .spec
             .nodes
             .role_groups
-            .insert(security_config.managing_role_group.to_string(), role_group);
+            .insert(security.managing_role_group.to_string(), role_group);
     }
 
     Ok(cluster)

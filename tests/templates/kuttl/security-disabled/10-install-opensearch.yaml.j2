@@ -11,7 +11,7 @@ spec:
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
-    securityConfig:
+    security:
       enabled: false
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery

@@ -106,7 +106,7 @@ pub mod versioned {
 
         /// TODO Add description
         #[serde(default)]
-        pub security_config: SecurityConfig,
+        pub security: Security,
 
         /// TLS configuration options for the server (REST API) and internal communication (transport).
         #[serde(default)]
@@ -132,13 +132,20 @@ pub mod versioned {
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct SecurityConfig {
+    pub struct Security {
         #[serde(default = "security_config_enabled_default")]
         pub enabled: bool,
 
         #[serde(default = "security_config_managing_role_group")]
         pub managing_role_group: RoleGroupName,
 
+        #[serde(default)]
+        pub config: SecurityConfig,
+    }
+
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SecurityConfig {
         #[serde(default = "security_config_file_type_actiongroups_default")]
         pub action_groups: SecurityConfigFileType,
 
@@ -493,11 +500,19 @@ impl v1alpha1::OpenSearchConfig {
     }
 }
 
-impl Default for v1alpha1::SecurityConfig {
+impl Default for v1alpha1::Security {
     fn default() -> Self {
-        v1alpha1::SecurityConfig {
+        Self {
             enabled: security_config_enabled_default(),
             managing_role_group: security_config_managing_role_group(),
+            config: v1alpha1::SecurityConfig::default(),
+        }
+    }
+}
+
+impl Default for v1alpha1::SecurityConfig {
+    fn default() -> Self {
+        Self {
             action_groups: security_config_file_type_actiongroups_default(),
             allow_list: security_config_file_type_allowlist_default(),
             audit: security_config_file_type_audit_default(),
@@ -651,9 +666,7 @@ impl v1alpha1::SecurityConfig {
     }
 
     pub fn value(&self, file_type: SecurityConfigFileType) -> Option<String> {
-        if !self.enabled {
-            None
-        } else if let v1alpha1::SecurityConfigFileType {
+        if let v1alpha1::SecurityConfigFileType {
             content:
                 v1alpha1::SecurityConfigFileTypeContent::Value(
                     v1alpha1::SecurityConfigFileTypeContentValue { value },
@@ -671,9 +684,7 @@ impl v1alpha1::SecurityConfig {
         &self,
         file_type: SecurityConfigFileType,
     ) -> Option<&v1alpha1::ConfigMapKeyRef> {
-        if !self.enabled {
-            None
-        } else if let v1alpha1::SecurityConfigFileType {
+        if let v1alpha1::SecurityConfigFileType {
             content:
                 v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
                     v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
@@ -693,9 +704,7 @@ impl v1alpha1::SecurityConfig {
         &self,
         file_type: SecurityConfigFileType,
     ) -> Option<&v1alpha1::SecretKeyRef> {
-        if !self.enabled {
-            None
-        } else if let v1alpha1::SecurityConfigFileType {
+        if let v1alpha1::SecurityConfigFileType {
             content:
                 v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
                     v1alpha1::SecurityConfigFileTypeContentValueFrom::SecretKeyRef(secret_key_ref),
