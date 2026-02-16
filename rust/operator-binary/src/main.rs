@@ -34,6 +34,7 @@ use strum::{EnumDiscriminants, IntoStaticStr};
 mod controller;
 mod crd;
 mod framework;
+mod webhooks;
 
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
@@ -74,6 +75,18 @@ pub enum Error {
     CreateSignalWatcher {
         source: stackable_operator::utils::signal::SignalError,
     },
+
+    #[snafu(display("failed to create webhook server"))]
+    CreateWebhook { source: webhooks::conversion::Error },
+
+    // No context selector is being generated here so that we can run the webhook
+    // as is, without the need to map the error to this variant. The ? operator
+    // used after the futures::try_join function automatically converts the
+    // underlying error to this variant.
+    #[snafu(display("failed to run webhook server"), context(false))]
+    RunWebhook {
+        source: stackable_operator::webhook::WebhookServerError,
+    },
 }
 
 #[derive(clap::Parser)]
@@ -95,7 +108,7 @@ async fn main() -> Result<()> {
                 .context(SerializeCrdSnafu)?;
         }
         Command::Run(RunArguments {
-            operator_environment: _,
+            operator_environment,
             product_config: _,
             watch_namespace,
             maintenance,
@@ -134,6 +147,16 @@ async fn main() -> Result<()> {
             )
             .await
             .context(CreateClientSnafu)?;
+
+            let webhook_server = webhooks::conversion::create_webhook_server(
+                &operator_environment,
+                maintenance.disable_crd_maintenance,
+                client.as_kube_client(),
+            )
+            .await
+            .context(CreateWebhookSnafu)?;
+
+            let webhook_server = webhook_server.run(sigterm_watcher.handle());
 
             let controller_context = controller::Context::new(client.clone(), operator_name);
             let full_controller_name = controller_context.full_controller_name();
@@ -203,7 +226,7 @@ async fn main() -> Result<()> {
             )
             .map(Ok);
 
-            futures::try_join!(controller, eos_checker)?;
+            futures::try_join!(controller, eos_checker, webhook_server)?;
         }
     }
 
