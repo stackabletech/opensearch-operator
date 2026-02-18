@@ -4,27 +4,6 @@ kind: Secret
 metadata:
   name: opensearch-security-config
 stringData:
-  action_groups.yml: |
-    ---
-    _meta:
-      type: actiongroups
-      config_version: 2
-  allowlist.yml: |
-    ---
-    _meta:
-      type: allowlist
-      config_version: 2
-
-    config:
-      enabled: false
-  audit.yml: |
-    ---
-    _meta:
-      type: audit
-      config_version: 2
-
-    config:
-      enabled: false
   config.yml: |
     ---
     _meta:
@@ -83,8 +62,6 @@ stringData:
                 rolename: cn
   internal_users.yml: |
     ---
-    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
-
     _meta:
       type: internalusers
       config_version: 2
@@ -100,11 +77,6 @@ stringData:
       hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
       reserved: true
       description: OpenSearch Dashboards user
-  nodes_dn.yml: |
-    ---
-    _meta:
-      type: nodesdn
-      config_version: 2
   roles.yml: |
     ---
     _meta:
@@ -144,8 +116,3 @@ stringData:
       reserved: false
       backend_roles:
         - testgroup
-  tenants.yml: |
-    ---
-    _meta:
-      type: tenants
-      config_version: 2
