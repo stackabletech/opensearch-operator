@@ -12,14 +12,55 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     keystore:
-    - key: s3.client.default.access_key
-      secretKeyRef:
-        name: s3-credentials
-        key: ACCESS_KEY
-    - key: s3.client.default.secret_key
-      secretKeyRef:
-        name: s3-credentials
-        key: SECRET_KEY
+      - key: s3.client.default.access_key
+        secretKeyRef:
+          name: s3-credentials
+          key: ACCESS_KEY
+      - key: s3.client.default.secret_key
+        secretKeyRef:
+          name: s3-credentials
+          key: SECRET_KEY
+    security:
+      config:
+        config:
+          managedBy: API
+          content:
+            value:
+              _meta:
+                type: config
+                config_version: 2
+              config:
+                dynamic:
+                  authc:
+                    basic_internal_auth_domain:
+                      description: Authenticate via HTTP Basic against internal users database
+                      http_enabled: true
+                      transport_enabled: true
+                      order: 1
+                      http_authenticator:
+                        type: basic
+                        challenge: true
+                      authentication_backend:
+                        type: intern
+                  authz: {}
+        internalUsers:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: opensearch-2-security-config
+                key: internal_users.yml
+        rolesMapping:
+          managedBy: API
+          content:
+            value:
+              _meta:
+                type: rolesmapping
+                config_version: 2
+              all_access:
+                reserved: false
+                backend_roles:
+                  - admin
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
@@ -41,7 +82,6 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.allow_default_init_securityindex: "true"
         plugins.security.authcz.admin_dn: CN=opensearch-2-admin-certificate
         plugins.security.restapi.roles_enabled: all_access
         plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
@@ -110,9 +150,6 @@ spec:
         containers:
           - name: opensearch
             volumeMounts:
-              - name: security-config
-                mountPath: /stackable/opensearch/config/opensearch-security
-                readOnly: true
 {% if test_scenario['values']['s3-use-tls'] == 'true' %}
               - name: system-trust-store
                 mountPath: /etc/pki/java/cacerts
@@ -126,10 +163,6 @@ spec:
           - name: admin-certificate
             secret:
               secretName: opensearch-2-admin-certificate
-              defaultMode: 0o660
-          - name: security-config
-            secret:
-              secretName: opensearch-2-security-config
               defaultMode: 0o660
 {% if test_scenario['values']['s3-use-tls'] == 'true' %}
           - name: s3-ca-crt
@@ -149,51 +182,8 @@ kind: Secret
 metadata:
   name: opensearch-2-security-config
 stringData:
-  action_groups.yml: |
-    ---
-    _meta:
-      type: actiongroups
-      config_version: 2
-  allowlist.yml: |
-    ---
-    _meta:
-      type: allowlist
-      config_version: 2
-
-    config:
-      enabled: false
-  audit.yml: |
-    ---
-    _meta:
-      type: audit
-      config_version: 2
-
-    config:
-      enabled: false
-  config.yml: |
-    ---
-    _meta:
-      type: config
-      config_version: 2
-
-    config:
-      dynamic:
-        authc:
-          basic_internal_auth_domain:
-            description: Authenticate via HTTP Basic against internal users database
-            http_enabled: true
-            transport_enabled: true
-            order: 1
-            http_authenticator:
-              type: basic
-              challenge: true
-            authentication_backend:
-              type: intern
-        authz: {}
   internal_users.yml: |
     ---
-    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
-
     _meta:
       type: internalusers
       config_version: 2
@@ -204,38 +194,3 @@ stringData:
       backend_roles:
         - admin
       description: OpenSearch admin user
-
-    kibanaserver:
-      hash: $2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
-      reserved: true
-      description: OpenSearch Dashboards user
-  nodes_dn.yml: |
-    ---
-    _meta:
-      type: nodesdn
-      config_version: 2
-  roles.yml: |
-    ---
-    _meta:
-      type: roles
-      config_version: 2
-  roles_mapping.yml: |
-    ---
-    _meta:
-      type: rolesmapping
-      config_version: 2
-
-    all_access:
-      reserved: false
-      backend_roles:
-        - admin
-
-    kibana_server:
-      reserved: true
-      users:
-        - kibanaserver
-  tenants.yml: |
-    ---
-    _meta:
-      type: tenants
-      config_version: 2
