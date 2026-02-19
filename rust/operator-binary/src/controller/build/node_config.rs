@@ -71,8 +71,8 @@ const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 /// Type: string
 const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";
 
-/// If this is set to true OpenSearch Security will automatically initialize the configuration index
-/// with the files in the config directory if the index does not exist.
+/// If this is set to true, the OpenSearch security plugin will automatically initialize the
+/// configuration index with the files in the config directory if the index does not exist.
 /// Type: boolean
 const CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX: &str =
     "plugins.security.allow_default_init_securityindex";
@@ -81,7 +81,7 @@ const CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX: &str =
 /// Type: (comma-separated) list of strings
 const CONFIG_OPTION_PLUGINS_SECURITY_AUTHCZ_ADMIN_DN: &str = "plugins.security.authcz.admin_dn";
 
-/// Disables the security plugin
+/// Whether to disable the security plugin
 /// Type: boolean
 const CONFIG_OPTION_PLUGINS_SECURITY_DISABLED: &str = "plugins.security.disabled";
 
@@ -536,7 +536,7 @@ mod tests {
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                kubernetes::{ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName},
                 operator::{ClusterName, ProductVersion, RoleGroupName},
             },
         },
@@ -627,8 +627,21 @@ mod tests {
             )]
             .into(),
             Some(ValidatedSecurity {
-                managing_role_group: None,
-                config: v1alpha1::SecurityConfig::default(),
+                managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
+                config: v1alpha1::SecurityConfig {
+                    config: v1alpha1::SecurityConfigFileType {
+                        managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
+                        content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
+                            v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                                v1alpha1::ConfigMapKeyRef {
+                                    name: ConfigMapName::from_str_unsafe("security-config"),
+                                    key: ConfigMapKey::from_str_unsafe("config.yml"),
+                                },
+                            ),
+                        ),
+                    },
+                    ..v1alpha1::SecurityConfig::default()
+                },
                 tls: v1alpha1::OpenSearchTls::default(),
             }),
             vec![],
@@ -659,7 +672,8 @@ mod tests {
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
                 "path.logs: \"/stackable/log/opensearch\"\n",
-                "plugins.security.allow_default_init_securityindex: true\n",
+                "plugins.security.allow_default_init_securityindex: false\n",
+                "plugins.security.authcz.admin_dn: \"CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b\"\n",
                 "plugins.security.disabled: false\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: true\n",
