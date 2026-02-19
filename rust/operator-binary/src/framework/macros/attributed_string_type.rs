@@ -169,13 +169,13 @@ macro_rules! attributed_string_type {
         }
 
         // The JsonSchema implementation requires `max_length`.
-        impl schemars::JsonSchema for $name {
+        impl stackable_operator::schemars::JsonSchema for $name {
             fn schema_name() -> std::borrow::Cow<'static, str> {
                 std::stringify!($name).into()
             }
 
-            fn json_schema(_generator: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
-                schemars::json_schema!({
+            fn json_schema(_generator: &mut stackable_operator::schemars::generate::SchemaGenerator) -> stackable_operator::schemars::Schema {
+                stackable_operator::schemars::json_schema!({
                     "type": "string",
                     "minLength": $name::MIN_LENGTH,
                     "maxLength": if $name::MAX_LENGTH != usize::MAX {
@@ -489,7 +489,7 @@ pub const fn max(x: usize, y: usize) -> usize {
 mod tests {
     use std::str::FromStr;
 
-    use schemars::{JsonSchema, SchemaGenerator};
+    use stackable_operator::schemars::{JsonSchema, SchemaGenerator};
     use serde_json::{Number, Value, json};
     use uuid::uuid;
 

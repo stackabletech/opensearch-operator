@@ -11,7 +11,7 @@ use stackable_operator::{
     },
     k8s_openapi::{DeepMerge, api::core::v1::PodTemplateSpec},
     role_utils::{CommonConfiguration, Role, RoleGroup},
-    schemars::JsonSchema,
+    schemars::{self, JsonSchema},
 };
 
 use super::{
@@ -227,13 +227,13 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use rstest::*;
-    use schemars::JsonSchema;
     use serde::Serialize;
     use stackable_operator::{
         config::{fragment::Fragment, merge::Merge},
         k8s_openapi::api::core::v1::PodTemplateSpec,
         kube::api::ObjectMeta,
         role_utils::{CommonConfiguration, GenericRoleConfig, Role, RoleGroup},
+        schemars::{self, JsonSchema},
     };
 
     use super::ResourceNames;
