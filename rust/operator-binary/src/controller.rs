@@ -59,6 +59,7 @@ pub const HTTP_PORT_NAME: &str = "http";
 pub const HTTP_PORT: Port = Port(9200);
 pub const TRANSPORT_PORT_NAME: &str = "transport";
 pub const TRANSPORT_PORT: Port = Port(9300);
+pub const FIELD_MANAGER: &str = "opensearch-operator";
 
 /// Names in the controller context which are passed to the submodules of the controller
 ///

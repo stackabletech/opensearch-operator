@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Add conversion webhook ([#114]).
 - Allow the configuration of TLS for the HTTP and TRANSPORT ports with the operator ([#55]).
 - Add the role group as a node attribute ([#63]).
 - Allow adding entries to the OpenSearch keystore ([#76]).
@@ -47,6 +48,7 @@ All notable changes to this project will be documented in this file.
 [#107]: https://github.com/stackabletech/opensearch-operator/pull/107
 [#108]: https://github.com/stackabletech/opensearch-operator/pull/108
 [#110]: https://github.com/stackabletech/opensearch-operator/pull/110
+[#114]: https://github.com/stackabletech/opensearch-operator/pull/114
 
 ## [25.11.0] - 2025-11-07
 
