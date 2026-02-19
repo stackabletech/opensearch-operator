@@ -211,7 +211,7 @@ impl<'a> RoleGroupBuilder<'a> {
             && self.security_managing_container(security).is_some()
         {
             for file_type in SecurityConfigFileType::iter() {
-                if let Some(value) = security.config.value(file_type) {
+                if let Some(value) = security.settings.value(file_type) {
                     data.insert(file_type.filename(), value.to_string());
                 }
             }
@@ -442,7 +442,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
             if self.security_managing_container(security).is_some() {
                 volumes.extend(RoleGroupBuilder::security_config_volumes(
-                    &security.config,
+                    &security.settings,
                     self.resource_names.role_group_config_map(),
                 ));
             }
@@ -737,7 +737,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             );
 
         for file_type in SecurityConfigFileType::iter() {
-            let managed_by_operator = security.config.security_config(file_type).managed_by
+            let managed_by_operator = security.settings.security_config(file_type).managed_by
                 == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
 
             env_vars = env_vars.with_value(
@@ -1332,7 +1332,7 @@ mod tests {
             .into(),
             Some(ValidatedSecurity {
                 managing_role_group: None,
-                config: v1alpha1::SecurityConfig::default(),
+                settings: v1alpha1::SecurityConfig::default(),
                 tls: v1alpha1::OpenSearchTls::default(),
             }),
             vec![v1alpha1::OpenSearchKeystore {

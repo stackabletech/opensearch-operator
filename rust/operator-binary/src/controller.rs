@@ -184,7 +184,7 @@ impl ValidatedLogging {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedSecurity {
     pub managing_role_group: Option<RoleGroupName>,
-    pub config: v1alpha1::SecurityConfig,
+    pub settings: v1alpha1::SecurityConfig,
     pub tls: v1alpha1::OpenSearchTls,
 }
 
@@ -577,7 +577,7 @@ mod tests {
             .into(),
             Some(ValidatedSecurity {
                 managing_role_group: None,
-                config: v1alpha1::SecurityConfig::default(),
+                settings: v1alpha1::SecurityConfig::default(),
                 tls: v1alpha1::OpenSearchTls::default(),
             }),
             vec![],

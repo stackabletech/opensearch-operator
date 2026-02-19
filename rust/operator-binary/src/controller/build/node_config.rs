@@ -242,9 +242,9 @@ impl NodeConfig {
         if let Some(security) = &self.cluster.security {
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX.to_owned(),
-                json!(security.config.is_only_managed_by_api()),
+                json!(security.settings.is_only_managed_by_api()),
             );
-            if !security.config.is_only_managed_by_api() {
+            if !security.settings.is_only_managed_by_api() {
                 config.insert(
                     CONFIG_OPTION_PLUGINS_SECURITY_AUTHCZ_ADMIN_DN.to_owned(),
                     json!(self.super_admin_dn()),
@@ -628,7 +628,7 @@ mod tests {
             .into(),
             Some(ValidatedSecurity {
                 managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
-                config: v1alpha1::SecurityConfig {
+                settings: v1alpha1::SecurityConfig {
                     config: v1alpha1::SecurityConfigFileType {
                         managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
                         content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(

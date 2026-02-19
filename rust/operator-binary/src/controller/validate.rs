@@ -313,7 +313,7 @@ fn validate_security_config(
 
         Some(ValidatedSecurity {
             managing_role_group,
-            config: spec.cluster_config.security.settings.clone(),
+            settings: spec.cluster_config.security.settings.clone(),
             tls: spec.cluster_config.tls.clone(),
         })
     } else {
@@ -659,7 +659,7 @@ mod tests {
                 .into(),
                 Some(ValidatedSecurity {
                     managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
-                    config: v1alpha1::SecurityConfig {
+                    settings: v1alpha1::SecurityConfig {
                         config: v1alpha1::SecurityConfigFileType {
                             managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
                             content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(

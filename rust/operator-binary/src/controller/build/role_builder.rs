@@ -429,7 +429,7 @@ mod tests {
             .into(),
             Some(ValidatedSecurity {
                 managing_role_group: None,
-                config: v1alpha1::SecurityConfig::default(),
+                settings: v1alpha1::SecurityConfig::default(),
                 tls: v1alpha1::OpenSearchTls::default(),
             }),
             vec![],
