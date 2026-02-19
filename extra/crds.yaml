@@ -221,13 +221,19 @@ spec:
                                 config_version: 2
                                 type: tenants
                           managedBy: API
-                    description: TODO Add description
+                    description: Configuration of the OpenSearch security plugin
                     properties:
                       enabled:
                         default: true
+                        description: |-
+                          Whether to enable the OpenSearch security plugin
+
+                          Disabling the security plugin also disables TLS and exposes the security index if it
+                          exists.
                         type: boolean
                       managingRoleGroup:
                         default: security-config
+                        description: The role group that updates the security index if any setting is managed by the operator.
                         maxLength: 16
                         minLength: 1
                         type: string
@@ -305,6 +311,7 @@ spec:
                                   config_version: 2
                                   type: tenants
                             managedBy: API
+                        description: Settings for the OpenSearch security plugin
                         properties:
                           actionGroups:
                             default:
@@ -314,8 +321,13 @@ spec:
                                     config_version: 2
                                     type: actiongroups
                               managedBy: API
+                            description: |-
+                              User-defined action groups
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -323,9 +335,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -333,6 +347,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -351,6 +366,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -371,7 +387,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -390,8 +411,13 @@ spec:
                                   config:
                                     enabled: false
                               managedBy: API
+                            description: |-
+                              List of allowed HTTP endpoints
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -399,9 +425,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -409,6 +437,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -427,6 +456,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -447,7 +477,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -466,8 +501,13 @@ spec:
                                   config:
                                     enabled: false
                               managedBy: API
+                            description: |-
+                              Settings for audit logging
+
+                              see https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -475,9 +515,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -485,6 +527,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -503,6 +546,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -523,7 +567,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -545,8 +594,13 @@ spec:
                                       authz: {}
                                       http: {}
                               managedBy: API
+                            description: |-
+                              Configuration of the security backend
+
+                              see https://docs.opensearch.org/latest/security/configuration/configuration/
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -554,9 +608,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -564,6 +620,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -582,6 +639,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -602,7 +660,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -619,8 +682,13 @@ spec:
                                     config_version: 2
                                     type: internalusers
                               managedBy: API
+                            description: |-
+                              The internal user database
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -628,9 +696,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -638,6 +708,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -656,6 +727,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -676,7 +748,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -693,8 +770,13 @@ spec:
                                     config_version: 2
                                     type: nodesdn
                               managedBy: API
+                            description: |-
+                              Distinguished names (DNs) of nodes to allow communication between nodes and clusters
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -702,9 +784,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -712,6 +796,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -730,6 +815,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -750,7 +836,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -767,8 +858,13 @@ spec:
                                     config_version: 2
                                     type: roles
                               managedBy: API
+                            description: |-
+                              Definition of roles in the security plugin
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -776,9 +872,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -786,6 +884,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -804,6 +903,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -824,7 +924,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -841,8 +946,13 @@ spec:
                                     config_version: 2
                                     type: rolesmapping
                               managedBy: API
+                            description: |-
+                              Role mappings to users or backend roles
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -850,9 +960,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -860,6 +972,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -878,6 +991,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -898,7 +1012,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -915,8 +1034,13 @@ spec:
                                     config_version: 2
                                     type: tenants
                               managedBy: API
+                            description: |-
+                              OpenSearch Dashboards tenants
+
+                              see https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml
                             properties:
                               content:
+                                description: The content of the security configuration file
                                 oneOf:
                                 - required:
                                   - value
@@ -924,9 +1048,11 @@ spec:
                                   - valueFrom
                                 properties:
                                   value:
+                                    description: Security configuration file content defined inline
                                     type: object
                                     x-kubernetes-preserve-unknown-fields: true
                                   valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
                                     oneOf:
                                     - required:
                                       - configMapKeyRef
@@ -934,6 +1060,7 @@ spec:
                                       - secretKeyRef
                                     properties:
                                       configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
                                         properties:
                                           key:
                                             description: Key in the ConfigMap that contains the value
@@ -952,6 +1079,7 @@ spec:
                                         - name
                                         type: object
                                       secretKeyRef:
+                                        description: Reference to a key in a Secret
                                         properties:
                                           key:
                                             description: Key in the Secret that contains the value
@@ -972,7 +1100,12 @@ spec:
                                     type: object
                                 type: object
                               managedBy:
-                                description: No default, so that the user is aware!
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
                                 enum:
                                 - API
                                 - operator
@@ -987,7 +1120,10 @@ spec:
                     default:
                       internalSecretClass: tls
                       serverSecretClass: tls
-                    description: TLS configuration options for the server (REST API) and internal communication (transport).
+                    description: |-
+                      TLS configuration options for the server (REST API) and internal communication (transport).
+
+                      This configuration is only effective if the OpenSearch security plugin is not disabled.
                     properties:
                       internalSecretClass:
                         default: tls

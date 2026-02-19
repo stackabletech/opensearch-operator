@@ -104,11 +104,13 @@ pub mod versioned {
         #[serde(default)]
         pub keystore: Vec<OpenSearchKeystore>,
 
-        /// TODO Add description
+        /// Configuration of the OpenSearch security plugin
         #[serde(default)]
         pub security: Security,
 
         /// TLS configuration options for the server (REST API) and internal communication (transport).
+        ///
+        /// This configuration is only effective if the OpenSearch security plugin is not disabled.
         #[serde(default)]
         pub tls: OpenSearchTls,
 
@@ -133,12 +135,18 @@ pub mod versioned {
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Security {
+        /// Whether to enable the OpenSearch security plugin
+        ///
+        /// Disabling the security plugin also disables TLS and exposes the security index if it
+        /// exists.
         #[serde(default = "security_config_enabled_default")]
         pub enabled: bool,
 
+        /// The role group that updates the security index if any setting is managed by the operator.
         #[serde(default = "security_config_managing_role_group")]
         pub managing_role_group: RoleGroupName,
 
+        /// Settings for the OpenSearch security plugin
         #[serde(default)]
         pub settings: SecurityConfig,
     }
@@ -146,30 +154,57 @@ pub mod versioned {
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SecurityConfig {
+        /// User-defined action groups
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml
         #[serde(default = "security_config_file_type_actiongroups_default")]
         pub action_groups: SecurityConfigFileType,
 
+        /// List of allowed HTTP endpoints
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml
         #[serde(default = "security_config_file_type_allowlist_default")]
         pub allow_list: SecurityConfigFileType,
 
+        /// Settings for audit logging
+        ///
+        /// see https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml
         #[serde(default = "security_config_file_type_audit_default")]
         pub audit: SecurityConfigFileType,
 
+        /// Configuration of the security backend
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/configuration/
         #[serde(default = "security_config_file_type_config_default")]
         pub config: SecurityConfigFileType,
 
+        /// The internal user database
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml
         #[serde(default = "security_config_file_type_internalusers_default")]
         pub internal_users: SecurityConfigFileType,
 
+        /// Distinguished names (DNs) of nodes to allow communication between nodes and clusters
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml
         #[serde(default = "security_config_file_type_nodesdn_default")]
         pub nodes_dn: SecurityConfigFileType,
 
+        /// Definition of roles in the security plugin
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml
         #[serde(default = "security_config_file_type_roles_default")]
         pub roles: SecurityConfigFileType,
 
+        /// Role mappings to users or backend roles
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml
         #[serde(default = "security_config_file_type_rolesmapping_default")]
         pub roles_mapping: SecurityConfigFileType,
 
+        /// OpenSearch Dashboards tenants
+        ///
+        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml
         #[serde(default = "security_config_file_type_tenants_default")]
         pub tenants: SecurityConfigFileType,
     }
@@ -177,8 +212,15 @@ pub mod versioned {
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct SecurityConfigFileType {
-        /// No default, so that the user is aware!
+        /// Whether this configuration should only be applied initially and afterwards be managed
+        /// via the "API", or managed all the time by the "operator".
+        ///
+        /// If this configuration is changed later from "API" to "operator", then the changes made
+        /// via the API are overridden.
+        // No default, so that the user is aware of!
         pub managed_by: SecurityConfigFileTypeManagedBy,
+
+        /// The content of the security configuration file
         pub content: SecurityConfigFileTypeContent,
     }
 
@@ -196,9 +238,11 @@ pub mod versioned {
         Serialize,
     )]
     pub enum SecurityConfigFileTypeManagedBy {
+        /// Only initially applied by the operator, but afterwards managed via the API.
         #[serde(rename = "API")]
         Api,
 
+        /// Managed by the operator; Changes made via the API will be eventually overridden.
         #[serde(rename = "operator")]
         Operator,
     }
@@ -206,7 +250,10 @@ pub mod versioned {
     #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub enum SecurityConfigFileTypeContent {
+        /// Security configuration file content defined inline
         Value(SecurityConfigFileTypeContentValue),
+
+        /// Security configuration file content ingested from a ConfigMap or Secret
         ValueFrom(SecurityConfigFileTypeContentValueFrom),
     }
 
@@ -220,7 +267,10 @@ pub mod versioned {
     #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub enum SecurityConfigFileTypeContentValueFrom {
+        /// Reference to a key in a ConfigMap
         ConfigMapKeyRef(ConfigMapKeyRef),
+
+        /// Reference to a key in a Secret
         SecretKeyRef(SecretKeyRef),
     }
 
@@ -228,6 +278,7 @@ pub mod versioned {
     pub struct ConfigMapKeyRef {
         /// Name of the ConfigMap
         pub name: ConfigMapName,
+
         /// Key in the ConfigMap that contains the value
         pub key: ConfigMapKey,
     }
@@ -236,6 +287,7 @@ pub mod versioned {
     pub struct SecretKeyRef {
         /// Name of the Secret
         pub name: SecretName,
+
         /// Key in the Secret that contains the value
         pub key: SecretKey,
     }
