@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -e -u -o pipefail
+
 function log () {
     level="$1"
     message="$2"
@@ -7,7 +11,7 @@ function log () {
 }
 
 function info () {
-    message="$@"
+    message="$*"
 
     log INFO "$message"
 }
@@ -39,7 +43,7 @@ function create_admin_certificate () {
     openssl req \
         -x509 \
         -nodes \
-        -subj=/$ADMIN_DN \
+        -subj=/"$ADMIN_DN" \
         -out=/stackable/tls-admin-cert/tls.crt \
         -keyout=/stackable/tls-admin-cert/tls.key
 }

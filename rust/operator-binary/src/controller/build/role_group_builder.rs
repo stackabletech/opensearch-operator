@@ -666,13 +666,10 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
                 .expect("should be a valid container name"),
         )
         .image_from_product_image(&self.cluster.image)
-        .command(vec![
-            "/bin/bash".to_string(),
-            "-euo".to_string(),
-            "pipefail".to_string(),
-            "-c".to_string(),
+        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+        .args(vec![
+            include_str!("scripts/create-admin-certificate.sh").to_owned(),
         ])
-        .args(vec![include_str!("create-admin-certificate.sh").to_owned()])
         .add_env_vars(env_vars.into())
         .add_volume_mounts(volume_mounts)
         .expect("The mount paths are statically defined and there should be no duplicates.")
@@ -754,13 +751,10 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
 
         new_container_builder(&v1alpha1::Container::UpdateSecurityConfig.to_container_name())
             .image_from_product_image(&self.cluster.image)
-            .command(vec![
-                "/bin/bash".to_string(),
-                "-uo".to_string(),
-                "pipefail".to_string(),
-                "-c".to_string(),
+            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+            .args(vec![
+                include_str!("scripts/update-security-config.sh").to_owned(),
             ])
-            .args(vec![include_str!("update-security-config.sh").to_owned()])
             .add_env_vars(env_vars.into())
             .add_volume_mounts(volume_mounts)
             .expect("The mount paths are statically defined and there should be no duplicates.")

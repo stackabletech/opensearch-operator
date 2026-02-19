@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -u -o pipefail
+
 function log () {
     level="$1"
     message="$2"
@@ -7,7 +11,7 @@ function log () {
 }
 
 function info () {
-    message="$@"
+    message="$*"
 
     log INFO "$message"
 }
@@ -33,7 +37,7 @@ function wait_seconds () {
         mkdir --parents /stackable/log/_vector
         inotifywait \
             --quiet --quiet \
-            --timeout $seconds \
+            --timeout "$seconds" \
             --event create \
             /stackable/log/_vector
     fi
