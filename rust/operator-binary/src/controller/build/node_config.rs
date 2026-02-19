@@ -243,7 +243,7 @@ impl NodeConfig {
             if !security.config.is_only_managed_by_api() {
                 config.insert(
                     CONFIG_OPTION_PLUGINS_SECURITY_AUTHCZ_ADMIN_DN.to_owned(),
-                    json!(self.admin_dn()),
+                    json!(self.super_admin_dn()),
                 );
             }
         }
@@ -251,7 +251,8 @@ impl NodeConfig {
         config
     }
 
-    pub fn admin_dn(&self) -> String {
+    /// Distinguished name (DN) of the super admin certificate
+    pub fn super_admin_dn(&self) -> String {
         // The common name field is limited to 64 characters, see RFC 5280.
         format!("CN=update-security-config.{}", self.cluster.uid)
     }

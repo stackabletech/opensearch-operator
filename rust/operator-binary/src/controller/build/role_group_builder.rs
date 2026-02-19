@@ -632,7 +632,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         let env_vars = EnvVarSet::new()
             .with_value(
                 &EnvVarName::from_str_unsafe("ADMIN_DN"),
-                self.node_config.admin_dn(),
+                self.node_config.super_admin_dn(),
             )
             .with_field_path(
                 &EnvVarName::from_str_unsafe("POD_NAME"),
