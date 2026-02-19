@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
   - Configuration parameter `spec.nodes.roleGroups.<role-group-name>.config.discoveryServiceExposed`
     added to expose a role-group via the discovery service.
 - Add support for OpenSearch 3.4.0 ([#108]).
+- Allow the configuration of the OpenSearch security plugin ([#117]).
 
 ### Changed
 
@@ -49,6 +50,7 @@ All notable changes to this project will be documented in this file.
 [#108]: https://github.com/stackabletech/opensearch-operator/pull/108
 [#110]: https://github.com/stackabletech/opensearch-operator/pull/110
 [#114]: https://github.com/stackabletech/opensearch-operator/pull/114
+[#117]: https://github.com/stackabletech/opensearch-operator/pull/117
 
 ## [25.11.0] - 2025-11-07
 
