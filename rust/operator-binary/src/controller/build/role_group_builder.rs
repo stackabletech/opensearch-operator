@@ -948,7 +948,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             .common_metadata(self.resource_names.headless_service_name())
             .with_labels(Self::prometheus_labels())
             .with_annotations(Self::prometheus_annotations(
-                self.node_config.tls_on_http_port_enabled(),
+                self.cluster.is_server_tls_enabled(),
             ))
             .build();
 

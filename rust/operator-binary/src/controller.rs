@@ -281,6 +281,14 @@ impl ValidatedCluster {
             .filter(|c| c.1.config.node_roles.contains(node_role))
             .collect()
     }
+
+    /// Whether security is enabled and a server TLS class is defined or not.
+    pub fn is_server_tls_enabled(&self) -> bool {
+        self.security
+            .as_ref()
+            .and_then(|security| security.tls.server_secret_class.as_ref())
+            .is_some()
+    }
 }
 
 impl HasName for ValidatedCluster {

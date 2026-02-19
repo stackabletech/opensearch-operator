@@ -1,11 +1,10 @@
 //! Configuration of an OpenSearch node
 
-use std::str::FromStr;
-
 use serde_json::{Value, json};
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
 };
+use tracing::warn;
 
 use super::ValidatedCluster;
 use crate::{
@@ -184,7 +183,12 @@ impl NodeConfig {
             .into_iter()
             .flatten()
         {
-            config.insert(setting.to_owned(), json!(value));
+            let old_value = config.insert(setting.to_owned(), json!(value));
+            if let Some(old_value) = old_value {
+                warn!(
+                    "configOverrides: Configuration setting {setting:?} changed from {old_value} to {value:?}."
+                );
+            }
         }
 
         // Ensure a deterministic result
@@ -308,26 +312,6 @@ impl NodeConfig {
         }
 
         config
-    }
-
-    // TODO Obsolete or should configOverrides be the truth?
-    /// Returns `true` if TLS is enabled on the HTTP port
-    pub fn tls_on_http_port_enabled(&self) -> bool {
-        self.opensearch_config()
-            .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
-            .and_then(Self::value_as_bool)
-            == Some(true)
-    }
-
-    /// Converts the given JSON value to [`bool`] if possible
-    pub fn value_as_bool(value: &Value) -> Option<bool> {
-        value.as_bool().or(
-            // OpenSearch parses the strings "true" and "false" as boolean, see
-            // https://github.com/opensearch-project/OpenSearch/blob/3.4.0/libs/common/src/main/java/org/opensearch/common/Booleans.java#L45-L84
-            value
-                .as_str()
-                .and_then(|value| FromStr::from_str(value).ok()),
-        )
     }
 
     /// Creates environment variables for the OpenSearch configurations

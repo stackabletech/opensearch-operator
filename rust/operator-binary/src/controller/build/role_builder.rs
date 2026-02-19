@@ -171,14 +171,7 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
-        let tls_server_secret_class_defined = self
-            .cluster
-            .security
-            .as_ref()
-            .and_then(|security| security.tls.server_secret_class.as_ref())
-            .is_some();
-
-        let protocol = if tls_server_secret_class_defined {
+        let protocol = if self.cluster.is_server_tls_enabled() {
             "https"
         } else {
             "http"
