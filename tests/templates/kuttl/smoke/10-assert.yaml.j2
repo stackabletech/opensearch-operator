@@ -184,9 +184,9 @@ spec:
           name: log
         - mountPath: /stackable/listeners/discovery-service
           name: discovery-service-listener
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
           name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
           subPath: tls.crt
@@ -657,9 +657,9 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
           name: tls-internal
+{% if test_scenario['values']['server-use-tls'] == 'true' %}
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
           subPath: tls.crt

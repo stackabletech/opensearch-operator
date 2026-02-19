@@ -140,7 +140,7 @@ pub mod versioned {
         pub managing_role_group: RoleGroupName,
 
         #[serde(default)]
-        pub config: SecurityConfig,
+        pub settings: SecurityConfig,
     }
 
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -511,7 +511,7 @@ impl Default for v1alpha1::Security {
         Self {
             enabled: security_config_enabled_default(),
             managing_role_group: security_config_managing_role_group(),
-            config: v1alpha1::SecurityConfig::default(),
+            settings: v1alpha1::SecurityConfig::default(),
         }
     }
 }

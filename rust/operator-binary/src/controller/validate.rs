@@ -283,7 +283,12 @@ fn validate_security_config(
     spec: &v1alpha1::OpenSearchClusterSpec,
 ) -> Result<Option<ValidatedSecurity>> {
     let security = if spec.cluster_config.security.enabled {
-        let managing_role_group = if !spec.cluster_config.security.config.is_only_managed_by_api() {
+        let managing_role_group = if !spec
+            .cluster_config
+            .security
+            .settings
+            .is_only_managed_by_api()
+        {
             let managing_role_group = spec.cluster_config.security.managing_role_group.clone();
 
             ensure!(
@@ -308,7 +313,7 @@ fn validate_security_config(
 
         Some(ValidatedSecurity {
             managing_role_group,
-            config: spec.cluster_config.security.config.clone(),
+            config: spec.cluster_config.security.settings.clone(),
             tls: spec.cluster_config.tls.clone(),
         })
     } else {
@@ -891,7 +896,7 @@ mod tests {
                     .spec
                     .cluster_config
                     .security
-                    .config
+                    .settings
                     .config
                     .managed_by = v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
                 cluster.spec.cluster_config.tls.server_secret_class = None;
@@ -946,7 +951,7 @@ mod tests {
                     security: v1alpha1::Security {
                         enabled: true,
                         managing_role_group: RoleGroupName::from_str_unsafe("default"),
-                        config: v1alpha1::SecurityConfig {
+                        settings: v1alpha1::SecurityConfig {
                             config: v1alpha1::SecurityConfigFileType {
                                 managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
                                 content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(

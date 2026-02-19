@@ -26,7 +26,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub fn preprocess(mut cluster: v1alpha1::OpenSearchCluster) -> Result<v1alpha1::OpenSearchCluster> {
     let security = &cluster.spec.cluster_config.security;
     if security.enabled
-        && !security.config.is_only_managed_by_api()
+        && !security.settings.is_only_managed_by_api()
         && !cluster
             .spec
             .nodes

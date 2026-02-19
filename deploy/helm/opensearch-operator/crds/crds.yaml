@@ -32,7 +32,9 @@ spec:
                   default:
                     keystore: []
                     security:
-                      config:
+                      enabled: true
+                      managingRoleGroup: security-config
+                      settings:
                         actionGroups:
                           content:
                             value:
@@ -105,8 +107,6 @@ spec:
                                 config_version: 2
                                 type: tenants
                           managedBy: API
-                      enabled: true
-                      managingRoleGroup: security-config
                     tls:
                       internalSecretClass: tls
                       serverSecretClass: tls
@@ -148,7 +148,9 @@ spec:
                       type: array
                     security:
                       default:
-                        config:
+                        enabled: true
+                        managingRoleGroup: security-config
+                        settings:
                           actionGroups:
                             content:
                               value:
@@ -221,11 +223,17 @@ spec:
                                   config_version: 2
                                   type: tenants
                             managedBy: API
-                        enabled: true
-                        managingRoleGroup: security-config
                       description: TODO Add description
                       properties:
-                        config:
+                        enabled:
+                          default: true
+                          type: boolean
+                        managingRoleGroup:
+                          default: security-config
+                          maxLength: 16
+                          minLength: 1
+                          type: string
+                        settings:
                           default:
                             actionGroups:
                               content:
@@ -976,14 +984,6 @@ spec:
                                 - managedBy
                               type: object
                           type: object
-                        enabled:
-                          default: true
-                          type: boolean
-                        managingRoleGroup:
-                          default: security-config
-                          maxLength: 16
-                          minLength: 1
-                          type: string
                       type: object
                     tls:
                       default:

@@ -251,21 +251,9 @@ impl NodeConfig {
         config
     }
 
-    pub fn admin_dn(&self) -> Option<String> {
-        let security = self.cluster.security.as_ref()?;
-
-        security
-            .managing_role_group
-            .as_ref()
-            .map(|managing_role_group| {
-                format!(
-                    "CN={container}.{pod}-0.{namespace}.{cluster_domain_name}",
-                    container = "update-security-config",
-                    pod = managing_role_group,
-                    namespace = self.cluster.namespace,
-                    cluster_domain_name = self.cluster_domain_name
-                )
-            })
+    pub fn admin_dn(&self) -> String {
+        // The common name field is limited to 64 characters, see RFC 5280.
+        format!("CN=update-security-config.{}", self.cluster.uid)
     }
 
     pub fn tls_config(&self) -> serde_json::Map<String, Value> {

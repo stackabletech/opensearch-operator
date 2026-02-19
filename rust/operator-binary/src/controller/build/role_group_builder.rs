@@ -629,10 +629,11 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             return None;
         }
 
-        let admin_dn = self.node_config.admin_dn().expect("");
-
         let env_vars = EnvVarSet::new()
-            .with_value(&EnvVarName::from_str_unsafe("ADMIN_DN"), admin_dn)
+            .with_value(
+                &EnvVarName::from_str_unsafe("ADMIN_DN"),
+                self.node_config.admin_dn(),
+            )
             .with_field_path(
                 &EnvVarName::from_str_unsafe("POD_NAME"),
                 FieldPathEnvVar::Name,
