@@ -489,8 +489,8 @@ pub const fn max(x: usize, y: usize) -> usize {
 mod tests {
     use std::str::FromStr;
 
-    use stackable_operator::schemars::{JsonSchema, SchemaGenerator};
     use serde_json::{Number, Value, json};
+    use stackable_operator::schemars::{JsonSchema, SchemaGenerator};
     use uuid::uuid;
 
     use super::{ErrorDiscriminants, Regex};
