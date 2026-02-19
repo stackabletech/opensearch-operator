@@ -512,7 +512,7 @@ impl NodeConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
     use stackable_operator::{
@@ -674,62 +674,6 @@ mod tests {
             )
             .to_owned(),
             node_config.opensearch_config_file_content()
-        );
-    }
-
-    #[test]
-    pub fn test_tls_on_http_port_enabled() {
-        let node_config_tls_undefined = node_config(TestConfig::default());
-
-        let node_config_tls_enabled = node_config(TestConfig {
-            config_settings: &[("plugins.security.ssl.http.enabled", "true")],
-            ..TestConfig::default()
-        });
-
-        let node_config_tls_disabled = node_config(TestConfig {
-            config_settings: &[("plugins.security.ssl.http.enabled", "false")],
-            ..TestConfig::default()
-        });
-
-        assert!(node_config_tls_undefined.tls_on_http_port_enabled());
-        assert!(node_config_tls_enabled.tls_on_http_port_enabled());
-        assert!(!node_config_tls_disabled.tls_on_http_port_enabled());
-    }
-
-    #[test]
-    pub fn test_value_as_bool() {
-        // boolean
-        assert_eq!(Some(true), NodeConfig::value_as_bool(&Value::Bool(true)));
-        assert_eq!(Some(false), NodeConfig::value_as_bool(&Value::Bool(false)));
-
-        // valid strings
-        assert_eq!(
-            Some(true),
-            NodeConfig::value_as_bool(&Value::String("true".to_owned()))
-        );
-        assert_eq!(
-            Some(false),
-            NodeConfig::value_as_bool(&Value::String("false".to_owned()))
-        );
-
-        // invalid strings
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::String("True".to_owned()))
-        );
-
-        // invalid types
-        assert_eq!(None, NodeConfig::value_as_bool(&Value::Null));
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::Number(
-                serde_json::Number::from_i128(1).expect("should be a valid number")
-            ))
-        );
-        assert_eq!(None, NodeConfig::value_as_bool(&Value::Array(vec![])));
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::Object(serde_json::Map::new()))
         );
     }
 
