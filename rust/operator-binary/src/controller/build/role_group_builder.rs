@@ -33,7 +33,6 @@ use stackable_operator::{
         VECTOR_CONFIG_FILE, calculate_log_volume_size_limit, create_vector_shutdown_file_command,
         remove_vector_shutdown_file_command,
     },
-    shared::time::Duration,
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
 use strum::IntoEnumIterator;
@@ -69,8 +68,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ConfigMapName, ContainerName, ListenerName, PersistentVolumeClaimName,
-                SecretClassName, ServiceAccountName, ServiceName, VolumeName,
+                ContainerName, ListenerName, PersistentVolumeClaimName, ServiceAccountName,
+                ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -313,179 +312,56 @@ impl<'a> RoleGroupBuilder<'a> {
             )
             .build();
 
-        let opensearch_container = self.build_opensearch_container();
-        let vector_container = self
-            .role_group_config
-            .config
-            .logging
-            .vector_container
-            .as_ref()
-            .map(|vector_container_log_config| {
-                vector_container(
-                    &v1alpha1::Container::Vector.to_container_name(),
-                    &self.cluster.image,
-                    vector_container_log_config,
-                    &self.resource_names,
-                    &CONFIG_VOLUME_NAME,
-                    &LOG_VOLUME_NAME,
-                    vector_config_file_extra_env_vars(),
-                )
-            });
+        let containers = [
+            Some(self.build_opensearch_container()),
+            self.build_maybe_vector_container(),
+            self.build_maybe_security_config_container(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
-        let security_config_container = if let Some(security) = &self.cluster.security
-            && self.security_managing_container(security)
-                == Some(v1alpha1::Container::UpdateSecurityConfig)
-        {
-            Some(self.build_security_config_container(security))
-        } else {
-            None
-        };
+        let init_containers = [
+            self.build_maybe_keystore_init_container(),
+            self.build_maybe_admin_certificate_init_container(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
-        let mut init_containers = vec![];
-        if let Some(keystore_init_container) = self.build_maybe_keystore_init_container() {
-            init_containers.push(keystore_init_container);
-        }
-        if let Some(admin_certificate_init_container) =
-            self.build_maybe_admin_certificate_init_container()
-        {
-            init_containers.push(admin_certificate_init_container);
-        }
+        let volumes = [
+            self.build_config_volumes(),
+            self.build_log_volumes(),
+            self.build_security_volumes(),
+            self.build_keystore_volumes(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
-        let log_config_volume_config_map =
-            if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
-                &self.role_group_config.config.logging.opensearch_container
-            {
-                config_map_name.clone()
-            } else {
-                self.resource_names.role_group_config_map()
-            };
-
-        let mut volumes = vec![
-            Volume {
-                name: CONFIG_VOLUME_NAME.to_string(),
-                config_map: Some(ConfigMapVolumeSource {
-                    default_mode: Some(0o660),
-                    name: self.resource_names.role_group_config_map().to_string(),
-                    ..Default::default()
-                }),
-                ..Volume::default()
-            },
-            Volume {
-                name: LOG_CONFIG_VOLUME_NAME.to_string(),
-                config_map: Some(ConfigMapVolumeSource {
-                    default_mode: Some(0o660),
-                    name: log_config_volume_config_map.to_string(),
-                    ..Default::default()
-                }),
-                ..Volume::default()
-            },
-            Volume {
-                name: LOG_VOLUME_NAME.to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(calculate_log_volume_size_limit(&[
-                        MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE,
-                    ])),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            },
-        ];
-
-        if let Some(security) = &self.cluster.security {
-            let mut internal_tls_volume_service_scopes = vec![];
-            if self
+        let affinity = Affinity {
+            node_affinity: self.role_group_config.config.affinity.node_affinity.clone(),
+            pod_affinity: self.role_group_config.config.affinity.pod_affinity.clone(),
+            pod_anti_affinity: self
                 .role_group_config
                 .config
-                .node_roles
-                .contains(&v1alpha1::NodeRole::ClusterManager)
-            {
-                internal_tls_volume_service_scopes
-                    .push(self.node_config.seed_nodes_service_name.clone());
-            }
-            let internal_tls_volume = self.build_tls_volume(
-                &TLS_INTERNAL_VOLUME_NAME,
-                &security.tls.internal_secret_class,
-                internal_tls_volume_service_scopes,
-                SecretFormat::TlsPem,
-                &self.role_group_config.config.requested_secret_lifetime,
-                vec![ROLE_GROUP_LISTENER_VOLUME_NAME.clone()],
-            );
-            volumes.push(internal_tls_volume);
+                .affinity
+                .pod_anti_affinity
+                .clone(),
+        };
 
-            if let Some(tls_http_secret_class_name) = &security.tls.server_secret_class {
-                let mut listener_scopes = vec![ROLE_GROUP_LISTENER_VOLUME_NAME.to_owned()];
-                if self.role_group_config.config.discovery_service_exposed {
-                    listener_scopes.push(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_owned());
-                }
+        let node_selector = self
+            .role_group_config
+            .config
+            .affinity
+            .node_selector
+            .clone()
+            .map(|wrapped| wrapped.node_selector);
 
-                volumes.push(self.build_tls_volume(
-                    &TLS_SERVER_VOLUME_NAME,
-                    tls_http_secret_class_name,
-                    vec![],
-                    SecretFormat::TlsPem,
-                    &self.role_group_config.config.requested_secret_lifetime,
-                    listener_scopes,
-                ))
-            };
-
-            if self.server_ca_volume(security) != TLS_SERVER_VOLUME_NAME.to_owned() {
-                // An init container is responsible for creating the file ca.crt.
-                volumes.push(Volume {
-                    name: self.server_ca_volume(security).to_string(),
-                    empty_dir: Some(EmptyDirVolumeSource {
-                        size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
-                        ..EmptyDirVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                });
-            }
-
-            if self.security_managing_container(security).is_some() {
-                volumes.extend(RoleGroupBuilder::security_config_volumes(
-                    &security.settings,
-                    self.resource_names.role_group_config_map(),
-                ));
-            }
-
-            if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
-                volumes.push(Volume {
-                    name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
-                    empty_dir: Some(EmptyDirVolumeSource {
-                        size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
-                        ..EmptyDirVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                });
-            }
-        }
-
-        if !self.cluster.keystores.is_empty() {
-            volumes.push(Volume {
-                name: OPENSEARCH_KEYSTORE_VOLUME_NAME.to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(Quantity(OPENSEARCH_KEYSTORE_VOLUME_SIZE.to_owned())),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            })
-        }
-
-        for (index, keystore) in self.cluster.keystores.iter().enumerate() {
-            volumes.push(Volume {
-                name: format!("keystore-{index}"),
-                secret: Some(SecretVolumeSource {
-                    default_mode: Some(0o660),
-                    secret_name: Some(keystore.secret_key_ref.name.to_string()),
-                    items: Some(vec![KeyToPath {
-                        key: keystore.secret_key_ref.key.to_string(),
-                        path: keystore.secret_key_ref.key.to_string(),
-                        ..KeyToPath::default()
-                    }]),
-                    ..SecretVolumeSource::default()
-                }),
-                ..Volume::default()
-            });
-        }
+        let security_context = PodSecurityContext {
+            fs_group: Some(1000),
+            ..PodSecurityContext::default()
+        };
 
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
@@ -494,36 +370,11 @@ impl<'a> RoleGroupBuilder<'a> {
         let mut pod_template = PodTemplateSpec {
             metadata: Some(metadata),
             spec: Some(PodSpec {
-                affinity: Some(Affinity {
-                    node_affinity: self.role_group_config.config.affinity.node_affinity.clone(),
-                    pod_affinity: self.role_group_config.config.affinity.pod_affinity.clone(),
-                    pod_anti_affinity: self
-                        .role_group_config
-                        .config
-                        .affinity
-                        .pod_anti_affinity
-                        .clone(),
-                }),
-                containers: [
-                    Some(opensearch_container),
-                    vector_container,
-                    security_config_container,
-                ]
-                .into_iter()
-                .flatten()
-                .collect(),
+                affinity: Some(affinity),
+                containers,
                 init_containers: Some(init_containers),
-                node_selector: self
-                    .role_group_config
-                    .config
-                    .affinity
-                    .node_selector
-                    .clone()
-                    .map(|wrapped| wrapped.node_selector),
-                security_context: Some(PodSecurityContext {
-                    fs_group: Some(1000),
-                    ..PodSecurityContext::default()
-                }),
+                node_selector,
+                security_context: Some(security_context),
                 service_account_name: Some(self.service_account_name.to_string()),
                 termination_grace_period_seconds: Some(
                     self.role_group_config
@@ -621,7 +472,7 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         )
     }
 
-    /// Builds the container for the [`PodTemplateSpec`]
+    /// Builds the create-admin-certificate container for the [`PodTemplateSpec`]
     fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
         let security = self.cluster.security.as_ref()?;
 
@@ -690,89 +541,6 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
         .build();
 
         Some(container)
-    }
-
-    /// Builds the container for the [`PodTemplateSpec`]
-    fn build_security_config_container(&self, security: &ValidatedSecurity) -> Container {
-        let opensearch_path_conf = self.node_config.opensearch_path_conf();
-
-        let mut volume_mounts = vec![
-            VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/tls.crt"),
-                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
-                read_only: Some(true),
-                sub_path: Some("tls.crt".to_owned()),
-                ..VolumeMount::default()
-            },
-            VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/tls.key"),
-                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
-                read_only: Some(true),
-                sub_path: Some("tls.key".to_owned()),
-                ..VolumeMount::default()
-            },
-            VolumeMount {
-                mount_path: format!("{opensearch_path_conf}/tls/ca.crt"),
-                name: TLS_SERVER_CA_VOLUME_NAME.to_string(),
-                read_only: Some(true),
-                sub_path: Some("ca.crt".to_owned()),
-                ..VolumeMount::default()
-            },
-            VolumeMount {
-                mount_path: LOG_VOLUME_DIR.to_owned(),
-                name: LOG_VOLUME_NAME.to_string(),
-                ..VolumeMount::default()
-            },
-        ];
-        volume_mounts.extend(self.security_config_volume_mounts());
-
-        let mut env_vars = EnvVarSet::new()
-            .with_value(
-                &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
-                opensearch_path_conf,
-            )
-            .with_field_path(
-                &EnvVarName::from_str_unsafe("POD_NAME"),
-                FieldPathEnvVar::Name,
-            );
-
-        for file_type in SecurityConfigFileType::iter() {
-            let managed_by_operator = security.settings.security_config(file_type).managed_by
-                == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
-
-            env_vars = env_vars.with_value(
-                &EnvVarName::from_str_unsafe(&format!(
-                    "MANAGE_{}",
-                    file_type.volume_name().to_uppercase()
-                )),
-                managed_by_operator.to_string(),
-            );
-        }
-
-        new_container_builder(&v1alpha1::Container::UpdateSecurityConfig.to_container_name())
-            .image_from_product_image(&self.cluster.image)
-            .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-            .args(vec![
-                include_str!("scripts/update-security-config.sh").to_owned(),
-            ])
-            .add_env_vars(env_vars.into())
-            .add_volume_mounts(volume_mounts)
-            .expect("The mount paths are statically defined and there should be no duplicates.")
-            .resources(
-                Resources::<()> {
-                    memory: MemoryLimits {
-                        limit: Some(Quantity("512Mi".to_owned())),
-                        ..MemoryLimits::default()
-                    },
-                    cpu: CpuLimits {
-                        min: Some(Quantity("100m".to_owned())),
-                        max: Some(Quantity("400m".to_owned())),
-                    },
-                    ..Resources::default()
-                }
-                .into(),
-            )
-            .build()
     }
 
     /// Builds the container for the [`PodTemplateSpec`]
@@ -936,6 +704,364 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             .build()
     }
 
+    /// Builds the vector container for the [`PodTemplateSpec`] if it is enabled
+    fn build_maybe_vector_container(&self) -> Option<Container> {
+        let vector_container_log_config = self
+            .role_group_config
+            .config
+            .logging
+            .vector_container
+            .as_ref()?;
+
+        Some(vector_container(
+            &v1alpha1::Container::Vector.to_container_name(),
+            &self.cluster.image,
+            vector_container_log_config,
+            &self.resource_names,
+            &CONFIG_VOLUME_NAME,
+            &LOG_VOLUME_NAME,
+            vector_config_file_extra_env_vars(),
+        ))
+    }
+
+    /// Builds the update-security-config container for the [`PodTemplateSpec`] if security is
+    /// enabled and managed by this role group
+    fn build_maybe_security_config_container(&self) -> Option<Container> {
+        let security = self.cluster.security.as_ref()?;
+
+        let is_security_config_container_required = self.security_managing_container(security)
+            == Some(v1alpha1::Container::UpdateSecurityConfig);
+        is_security_config_container_required.then_some(())?;
+
+        let opensearch_path_conf = self.node_config.opensearch_path_conf();
+
+        let mut volume_mounts = vec![
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/tls.crt"),
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("tls.crt".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/tls.key"),
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("tls.key".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/ca.crt"),
+                name: TLS_SERVER_CA_VOLUME_NAME.to_string(),
+                read_only: Some(true),
+                sub_path: Some("ca.crt".to_owned()),
+                ..VolumeMount::default()
+            },
+            VolumeMount {
+                mount_path: LOG_VOLUME_DIR.to_owned(),
+                name: LOG_VOLUME_NAME.to_string(),
+                ..VolumeMount::default()
+            },
+        ];
+        volume_mounts.extend(self.security_config_volume_mounts());
+
+        let mut env_vars = EnvVarSet::new()
+            .with_value(
+                &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
+                opensearch_path_conf,
+            )
+            .with_field_path(
+                &EnvVarName::from_str_unsafe("POD_NAME"),
+                FieldPathEnvVar::Name,
+            );
+
+        for file_type in SecurityConfigFileType::iter() {
+            let managed_by_operator = security.settings.security_config(file_type).managed_by
+                == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
+
+            env_vars = env_vars.with_value(
+                &EnvVarName::from_str_unsafe(&format!(
+                    "MANAGE_{}",
+                    file_type.volume_name().to_uppercase()
+                )),
+                managed_by_operator.to_string(),
+            );
+        }
+
+        Some(
+            new_container_builder(&v1alpha1::Container::UpdateSecurityConfig.to_container_name())
+                .image_from_product_image(&self.cluster.image)
+                .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+                .args(vec![
+                    include_str!("scripts/update-security-config.sh").to_owned(),
+                ])
+                .add_env_vars(env_vars.into())
+                .add_volume_mounts(volume_mounts)
+                .expect("The mount paths are statically defined and there should be no duplicates.")
+                .resources(
+                    Resources::<()> {
+                        memory: MemoryLimits {
+                            limit: Some(Quantity("512Mi".to_owned())),
+                            ..MemoryLimits::default()
+                        },
+                        cpu: CpuLimits {
+                            min: Some(Quantity("100m".to_owned())),
+                            max: Some(Quantity("400m".to_owned())),
+                        },
+                        ..Resources::default()
+                    }
+                    .into(),
+                )
+                .build(),
+        )
+    }
+
+    fn build_config_volumes(&self) -> Vec<Volume> {
+        vec![Volume {
+            name: CONFIG_VOLUME_NAME.to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                default_mode: Some(0o660),
+                name: self.resource_names.role_group_config_map().to_string(),
+                ..Default::default()
+            }),
+            ..Volume::default()
+        }]
+    }
+
+    fn build_log_volumes(&self) -> Vec<Volume> {
+        let log_config_volume_config_map =
+            if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
+                &self.role_group_config.config.logging.opensearch_container
+            {
+                config_map_name.clone()
+            } else {
+                self.resource_names.role_group_config_map()
+            };
+
+        vec![
+            Volume {
+                name: LOG_CONFIG_VOLUME_NAME.to_string(),
+                config_map: Some(ConfigMapVolumeSource {
+                    default_mode: Some(0o660),
+                    name: log_config_volume_config_map.to_string(),
+                    ..Default::default()
+                }),
+                ..Volume::default()
+            },
+            Volume {
+                name: LOG_VOLUME_NAME.to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(calculate_log_volume_size_limit(&[
+                        MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE,
+                    ])),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            },
+        ]
+    }
+
+    fn build_security_volumes(&self) -> Vec<Volume> {
+        if let Some(security) = &self.cluster.security {
+            [
+                Self::build_security_internal_tls_volumes,
+                Self::build_security_server_tls_volumes,
+                Self::build_security_server_tls_ca_volumes,
+                Self::build_security_settings_volumes,
+                Self::build_security_admin_cert_volumes,
+            ]
+            .into_iter()
+            .flat_map(|f| f(self, security))
+            .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    fn build_security_internal_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+        let mut volume_source_builder =
+            SecretOperatorVolumeSourceBuilder::new(&security.tls.internal_secret_class);
+
+        volume_source_builder
+            .with_pod_scope()
+            .with_listener_volume_scope(ROLE_GROUP_LISTENER_VOLUME_NAME.to_string())
+            .with_format(SecretFormat::TlsPem)
+            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime);
+
+        if self
+            .role_group_config
+            .config
+            .node_roles
+            .contains(&v1alpha1::NodeRole::ClusterManager)
+        {
+            volume_source_builder.with_service_scope(&self.node_config.seed_nodes_service_name);
+        }
+
+        let volume_source = volume_source_builder
+            .build()
+            .expect("volume should be built without parse errors");
+
+        vec![
+            VolumeBuilder::new(TLS_INTERNAL_VOLUME_NAME.to_string())
+                .ephemeral(volume_source)
+                .build(),
+        ]
+    }
+
+    fn build_security_server_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+        let Some(tls_http_secret_class_name) = &security.tls.server_secret_class else {
+            return vec![];
+        };
+
+        let mut volume_source_builder =
+            SecretOperatorVolumeSourceBuilder::new(tls_http_secret_class_name);
+
+        volume_source_builder
+            .with_pod_scope()
+            .with_listener_volume_scope(ROLE_GROUP_LISTENER_VOLUME_NAME.to_string())
+            .with_format(SecretFormat::TlsPem)
+            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime);
+
+        if self.role_group_config.config.discovery_service_exposed {
+            volume_source_builder
+                .with_listener_volume_scope(DISCOVERY_SERVICE_LISTENER_VOLUME_NAME.to_string());
+        }
+
+        let volume_source = volume_source_builder
+            .build()
+            .expect("volume should be built without parse errors");
+
+        vec![
+            VolumeBuilder::new(TLS_SERVER_VOLUME_NAME.to_string())
+                .ephemeral(volume_source)
+                .build(),
+        ]
+    }
+
+    fn build_security_server_tls_ca_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+        if self.server_ca_volume(security) != TLS_SERVER_VOLUME_NAME.to_owned() {
+            vec![Volume {
+                name: self.server_ca_volume(security).to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    fn build_security_settings_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+        let mut volumes = vec![];
+
+        for file_type in SecurityConfigFileType::iter() {
+            let volume_name = format!("security-config-file-{}", file_type.volume_name());
+            if security.settings.value(file_type).is_some() {
+                let volume = Volume {
+                    name: volume_name,
+                    config_map: Some(ConfigMapVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: file_type.filename(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        name: self.resource_names.role_group_config_map().to_string(),
+                        ..Default::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
+                security.settings.config_map_key_ref(file_type)
+            {
+                let volume = Volume {
+                    name: volume_name,
+                    config_map: Some(ConfigMapVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: key.to_string(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        name: name.to_string(),
+                        ..ConfigMapVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
+                security.settings.secret_key_ref(file_type)
+            {
+                let volume = Volume {
+                    name: volume_name,
+                    secret: Some(SecretVolumeSource {
+                        items: Some(vec![KeyToPath {
+                            key: key.to_string(),
+                            mode: Some(0o660),
+                            path: file_type.filename(),
+                        }]),
+                        secret_name: Some(name.to_string()),
+                        ..SecretVolumeSource::default()
+                    }),
+                    ..Volume::default()
+                };
+                volumes.push(volume);
+            }
+        }
+
+        volumes
+    }
+
+    fn build_security_admin_cert_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+        if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
+            vec![Volume {
+                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    fn build_keystore_volumes(&self) -> Vec<Volume> {
+        let mut volumes = vec![];
+
+        if !self.cluster.keystores.is_empty() {
+            volumes.push(Volume {
+                name: OPENSEARCH_KEYSTORE_VOLUME_NAME.to_string(),
+                empty_dir: Some(EmptyDirVolumeSource {
+                    size_limit: Some(Quantity(OPENSEARCH_KEYSTORE_VOLUME_SIZE.to_owned())),
+                    ..EmptyDirVolumeSource::default()
+                }),
+                ..Volume::default()
+            })
+        }
+
+        for (index, keystore) in self.cluster.keystores.iter().enumerate() {
+            volumes.push(Volume {
+                name: format!("keystore-{index}"),
+                secret: Some(SecretVolumeSource {
+                    default_mode: Some(0o660),
+                    secret_name: Some(keystore.secret_key_ref.name.to_string()),
+                    items: Some(vec![KeyToPath {
+                        key: keystore.secret_key_ref.key.to_string(),
+                        path: keystore.secret_key_ref.key.to_string(),
+                        ..KeyToPath::default()
+                    }]),
+                    ..SecretVolumeSource::default()
+                }),
+                ..Volume::default()
+            });
+        }
+
+        volumes
+    }
+
     /// Builds the headless [`Service`] for the role-group
     pub fn build_headless_service(&self) -> Service {
         let metadata = self
@@ -1074,100 +1200,6 @@ cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTO
             &ValidatedCluster::role_name(),
             &self.role_group_name,
         )
-    }
-
-    fn build_tls_volume(
-        &self,
-        volume_name: &VolumeName,
-        tls_secret_class_name: &SecretClassName,
-        service_scopes: Vec<ServiceName>,
-        secret_format: SecretFormat,
-        requested_secret_lifetime: &Duration,
-        listener_volume_scopes: Vec<PersistentVolumeClaimName>,
-    ) -> Volume {
-        let mut secret_volume_source_builder =
-            SecretOperatorVolumeSourceBuilder::new(tls_secret_class_name);
-
-        for scope in service_scopes {
-            secret_volume_source_builder.with_service_scope(scope);
-        }
-        for scope in listener_volume_scopes {
-            secret_volume_source_builder.with_listener_volume_scope(scope);
-        }
-
-        VolumeBuilder::new(volume_name.to_string())
-            .ephemeral(
-                secret_volume_source_builder
-                    .with_pod_scope()
-                    .with_format(secret_format)
-                    .with_auto_tls_cert_lifetime(*requested_secret_lifetime)
-                    .build()
-                    .expect("volume should be built without parse errors"),
-            )
-            .build()
-    }
-
-    fn security_config_volumes(
-        security_config: &v1alpha1::SecurityConfig,
-        role_group_config_map_name: ConfigMapName,
-    ) -> Vec<Volume> {
-        let mut volumes = vec![];
-
-        for file_type in SecurityConfigFileType::iter() {
-            let volume_name = format!("security-config-file-{}", file_type.volume_name());
-            if security_config.value(file_type).is_some() {
-                let volume = Volume {
-                    name: volume_name,
-                    config_map: Some(ConfigMapVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: file_type.filename(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        name: role_group_config_map_name.to_string(),
-                        ..Default::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
-                security_config.config_map_key_ref(file_type)
-            {
-                let volume = Volume {
-                    name: volume_name,
-                    config_map: Some(ConfigMapVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: key.to_string(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        name: name.to_string(),
-                        ..ConfigMapVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
-                security_config.secret_key_ref(file_type)
-            {
-                let volume = Volume {
-                    name: volume_name,
-                    secret: Some(SecretVolumeSource {
-                        items: Some(vec![KeyToPath {
-                            key: key.to_string(),
-                            mode: Some(0o660),
-                            path: file_type.filename(),
-                        }]),
-                        secret_name: Some(name.to_string()),
-                        ..SecretVolumeSource::default()
-                    }),
-                    ..Volume::default()
-                };
-                volumes.push(volume);
-            }
-        }
-
-        volumes
     }
 
     fn security_config_volume_mounts(&self) -> Vec<VolumeMount> {
@@ -1900,7 +1932,7 @@ mod tests {
                                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                                     "secrets.stackable.tech/class": "tls",
                                                     "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "service=my-opensearch-cluster-seed-nodes,listener-volume=listener,pod"
+                                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
                                                 }
                                             },
                                             "spec": {
@@ -1926,7 +1958,7 @@ mod tests {
                                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                                     "secrets.stackable.tech/class": "tls",
                                                     "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "listener-volume=listener,listener-volume=discovery-service-listener,pod"
+                                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
                                                 }
                                             },
                                             "spec": {
