@@ -425,6 +425,7 @@ impl<'a> RoleGroupBuilder<'a> {
         if self.cluster.keystores.is_empty() {
             return None;
         }
+
         let opensearch_home = self.node_config.opensearch_home();
         let mut volume_mounts = vec![VolumeMount {
             mount_path: format!(
@@ -450,21 +451,8 @@ impl<'a> RoleGroupBuilder<'a> {
         Some(
             new_container_builder(&v1alpha1::Container::InitKeystore.to_container_name())
                 .image_from_product_image(&self.cluster.image)
-                .command(vec![
-                    "/bin/bash".to_string(),
-                    "-x".to_string(),
-                    "-euo".to_string(),
-                    "pipefail".to_string(),
-                    "-c".to_string(),
-                ])
-                .args(vec![format!(
-                    "bin/opensearch-keystore create
-for i in keystore-secrets/*; do
-    key=$(basename $i)
-    bin/opensearch-keystore add-file \"$key\" \"$i\"
-done
-cp --archive config/opensearch.keystore {OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTORY_NAME}",
-                )])
+                .command(vec!["/bin/bash".to_owned(), "-c".to_owned()])
+                .args(vec![include_str!("scripts/init-keystore.sh").to_owned()])
                 .add_volume_mounts(volume_mounts)
                 .expect("The mount paths are statically defined and there should be no duplicates.")
                 .resources(self.role_group_config.config.resources.clone().into())
@@ -1864,20 +1852,10 @@ mod tests {
                             "initContainers": [
                                 {
                                     "args": [
-                                        concat!(
-                                            "bin/opensearch-keystore create\n",
-                                            "for i in keystore-secrets/*; do\n",
-                                            "    key=$(basename $i)\n",
-                                            "    bin/opensearch-keystore add-file \"$key\" \"$i\"\n",
-                                            "done\n",
-                                            "cp --archive config/opensearch.keystore initialized-keystore"
-                                        ),
+                                        include_str!("scripts/init-keystore.sh")
                                     ],
                                     "command": [
                                         "/bin/bash",
-                                        "-x",
-                                        "-euo",
-                                        "pipefail",
                                         "-c"
                                     ],
                                     "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
