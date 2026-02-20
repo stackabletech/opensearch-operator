@@ -67,7 +67,7 @@ impl<'a> RoleBuilder<'a> {
             .map(|(role_group_name, role_group_config)| {
                 RoleGroupBuilder::new(
                     self.resource_names.service_account_name(),
-                    self.cluster.clone(),
+                    &self.cluster,
                     role_group_name.clone(),
                     role_group_config.clone(),
                     self.context_names,

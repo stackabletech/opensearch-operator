@@ -1,4 +1,4 @@
-//! Builder for role-group resources
+//! Builder for role group resources
 
 use std::{collections::BTreeMap, str::FromStr};
 
@@ -105,22 +105,43 @@ const OPENSEARCH_KEYSTORE_SECRETS_DIRECTORY: &str = "keystore-secrets";
 constant!(OPENSEARCH_KEYSTORE_VOLUME_NAME: VolumeName = "keystore");
 const OPENSEARCH_KEYSTORE_VOLUME_SIZE: &str = "1Mi";
 
+/// Depending on the security settings, the role group builder operates in one of these modes.
+enum RoleGroupBuilderSecurityMode<'a> {
+    /// The security plugin is enabled and all settings are initialized by an arbitrary role group.
+    /// The security settings are mounted to the main container for all role groups.
+    Initializing(&'a ValidatedSecurity),
+
+    /// The security plugin is enabled and some or all settings are initialized and updated by this
+    /// role group.
+    /// The admin certificate is created in an init container and the security settings are mounted
+    /// to and updated in a side-car container.
+    Managing(&'a ValidatedSecurity),
+
+    /// The security plugin is enabled and the settings are managed by another role group.
+    /// The security settings are not mounted.
+    Participating(&'a ValidatedSecurity),
+
+    /// The security plugin is disabled.
+    Disabled,
+}
+
 /// Builder for role-group resources
 pub struct RoleGroupBuilder<'a> {
     service_account_name: ServiceAccountName,
-    cluster: ValidatedCluster,
+    cluster: &'a ValidatedCluster,
     node_config: NodeConfig,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
     context_names: &'a ContextNames,
     resource_names: ResourceNames,
     discovery_service_listener_name: ListenerName,
+    security_mode: RoleGroupBuilderSecurityMode<'a>,
 }
 
 impl<'a> RoleGroupBuilder<'a> {
     pub fn new(
         service_account_name: ServiceAccountName,
-        cluster: ValidatedCluster,
+        cluster: &'a ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
         context_names: &'a ContextNames,
@@ -132,9 +153,32 @@ impl<'a> RoleGroupBuilder<'a> {
             role_name: ValidatedCluster::role_name(),
             role_group_name: role_group_name.clone(),
         };
+
+        let security_mode = match &cluster.security {
+            Some(
+                security @ ValidatedSecurity {
+                    managing_role_group: None,
+                    ..
+                },
+            ) => RoleGroupBuilderSecurityMode::Initializing(security),
+            Some(
+                security @ ValidatedSecurity {
+                    managing_role_group: Some(role_group),
+                    ..
+                },
+            ) if role_group == &role_group_name => RoleGroupBuilderSecurityMode::Managing(security),
+            Some(
+                security @ ValidatedSecurity {
+                    managing_role_group: Some(_),
+                    ..
+                },
+            ) => RoleGroupBuilderSecurityMode::Participating(security),
+            None => RoleGroupBuilderSecurityMode::Disabled,
+        };
+
         RoleGroupBuilder {
             service_account_name,
-            cluster: cluster.clone(),
+            cluster,
             node_config: NodeConfig::new(
                 cluster.clone(),
                 role_group_name.clone(),
@@ -148,34 +192,12 @@ impl<'a> RoleGroupBuilder<'a> {
             context_names,
             resource_names,
             discovery_service_listener_name,
+            security_mode,
         }
     }
 
-    /// Returns the container of this role group that manages the security or None if security is
-    /// not managed by this role group.
-    fn security_managing_container(
-        &self,
-        security: &ValidatedSecurity,
-    ) -> Option<v1alpha1::Container> {
-        match &security.managing_role_group {
-            None => Some(v1alpha1::Container::OpenSearch),
-            Some(managing_role_group) if managing_role_group == &self.role_group_name => {
-                Some(v1alpha1::Container::UpdateSecurityConfig)
-            }
-            _ => None,
-        }
-    }
-
-    fn server_ca_volume(&self, security: &ValidatedSecurity) -> VolumeName {
-        if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
-            TLS_SERVER_CA_VOLUME_NAME.to_owned()
-        } else {
-            TLS_SERVER_VOLUME_NAME.to_owned()
-        }
-    }
-
-    /// Builds the [`ConfigMap`] containing the configuration files of the role-group
-    /// [`StatefulSet`]
+    /// Builds the [`ConfigMap`] containing the configuration files for the [`StatefulSet`] of the
+    /// role group
     pub fn build_config_map(&self) -> ConfigMap {
         let metadata = self
             .common_metadata(self.resource_names.role_group_config_map())
@@ -206,8 +228,8 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if let Some(security) = &self.cluster.security
-            && self.security_managing_container(security).is_some()
+        if let RoleGroupBuilderSecurityMode::Initializing(security)
+        | RoleGroupBuilderSecurityMode::Managing(security) = self.security_mode
         {
             for file_type in SecurityConfigFileType::iter() {
                 if let Some(value) = security.settings.value(file_type) {
@@ -223,7 +245,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Builds the role-group [`StatefulSet`]
+    /// Builds the [`StatefulSet`] of the role group
     pub fn build_stateful_set(&self) -> StatefulSet {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
@@ -292,7 +314,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Builds the [`PodTemplateSpec`] for the role-group [`StatefulSet`]
+    /// Builds the [`PodTemplateSpec`] for the [`StatefulSet`] of the role group
     fn build_pod_template(&self) -> PodTemplateSpec {
         let mut node_role_labels = Labels::new();
 
@@ -420,7 +442,8 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be a valid label")
     }
 
-    /// Builds the container for the [`PodTemplateSpec`]
+    /// Builds the [`v1alpha1::Container::InitKeystore`] init container for the [`PodTemplateSpec`]
+    /// if keystores are defined
     fn build_maybe_keystore_init_container(&self) -> Option<Container> {
         if self.cluster.keystores.is_empty() {
             return None;
@@ -460,13 +483,12 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
-    /// Builds the create-admin-certificate container for the [`PodTemplateSpec`]
+    /// Builds the [`v1alpha1::Container::CreateAdminCertificate`] init container for the
+    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
     fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
-        let security = self.cluster.security.as_ref()?;
-
-        if security.managing_role_group.as_ref() != Some(&self.role_group_name) {
+        let RoleGroupBuilderSecurityMode::Managing(_) = self.security_mode else {
             return None;
-        }
+        };
 
         let env_vars = EnvVarSet::new()
             .with_value(
@@ -531,7 +553,7 @@ impl<'a> RoleGroupBuilder<'a> {
         Some(container)
     }
 
-    /// Builds the container for the [`PodTemplateSpec`]
+    /// Builds the [`v1alpha1::Container::OpenSearch`] container for the [`PodTemplateSpec`]
     fn build_opensearch_container(&self) -> Container {
         // Probe values taken from the official Helm chart
         let startup_probe = Probe {
@@ -623,13 +645,17 @@ impl<'a> RoleGroupBuilder<'a> {
                 });
                 volume_mounts.push(VolumeMount {
                     mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
-                    name: self.server_ca_volume(security).to_string(),
+                    name: if let RoleGroupBuilderSecurityMode::Managing(_) = self.security_mode {
+                        TLS_SERVER_CA_VOLUME_NAME.to_string()
+                    } else {
+                        TLS_SERVER_VOLUME_NAME.to_string()
+                    },
                     sub_path: Some("ca.crt".to_owned()),
                     ..VolumeMount::default()
                 });
             }
 
-            if self.security_managing_container(security) == Some(v1alpha1::Container::OpenSearch) {
+            if let RoleGroupBuilderSecurityMode::Initializing(_) = self.security_mode {
                 volume_mounts.extend(self.security_config_volume_mounts());
             }
         }
@@ -692,7 +718,32 @@ impl<'a> RoleGroupBuilder<'a> {
             .build()
     }
 
-    /// Builds the vector container for the [`PodTemplateSpec`] if it is enabled
+    /// Builds the security settings volume mounts for the [`v1alpha1::Container::OpenSearch`]
+    /// container or the [`v1alpha1::Container::UpdateSecurityConfig`] container
+    fn security_config_volume_mounts(&self) -> Vec<VolumeMount> {
+        let mut volume_mounts = vec![];
+
+        let opensearch_path_conf = self.node_config.opensearch_path_conf();
+
+        for file_type in SecurityConfigFileType::iter() {
+            let volume_name = format!("security-config-file-{}", file_type.volume_name());
+            volume_mounts.push(VolumeMount {
+                mount_path: format!(
+                    "{opensearch_path_conf}/opensearch-security/{filename}",
+                    filename = file_type.filename()
+                ),
+                name: volume_name,
+                read_only: Some(true),
+                sub_path: Some(file_type.filename()),
+                ..VolumeMount::default()
+            });
+        }
+
+        volume_mounts
+    }
+
+    /// Builds the [`v1alpha1::Container::Vector`] container for the [`PodTemplateSpec`] if it is
+    /// enabled
     fn build_maybe_vector_container(&self) -> Option<Container> {
         let vector_container_log_config = self
             .role_group_config
@@ -712,14 +763,12 @@ impl<'a> RoleGroupBuilder<'a> {
         ))
     }
 
-    /// Builds the update-security-config container for the [`PodTemplateSpec`] if security is
-    /// enabled and managed by this role group
+    /// Builds the [`v1alpha1::Container::UpdateSecurityConfig`] container for the
+    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
     fn build_maybe_security_config_container(&self) -> Option<Container> {
-        let security = self.cluster.security.as_ref()?;
-
-        let is_security_config_container_required = self.security_managing_container(security)
-            == Some(v1alpha1::Container::UpdateSecurityConfig);
-        is_security_config_container_required.then_some(())?;
+        let RoleGroupBuilderSecurityMode::Managing(security) = self.security_mode else {
+            return None;
+        };
 
         let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
@@ -804,6 +853,7 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
+    /// Builds the config volumes for the [`PodTemplateSpec`]
     fn build_config_volumes(&self) -> Vec<Volume> {
         vec![Volume {
             name: CONFIG_VOLUME_NAME.to_string(),
@@ -816,6 +866,7 @@ impl<'a> RoleGroupBuilder<'a> {
         }]
     }
 
+    /// Builds the log volumes for the [`PodTemplateSpec`]
     fn build_log_volumes(&self) -> Vec<Volume> {
         let log_config_volume_config_map =
             if let ValidatedContainerLogConfigChoice::Custom(config_map_name) =
@@ -849,23 +900,33 @@ impl<'a> RoleGroupBuilder<'a> {
         ]
     }
 
+    /// Builds the security volumes for the [`PodTemplateSpec`] depending on the
+    /// [`RoleGroupBuilderSecurityMode`]
     fn build_security_volumes(&self) -> Vec<Volume> {
-        if let Some(security) = &self.cluster.security {
-            [
-                Self::build_security_internal_tls_volumes,
-                Self::build_security_server_tls_volumes,
-                Self::build_security_server_tls_ca_volumes,
-                Self::build_security_settings_volumes,
-                Self::build_security_admin_cert_volumes,
-            ]
-            .into_iter()
-            .flat_map(|f| f(self, security))
-            .collect()
-        } else {
-            vec![]
-        }
+        let volumes = match self.security_mode {
+            RoleGroupBuilderSecurityMode::Initializing(security) => vec![
+                self.build_security_internal_tls_volumes(security),
+                self.build_security_server_tls_volumes(security),
+                self.build_security_settings_volumes(security),
+            ],
+            RoleGroupBuilderSecurityMode::Managing(security) => vec![
+                self.build_security_internal_tls_volumes(security),
+                self.build_security_server_tls_volumes(security),
+                self.build_security_settings_volumes(security),
+                self.build_security_server_tls_ca_volumes(),
+                self.build_security_admin_cert_volumes(),
+            ],
+            RoleGroupBuilderSecurityMode::Participating(security) => vec![
+                self.build_security_internal_tls_volumes(security),
+                self.build_security_server_tls_volumes(security),
+            ],
+            RoleGroupBuilderSecurityMode::Disabled => vec![],
+        };
+
+        volumes.into_iter().flatten().collect()
     }
 
+    /// Builds the internal TLS volumes for the [`PodTemplateSpec`]
     fn build_security_internal_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
         let mut volume_source_builder =
             SecretOperatorVolumeSourceBuilder::new(&security.tls.internal_secret_class);
@@ -896,13 +957,15 @@ impl<'a> RoleGroupBuilder<'a> {
         ]
     }
 
+    /// Builds the server TLS volumes for the [`PodTemplateSpec`] if a TLS server secret class is
+    /// defined
     fn build_security_server_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
-        let Some(tls_http_secret_class_name) = &security.tls.server_secret_class else {
+        let Some(tls_server_secret_class) = &security.tls.server_secret_class else {
             return vec![];
         };
 
         let mut volume_source_builder =
-            SecretOperatorVolumeSourceBuilder::new(tls_http_secret_class_name);
+            SecretOperatorVolumeSourceBuilder::new(tls_server_secret_class);
 
         volume_source_builder
             .with_pod_scope()
@@ -926,21 +989,21 @@ impl<'a> RoleGroupBuilder<'a> {
         ]
     }
 
-    fn build_security_server_tls_ca_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
-        if self.server_ca_volume(security) != TLS_SERVER_VOLUME_NAME.to_owned() {
-            vec![Volume {
-                name: self.server_ca_volume(security).to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            }]
-        } else {
-            vec![]
-        }
+    /// Builds the server TLS CA volumes for the [`PodTemplateSpec`]
+    /// It is not checked if these volumes are required in this role group.
+    fn build_security_server_tls_ca_volumes(&self) -> Vec<Volume> {
+        vec![Volume {
+            name: TLS_SERVER_CA_VOLUME_NAME.to_string(),
+            empty_dir: Some(EmptyDirVolumeSource {
+                size_limit: Some(Quantity(TLS_SERVER_CA_VOLUME_SIZE.to_owned())),
+                ..EmptyDirVolumeSource::default()
+            }),
+            ..Volume::default()
+        }]
     }
 
+    /// Builds the security settings volumes for the [`PodTemplateSpec`]
+    /// It is not checked if these volumes are required in this role group.
     fn build_security_settings_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
         let mut volumes = vec![];
 
@@ -1001,21 +1064,20 @@ impl<'a> RoleGroupBuilder<'a> {
         volumes
     }
 
-    fn build_security_admin_cert_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
-        if security.managing_role_group.as_ref() == Some(&self.role_group_name) {
-            vec![Volume {
-                name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
-                empty_dir: Some(EmptyDirVolumeSource {
-                    size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
-                    ..EmptyDirVolumeSource::default()
-                }),
-                ..Volume::default()
-            }]
-        } else {
-            vec![]
-        }
+    /// Builds the admin certificate volumes for the [`PodTemplateSpec`]
+    /// It is not checked if these volumes are required in this role group.
+    fn build_security_admin_cert_volumes(&self) -> Vec<Volume> {
+        vec![Volume {
+            name: TLS_ADMIN_CERT_VOLUME_NAME.to_string(),
+            empty_dir: Some(EmptyDirVolumeSource {
+                size_limit: Some(Quantity(TLS_ADMIN_CERT_VOLUME_SIZE.to_owned())),
+                ..EmptyDirVolumeSource::default()
+            }),
+            ..Volume::default()
+        }]
     }
 
+    /// Builds the keystore volumes for the [`PodTemplateSpec`]
     fn build_keystore_volumes(&self) -> Vec<Volume> {
         let mut volumes = vec![];
 
@@ -1050,7 +1112,7 @@ impl<'a> RoleGroupBuilder<'a> {
         volumes
     }
 
-    /// Builds the headless [`Service`] for the role-group
+    /// Builds the headless [`Service`] for the role group
     pub fn build_headless_service(&self) -> Service {
         let metadata = self
             .common_metadata(self.resource_names.headless_service_name())
@@ -1120,10 +1182,10 @@ impl<'a> RoleGroupBuilder<'a> {
         .expect("should be valid annotations")
     }
 
-    /// Builds the [`listener::v1alpha1::Listener`] for the role-group
+    /// Builds the [`listener::v1alpha1::Listener`] for the role group
     ///
     /// The Listener exposes only the HTTP port.
-    /// The Listener operator will create a Service per role-group.
+    /// The Listener operator will create a Service per role group.
     pub fn build_listener(&self) -> listener::v1alpha1::Listener {
         let metadata = self
             .common_metadata(self.resource_names.listener_name())
@@ -1148,27 +1210,23 @@ impl<'a> RoleGroupBuilder<'a> {
         }
     }
 
-    /// Common metadata for role-group resources
+    /// Common metadata for role group resources
     fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
         let mut builder = ObjectMetaBuilder::new();
 
         builder
             .name(resource_name)
             .namespace(&self.cluster.namespace)
-            .ownerreference(ownerreference_from_resource(
-                &self.cluster,
-                None,
-                Some(true),
-            ))
+            .ownerreference(ownerreference_from_resource(self.cluster, None, Some(true)))
             .with_labels(self.recommended_labels());
 
         builder
     }
 
-    /// Recommended labels for role-group resources
+    /// Recommended labels for role group resources
     fn recommended_labels(&self) -> Labels {
         recommended_labels(
-            &self.cluster,
+            self.cluster,
             &self.context_names.product_name,
             &self.cluster.product_version,
             &self.context_names.operator_name,
@@ -1178,38 +1236,16 @@ impl<'a> RoleGroupBuilder<'a> {
         )
     }
 
-    /// Labels to select a [`Pod`] in the role-group
+    /// Labels to select a [`Pod`] in the role group
     ///
     /// [`Pod`]: stackable_operator::k8s_openapi::api::core::v1::Pod
     fn pod_selector(&self) -> Labels {
         role_group_selector(
-            &self.cluster,
+            self.cluster,
             &self.context_names.product_name,
             &ValidatedCluster::role_name(),
             &self.role_group_name,
         )
-    }
-
-    fn security_config_volume_mounts(&self) -> Vec<VolumeMount> {
-        let mut volume_mounts = vec![];
-
-        let opensearch_path_conf = self.node_config.opensearch_path_conf();
-
-        for file_type in SecurityConfigFileType::iter() {
-            let volume_name = format!("security-config-file-{}", file_type.volume_name());
-            volume_mounts.push(VolumeMount {
-                mount_path: format!(
-                    "{opensearch_path_conf}/opensearch-security/{filename}",
-                    filename = file_type.filename()
-                ),
-                name: volume_name,
-                read_only: Some(true),
-                sub_path: Some(file_type.filename()),
-                ..VolumeMount::default()
-            });
-        }
-
-        volume_mounts
     }
 }
 
@@ -1366,9 +1402,10 @@ mod tests {
         )
     }
 
-    fn role_group_builder<'a>(context_names: &'a ContextNames) -> RoleGroupBuilder<'a> {
-        let cluster = validated_cluster();
-
+    fn role_group_builder<'a>(
+        cluster: &'a ValidatedCluster,
+        context_names: &'a ContextNames,
+    ) -> RoleGroupBuilder<'a> {
         let (role_group_name, role_group_config) = cluster
             .role_group_configs
             .first_key_value()
@@ -1390,8 +1427,9 @@ mod tests {
 
     #[test]
     fn test_build_config_map() {
+        let cluster = validated_cluster();
         let context_names = context_names();
-        let role_group_builder = role_group_builder(&context_names);
+        let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let mut config_map = serde_json::to_value(role_group_builder.build_config_map())
             .expect("should be serializable");
@@ -1452,8 +1490,9 @@ mod tests {
 
     #[test]
     fn test_build_stateful_set() {
+        let cluster = validated_cluster();
         let context_names = context_names();
-        let role_group_builder = role_group_builder(&context_names);
+        let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let stateful_set = serde_json::to_value(role_group_builder.build_stateful_set())
             .expect("should be serializable");
@@ -2198,8 +2237,9 @@ mod tests {
 
     #[test]
     fn test_build_headless_service() {
+        let cluster = validated_cluster();
         let context_names = context_names();
-        let role_group_builder = role_group_builder(&context_names);
+        let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let headless_service = serde_json::to_value(role_group_builder.build_headless_service())
             .expect("should be serializable");
@@ -2265,8 +2305,9 @@ mod tests {
 
     #[test]
     fn test_build_listener() {
+        let cluster = validated_cluster();
         let context_names = context_names();
-        let role_group_builder = role_group_builder(&context_names);
+        let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let listener = serde_json::to_value(role_group_builder.build_listener())
             .expect("should be serializable");
