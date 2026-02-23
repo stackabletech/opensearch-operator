@@ -320,7 +320,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener,service=opensearch-seed-nodes
             spec:
               accessModes:
               - ReadWriteOnce
@@ -338,7 +338,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,listener-volume=discovery-service-listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener,listener-volume=discovery-service-listener
             spec:
               accessModes:
               - ReadWriteOnce
@@ -793,7 +793,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
               - ReadWriteOnce
@@ -811,7 +811,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
               - ReadWriteOnce

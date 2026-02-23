@@ -125,7 +125,7 @@ enum RoleGroupBuilderSecurityMode<'a> {
     Disabled,
 }
 
-/// Builder for role-group resources
+/// Builder for role group resources
 pub struct RoleGroupBuilder<'a> {
     service_account_name: ServiceAccountName,
     cluster: &'a ValidatedCluster,
