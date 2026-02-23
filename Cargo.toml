@@ -10,7 +10,7 @@ edition = "2024"
 repository = "https://github.com/stackabletech/opensearch-operator"
 
 [workspace.dependencies]
-stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "stackable-operator-0.105.0", features = ["telemetry", "versioned", "webhook"] }
+stackable-operator = { git = "https://github.com/stackabletech/operator-rs.git", tag = "stackable-operator-0.106.1", features = ["telemetry", "versioned", "webhook"] }
 
 built = { version = "0.8.0", features = ["chrono", "git2"] }
 clap = "4.5"
@@ -18,7 +18,6 @@ futures = { version = "0.3", features = ["compat"] }
 pretty_assertions = "1.4"
 regex = "1.11"
 rstest = "0.26"
-schemars = { version = "1.0.0", features = ["url2"] } # same as in operator-rs
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 snafu = "0.8"
@@ -27,5 +26,5 @@ tokio = { version = "1.47", features = ["full"] }
 tracing = "0.1"
 uuid = "1.18"
 
-#[patch."https://github.com/stackabletech/operator-rs"]
+[patch."https://github.com/stackabletech/operator-rs"]
 # stackable-operator = { git = "https://github.com/stackabletech//operator-rs.git", branch = "main" }
