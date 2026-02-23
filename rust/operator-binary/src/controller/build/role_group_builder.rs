@@ -68,8 +68,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ContainerName, ListenerName, PersistentVolumeClaimName, ServiceAccountName,
-                ServiceName, VolumeName,
+                ListenerName, PersistentVolumeClaimName, ServiceAccountName, ServiceName,
+                VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -91,8 +91,8 @@ const DISCOVERY_SERVICE_LISTENER_VOLUME_DIR: &str = "/stackable/listeners/discov
 
 constant!(TLS_SERVER_VOLUME_NAME: VolumeName = "tls-server");
 constant!(TLS_SERVER_CA_VOLUME_NAME: VolumeName = "tls-server-ca");
-constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
 const TLS_SERVER_CA_VOLUME_SIZE: &str = "1Mi";
+constant!(TLS_INTERNAL_VOLUME_NAME: VolumeName = "tls-internal");
 constant!(TLS_ADMIN_CERT_VOLUME_NAME: VolumeName = "tls-admin-cert");
 const TLS_ADMIN_CERT_VOLUME_SIZE: &str = "1Mi";
 
@@ -113,8 +113,9 @@ enum RoleGroupBuilderSecurityMode<'a> {
 
     /// The security plugin is enabled and some or all settings are initialized and updated by this
     /// role group.
-    /// The admin certificate is created in an init container and the security settings are mounted
-    /// to and updated in a side-car container.
+    /// The admin certificate is created in the [`v1alpha1::Container::CreateAdminCertificate`]
+    /// init container and the security settings are mounted to and updated in the
+    /// [`v1alpha1::Container::UpdateSecurityConfig`] side-car container.
     Managing(&'a ValidatedSecurity),
 
     /// The security plugin is enabled and the settings are managed by another role group.
@@ -471,7 +472,7 @@ impl<'a> RoleGroupBuilder<'a> {
             });
         }
 
-        Some(
+        let container =
             new_container_builder(&v1alpha1::Container::InitKeystore.to_container_name())
                 .image_from_product_image(&self.cluster.image)
                 .command(vec!["/bin/bash".to_owned(), "-c".to_owned()])
@@ -479,8 +480,9 @@ impl<'a> RoleGroupBuilder<'a> {
                 .add_volume_mounts(volume_mounts)
                 .expect("The mount paths are statically defined and there should be no duplicates.")
                 .resources(self.role_group_config.config.resources.clone().into())
-                .build(),
-        )
+                .build();
+
+        Some(container)
     }
 
     /// Builds the [`v1alpha1::Container::CreateAdminCertificate`] init container for the
@@ -522,33 +524,31 @@ impl<'a> RoleGroupBuilder<'a> {
             },
         ];
 
-        let container = new_container_builder(
-            &ContainerName::from_str("create-admin-certificate")
-                .expect("should be a valid container name"),
-        )
-        .image_from_product_image(&self.cluster.image)
-        .command(vec!["/bin/bash".to_string(), "-c".to_string()])
-        .args(vec![
-            include_str!("scripts/create-admin-certificate.sh").to_owned(),
-        ])
-        .add_env_vars(env_vars.into())
-        .add_volume_mounts(volume_mounts)
-        .expect("The mount paths are statically defined and there should be no duplicates.")
-        .resources(
-            Resources::<()> {
-                memory: MemoryLimits {
-                    limit: Some(Quantity("128Mi".to_owned())),
-                    ..MemoryLimits::default()
-                },
-                cpu: CpuLimits {
-                    min: Some(Quantity("100m".to_owned())),
-                    max: Some(Quantity("400m".to_owned())),
-                },
-                ..Resources::default()
-            }
-            .into(),
-        )
-        .build();
+        let container =
+            new_container_builder(&v1alpha1::Container::CreateAdminCertificate.to_container_name())
+                .image_from_product_image(&self.cluster.image)
+                .command(vec!["/bin/bash".to_string(), "-c".to_string()])
+                .args(vec![
+                    include_str!("scripts/create-admin-certificate.sh").to_owned(),
+                ])
+                .add_env_vars(env_vars.into())
+                .add_volume_mounts(volume_mounts)
+                .expect("The mount paths are statically defined and there should be no duplicates.")
+                .resources(
+                    Resources::<()> {
+                        memory: MemoryLimits {
+                            limit: Some(Quantity("128Mi".to_owned())),
+                            ..MemoryLimits::default()
+                        },
+                        cpu: CpuLimits {
+                            min: Some(Quantity("100m".to_owned())),
+                            max: Some(Quantity("400m".to_owned())),
+                        },
+                        ..Resources::default()
+                    }
+                    .into(),
+                )
+                .build();
 
         Some(container)
     }
@@ -825,7 +825,7 @@ impl<'a> RoleGroupBuilder<'a> {
             );
         }
 
-        Some(
+        let container =
             new_container_builder(&v1alpha1::Container::UpdateSecurityConfig.to_container_name())
                 .image_from_product_image(&self.cluster.image)
                 .command(vec!["/bin/bash".to_string(), "-c".to_string()])
@@ -849,8 +849,9 @@ impl<'a> RoleGroupBuilder<'a> {
                     }
                     .into(),
                 )
-                .build(),
-        )
+                .build();
+
+        Some(container)
     }
 
     /// Builds the config volumes for the [`PodTemplateSpec`]
@@ -1257,6 +1258,7 @@ mod tests {
     };
 
     use pretty_assertions::assert_eq;
+    use rstest::rstest;
     use serde_json::json;
     use stackable_operator::{
         commons::{
@@ -1282,7 +1284,7 @@ mod tests {
             ValidatedSecurity,
             build::role_group_builder::{
                 DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
-                TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
+                TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_CA_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
             },
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
@@ -1292,8 +1294,8 @@ mod tests {
             role_utils::GenericProductSpecificCommonConfig,
             types::{
                 kubernetes::{
-                    ConfigMapName, ListenerClassName, ListenerName, NamespaceName, SecretKey,
-                    SecretName, ServiceAccountName, ServiceName,
+                    ConfigMapKey, ConfigMapName, ListenerClassName, ListenerName, NamespaceName,
+                    SecretKey, SecretName, ServiceAccountName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -1312,6 +1314,7 @@ mod tests {
         let _ = ROLE_GROUP_LISTENER_VOLUME_NAME;
         let _ = DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
         let _ = TLS_SERVER_VOLUME_NAME;
+        let _ = TLS_SERVER_CA_VOLUME_NAME;
         let _ = TLS_INTERNAL_VOLUME_NAME;
         let _ = LOG_VOLUME_NAME;
         let _ = OPENSEARCH_KEYSTORE_VOLUME_NAME;
@@ -1327,7 +1330,15 @@ mod tests {
         }
     }
 
-    fn validated_cluster() -> ValidatedCluster {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum TestSecurityMode {
+        Initializing,
+        Managing,
+        Participating,
+        Disabled,
+    }
+
+    fn validated_cluster(security_mode: TestSecurityMode) -> ValidatedCluster {
         let image = ResolvedProductImage {
             product_version: "3.4.0".to_owned(),
             app_version_label_value: LabelValue::from_str("3.4.0-stackable0.0.0-dev")
@@ -1374,6 +1385,71 @@ mod tests {
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
         };
 
+        let security_settings = v1alpha1::SecurityConfig {
+            config: v1alpha1::SecurityConfigFileType {
+                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
+                content: v1alpha1::SecurityConfigFileTypeContent::Value(
+                    v1alpha1::SecurityConfigFileTypeContentValue {
+                        value: json!({
+                            "_meta": {
+                              "type": "config",
+                              "config_version": 2
+                            },
+                            "config": {
+                              "dynamic": {
+                                "http": {},
+                                "authc": {},
+                                "authz": {}
+                              }
+                            }
+                        }),
+                    },
+                ),
+            },
+            internal_users: v1alpha1::SecurityConfigFileType {
+                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Api,
+                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
+                    v1alpha1::SecurityConfigFileTypeContentValueFrom::SecretKeyRef(
+                        v1alpha1::SecretKeyRef {
+                            name: SecretName::from_str_unsafe("opensearch-security-config"),
+                            key: SecretKey::from_str_unsafe("internal_users.yml"),
+                        },
+                    ),
+                ),
+            },
+            roles: v1alpha1::SecurityConfigFileType {
+                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Api,
+                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
+                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                        v1alpha1::ConfigMapKeyRef {
+                            name: ConfigMapName::from_str_unsafe("opensearch-security-config"),
+                            key: ConfigMapKey::from_str_unsafe("roles.yml"),
+                        },
+                    ),
+                ),
+            },
+            ..v1alpha1::SecurityConfig::default()
+        };
+
+        let security = match security_mode {
+            TestSecurityMode::Initializing => Some(ValidatedSecurity {
+                managing_role_group: None,
+                settings: security_settings,
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
+            TestSecurityMode::Managing => Some(ValidatedSecurity {
+                managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
+                settings: security_settings,
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
+            TestSecurityMode::Participating => Some(ValidatedSecurity {
+                managing_role_group: Some(RoleGroupName::from_str_unsafe("other")),
+                settings: security_settings,
+                tls: v1alpha1::OpenSearchTls::default(),
+            }),
+            TestSecurityMode::Disabled => None,
+        };
+
         ValidatedCluster::new(
             image.clone(),
             ProductVersion::from_str_unsafe(&image.product_version),
@@ -1386,11 +1462,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            Some(ValidatedSecurity {
-                managing_role_group: None,
-                settings: v1alpha1::SecurityConfig::default(),
-                tls: v1alpha1::OpenSearchTls::default(),
-            }),
+            security,
             vec![v1alpha1::OpenSearchKeystore {
                 key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                 secret_key_ref: v1alpha1::SecretKeyRef {
@@ -1425,9 +1497,13 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_build_config_map() {
-        let cluster = validated_cluster();
+    #[rstest]
+    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
+    #[case::security_mode_managing(TestSecurityMode::Managing)]
+    #[case::security_mode_participating(TestSecurityMode::Participating)]
+    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
+    fn test_build_config_map(#[case] security_mode: TestSecurityMode) {
+        let cluster = validated_cluster(security_mode);
         let context_names = context_names();
         let role_group_builder = role_group_builder(&cluster, &context_names);
 
@@ -1442,6 +1518,26 @@ mod tests {
         config_map["data"]["opensearch.yml"].take();
         // vector.yaml is a static file and does not have to be repeated here.
         config_map["data"]["vector.yaml"].take();
+
+        let expected_data = match security_mode {
+            TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
+               "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
+               "allow_list.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
+               "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
+               "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
+               "log4j2.properties": null,
+               "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
+               "opensearch.yml": null,
+               "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
+               "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
+               "vector.yaml": null
+            }),
+            TestSecurityMode::Participating | TestSecurityMode::Disabled => json!({
+               "log4j2.properties": null,
+               "opensearch.yml": null,
+               "vector.yaml": null
+            }),
+        };
 
         assert_eq!(
             json!({
@@ -1469,33 +1565,1337 @@ mod tests {
                         }
                     ]
                 },
-                "data": {
-                   "action_groups.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
-                   "allow_list.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
-                   "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
-                   "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
-                   "internal_users.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"internalusers\"}}",
-                   "log4j2.properties": null,
-                   "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
-                   "opensearch.yml": null,
-                   "roles.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"roles\"}}",
-                   "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
-                   "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
-                    "vector.yaml": null
-                }
+                "data": expected_data
             }),
             config_map
         );
     }
 
-    #[test]
-    fn test_build_stateful_set() {
-        let cluster = validated_cluster();
+    #[rstest]
+    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
+    #[case::security_mode_managing(TestSecurityMode::Managing)]
+    #[case::security_mode_participating(TestSecurityMode::Participating)]
+    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
+    fn test_build_stateful_set(#[case] security_mode: TestSecurityMode) {
+        let cluster = validated_cluster(security_mode);
         let context_names = context_names();
         let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let stateful_set = serde_json::to_value(role_group_builder.build_stateful_set())
             .expect("should be serializable");
+
+        let expected_opensearch_container_volume_mounts = match security_mode {
+            TestSecurityMode::Initializing => json!([
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.yml",
+                    "name": "config",
+                    "readOnly": true,
+                    "subPath": "opensearch.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/log4j2.properties",
+                    "name": "log-config",
+                    "readOnly": true,
+                    "subPath": "log4j2.properties"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/data",
+                    "name": "data"
+                },
+                {
+                    "mountPath": "/stackable/listeners/role-group",
+                    "name": "listener"
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log"
+                },
+                {
+                    "mountPath": "/stackable/listeners/discovery-service",
+                    "name": "discovery-service-listener"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/internal",
+                    "name": "tls-internal"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server",
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.crt",
+                    "name": "tls-server",
+                    "subPath": "tls.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.key",
+                    "name": "tls-server",
+                    "subPath": "tls.key"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/ca.crt",
+                    "name": "tls-server",
+                    "subPath": "ca.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/action_groups.yml",
+                    "name": "security-config-file-actiongroups",
+                    "readOnly": true,
+                    "subPath": "action_groups.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
+                    "name": "security-config-file-allowlist",
+                    "readOnly": true,
+                    "subPath": "allow_list.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
+                    "name": "security-config-file-audit",
+                    "readOnly": true,
+                    "subPath": "audit.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/config.yml",
+                    "name": "security-config-file-config",
+                    "readOnly": true,
+                    "subPath": "config.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/internal_users.yml",
+                    "name": "security-config-file-internalusers",
+                    "readOnly": true,
+                    "subPath": "internal_users.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/nodes_dn.yml",
+                    "name": "security-config-file-nodesdn",
+                    "readOnly": true,
+                    "subPath": "nodes_dn.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles.yml",
+                    "name": "security-config-file-roles",
+                    "readOnly": true,
+                    "subPath": "roles.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles_mapping.yml",
+                    "name": "security-config-file-rolesmapping",
+                    "readOnly": true,
+                    "subPath": "roles_mapping.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/tenants.yml",
+                    "name": "security-config-file-tenants",
+                    "readOnly": true,
+                    "subPath": "tenants.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.keystore",
+                    "name": "keystore",
+                    "readOnly": true,
+                    "subPath": "opensearch.keystore"
+                }
+            ]),
+            TestSecurityMode::Managing => json!([
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.yml",
+                    "name": "config",
+                    "readOnly": true,
+                    "subPath": "opensearch.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/log4j2.properties",
+                    "name": "log-config",
+                    "readOnly": true,
+                    "subPath": "log4j2.properties"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/data",
+                    "name": "data"
+                },
+                {
+                    "mountPath": "/stackable/listeners/role-group",
+                    "name": "listener"
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log"
+                },
+                {
+                    "mountPath": "/stackable/listeners/discovery-service",
+                    "name": "discovery-service-listener"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/internal",
+                    "name": "tls-internal"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server",
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.crt",
+                    "name": "tls-server",
+                    "subPath": "tls.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.key",
+                    "name": "tls-server",
+                    "subPath": "tls.key"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/ca.crt",
+                    "name": "tls-server-ca",
+                    "subPath": "ca.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.keystore",
+                    "name": "keystore",
+                    "readOnly": true,
+                    "subPath": "opensearch.keystore"
+                }
+            ]),
+            TestSecurityMode::Participating => json!([
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.yml",
+                    "name": "config",
+                    "readOnly": true,
+                    "subPath": "opensearch.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/log4j2.properties",
+                    "name": "log-config",
+                    "readOnly": true,
+                    "subPath": "log4j2.properties"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/data",
+                    "name": "data"
+                },
+                {
+                    "mountPath": "/stackable/listeners/role-group",
+                    "name": "listener"
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log"
+                },
+                {
+                    "mountPath": "/stackable/listeners/discovery-service",
+                    "name": "discovery-service-listener"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/internal",
+                    "name": "tls-internal"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server",
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.crt",
+                    "name": "tls-server",
+                    "subPath": "tls.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/tls.key",
+                    "name": "tls-server",
+                    "subPath": "tls.key"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/server/ca.crt",
+                    "name": "tls-server",
+                    "subPath": "ca.crt"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.keystore",
+                    "name": "keystore",
+                    "readOnly": true,
+                    "subPath": "opensearch.keystore"
+                }
+            ]),
+            TestSecurityMode::Disabled => json!([
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.yml",
+                    "name": "config",
+                    "readOnly": true,
+                    "subPath": "opensearch.yml"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/log4j2.properties",
+                    "name": "log-config",
+                    "readOnly": true,
+                    "subPath": "log4j2.properties"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/data",
+                    "name": "data"
+                },
+                {
+                    "mountPath": "/stackable/listeners/role-group",
+                    "name": "listener"
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log"
+                },
+                {
+                    "mountPath": "/stackable/listeners/discovery-service",
+                    "name": "discovery-service-listener"
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch.keystore",
+                    "name": "keystore",
+                    "readOnly": true,
+                    "subPath": "opensearch.keystore"
+                }
+            ]),
+        };
+
+        let expected_opensearch_container = json!({
+            "args": [
+                concat!(
+                    "\n",
+                    "prepare_signal_handlers()\n",
+                    "{\n",
+                    "    unset term_child_pid\n",
+                    "    unset term_kill_needed\n",
+                    "    trap 'handle_term_signal' TERM\n",
+                    "}\n",
+                    "\n",
+                    "handle_term_signal()\n",
+                    "{\n",
+                    "    if [ \"${term_child_pid}\" ]; then\n",
+                    "        kill -TERM \"${term_child_pid}\" 2>/dev/null\n",
+                    "    else\n",
+                    "        term_kill_needed=\"yes\"\n",
+                    "    fi\n",
+                    "}\n",
+                    "\n",
+                    "wait_for_termination()\n",
+                    "{\n",
+                    "    set +e\n",
+                    "    term_child_pid=$1\n",
+                    "    if [[ -v term_kill_needed ]]; then\n",
+                    "        kill -TERM \"${term_child_pid}\" 2>/dev/null\n",
+                    "    fi\n",
+                    "    wait ${term_child_pid} 2>/dev/null\n",
+                    "    trap - TERM\n",
+                    "    wait ${term_child_pid} 2>/dev/null\n",
+                    "    set -e\n",
+                    "}\n",
+                    "\n",
+                    "rm -f /stackable/log/_vector/shutdown\n",
+                    "prepare_signal_handlers\n",
+                    "if command --search containerdebug >/dev/null 2>&1; then\n",
+                    "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
+                    "else\n",
+                    "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",
+                    "fi\n",
+                    "./opensearch-docker-entrypoint.sh  &\n",
+                    "wait_for_termination $!\n",
+                    "mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown"
+                )
+            ],
+            "command": [
+                "/bin/bash",
+                "-x",
+                "-euo",
+                "pipefail",
+                "-c"
+            ],
+            "env": [
+                {
+                    "name": "_POD_NAME",
+                    "valueFrom": {
+                        "fieldRef": {
+                            "fieldPath": "metadata.name"
+                        }
+                    }
+                },
+                {
+                    "name": "discovery.seed_hosts",
+                    "value": "my-opensearch-cluster-seed-nodes.default.svc.cluster.local"
+                },
+                {
+                    "name": "http.publish_host",
+                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                },
+                {
+                    "name": "network.publish_host",
+                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                },
+                {
+                    "name": "node.name",
+                    "valueFrom": {
+                        "fieldRef": {
+                            "fieldPath": "metadata.name"
+                        }
+                    }
+                },
+                {
+                    "name": "node.roles",
+                    "value": "cluster_manager,data,ingest,remote_cluster_client"
+                },
+                {
+                    "name": "transport.publish_host",
+                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                },
+            ],
+            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "imagePullPolicy": "Always",
+            "name": "opensearch",
+            "ports": [
+                {
+                    "containerPort": 9200,
+                    "name": "http"
+                },
+                {
+                    "containerPort": 9300,
+                    "name": "transport"
+                }
+            ],
+            "readinessProbe": {
+                "failureThreshold": 3,
+                "periodSeconds": 5,
+                "tcpSocket": {
+                    "port": "http"
+                },
+                "timeoutSeconds": 3
+            },
+            "resources": {},
+            "startupProbe": {
+                "failureThreshold": 30,
+                "initialDelaySeconds": 5,
+                "periodSeconds": 10,
+                "tcpSocket": {
+                    "port": "http"
+                },
+                "timeoutSeconds": 3
+            },
+            "volumeMounts": expected_opensearch_container_volume_mounts
+        });
+
+        let expected_vector_container = json!({
+            "args": [
+                concat!(
+                    "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n",
+                    "vector & vector_pid=$!\n",
+                    "if [ ! -f \"/stackable/log/_vector/shutdown\" ]; then\n",
+                    "mkdir -p /stackable/log/_vector\n",
+                    "inotifywait -qq --event create /stackable/log/_vector;\n",
+                    "fi\n",
+                    "sleep 1\n",
+                    "kill $vector_pid"
+                ),
+            ],
+            "command": [
+                "/bin/bash",
+                "-x",
+                "-euo",
+                "pipefail",
+                "-c"
+            ],
+            "env": [
+                {
+                    "name": "CLUSTER_NAME",
+                    "value":"my-opensearch-cluster",
+                },
+                {
+                    "name": "LOG_DIR",
+                    "value": "/stackable/log",
+                },
+                {
+                    "name": "NAMESPACE",
+                    "valueFrom": {
+                        "fieldRef": {
+                            "fieldPath": "metadata.namespace",
+                        },
+                    },
+                },
+                {
+                    "name": "OPENSEARCH_SERVER_LOG_FILE",
+                    "value": "opensearch_server.json",
+                },
+                {
+                    "name": "ROLE_GROUP_NAME",
+                    "value": "default",
+                },
+                {
+                    "name": "ROLE_NAME",
+                    "value": "nodes",
+                },
+                {
+                    "name": "VECTOR_AGGREGATOR_ADDRESS",
+                    "valueFrom": {
+                        "configMapKeyRef": {
+                            "key": "ADDRESS",
+                            "name": "vector-aggregator",
+                        },
+                    },
+                },
+                {
+                    "name": "VECTOR_CONFIG_YAML",
+                    "value": "/stackable/config/vector.yaml",
+                },
+                {
+                    "name": "VECTOR_FILE_LOG_LEVEL",
+                    "value": "info",
+                },
+                {
+                    "name": "VECTOR_LOG",
+                    "value": "info",
+                },
+            ],
+            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "imagePullPolicy": "Always",
+            "name": "vector",
+            "resources": {
+                "limits": {
+                    "cpu": "500m",
+                    "memory": "128Mi",
+                },
+                "requests": {
+                    "cpu": "250m",
+                    "memory": "128Mi",
+                },
+            },
+            "volumeMounts": [
+                {
+                    "mountPath": "/stackable/config/vector.yaml",
+                    "name": "config",
+                    "readOnly": true,
+                    "subPath": "vector.yaml",
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log",
+                },
+            ],
+        });
+
+        let expected_update_security_config_container = json!({
+            "args": [
+                include_str!("scripts/update-security-config.sh")
+            ],
+            "command": [
+                "/bin/bash",
+                "-c",
+            ],
+            "env": [
+                {
+                    "name": "MANAGE_ACTIONGROUPS",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_ALLOWLIST",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_AUDIT",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_CONFIG",
+                    "value": "true",
+                },
+                {
+                    "name": "MANAGE_INTERNALUSERS",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_NODESDN",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_ROLES",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_ROLESMAPPING",
+                    "value": "false",
+                },
+                {
+                    "name": "MANAGE_TENANTS",
+                    "value": "false",
+                },
+                {
+                    "name": "OPENSEARCH_PATH_CONF",
+                    "value": "/stackable/opensearch/config",
+                },
+                {
+                    "name": "POD_NAME",
+                    "valueFrom": {
+                        "fieldRef": {
+                            "fieldPath": "metadata.name",
+                        },
+                    },
+                },
+            ],
+            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "imagePullPolicy": "Always",
+            "name": "update-security-config",
+            "resources": {
+                "limits": {
+                    "cpu": "400m",
+                    "memory": "512Mi",
+                },
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "512Mi",
+                },
+            },
+            "volumeMounts": [
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/tls.crt",
+                    "name": "tls-admin-cert",
+                    "readOnly": true,
+                    "subPath": "tls.crt",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/tls.key",
+                    "name": "tls-admin-cert",
+                    "readOnly": true,
+                    "subPath": "tls.key",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/tls/ca.crt",
+                    "name": "tls-server-ca",
+                    "readOnly": true,
+                    "subPath": "ca.crt",
+                },
+                {
+                    "mountPath": "/stackable/log",
+                    "name": "log",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/action_groups.yml",
+                    "name": "security-config-file-actiongroups",
+                    "readOnly": true,
+                    "subPath": "action_groups.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
+                    "name": "security-config-file-allowlist",
+                    "readOnly": true,
+                    "subPath": "allow_list.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
+                    "name": "security-config-file-audit",
+                    "readOnly": true,
+                    "subPath": "audit.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/config.yml",
+                    "name": "security-config-file-config",
+                    "readOnly": true,
+                    "subPath": "config.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/internal_users.yml",
+                    "name": "security-config-file-internalusers",
+                    "readOnly": true,
+                    "subPath": "internal_users.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/nodes_dn.yml",
+                    "name": "security-config-file-nodesdn",
+                    "readOnly": true,
+                    "subPath": "nodes_dn.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles.yml",
+                    "name": "security-config-file-roles",
+                    "readOnly": true,
+                    "subPath": "roles.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles_mapping.yml",
+                    "name": "security-config-file-rolesmapping",
+                    "readOnly": true,
+                    "subPath": "roles_mapping.yml",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/tenants.yml",
+                    "name": "security-config-file-tenants",
+                    "readOnly": true,
+                    "subPath": "tenants.yml",
+                },
+            ],
+        });
+
+        let expected_containers = match security_mode {
+            TestSecurityMode::Initializing => {
+                json!([expected_opensearch_container, expected_vector_container])
+            }
+            TestSecurityMode::Managing => {
+                json!([
+                    expected_opensearch_container,
+                    expected_vector_container,
+                    expected_update_security_config_container
+                ])
+            }
+            TestSecurityMode::Participating => {
+                json!([expected_opensearch_container, expected_vector_container])
+            }
+            TestSecurityMode::Disabled => {
+                json!([expected_opensearch_container, expected_vector_container])
+            }
+        };
+
+        let expected_init_keystore_container = json!({
+            "args": [
+                include_str!("scripts/init-keystore.sh")
+            ],
+            "command": [
+                "/bin/bash",
+                "-c"
+            ],
+            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "imagePullPolicy": "Always",
+            "name": "init-keystore",
+            "resources": {},
+            "volumeMounts": [
+                {
+                    "mountPath": "/stackable/opensearch/initialized-keystore",
+                    "name": "keystore",
+                },
+                {
+                    "mountPath": "/stackable/opensearch/keystore-secrets/Keystore1",
+                    "name": "keystore-0",
+                    "readOnly": true,
+                    "subPath": "my-keystore-file"
+                }
+            ]
+        });
+
+        let expected_create_admin_certificate_container = json!({
+            "args": [
+                include_str!("scripts/create-admin-certificate.sh")
+            ],
+            "command": [
+                "/bin/bash",
+                "-c",
+            ],
+            "env": [
+                {
+                    "name": "ADMIN_DN",
+                    "value": "CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b",
+                },
+                {
+                    "name": "POD_NAME",
+                    "valueFrom": {
+                        "fieldRef": {
+                            "fieldPath": "metadata.name",
+                        },
+                    },
+                },
+            ],
+            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "imagePullPolicy": "Always",
+            "name": "create-admin-certificate",
+            "resources": {
+                "limits": {
+                    "cpu": "400m",
+                    "memory": "128Mi",
+                },
+                "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi",
+                },
+            },
+            "volumeMounts": [
+                {
+                    "mountPath": "/stackable/tls-server/ca.crt",
+                    "name": "tls-server",
+                    "readOnly": true,
+                    "subPath": "ca.crt",
+                },
+                {
+                    "mountPath": "/stackable/tls-admin-cert",
+                    "name": "tls-admin-cert",
+                    "readOnly": false,
+                },
+                {
+                    "mountPath": "/stackable/tls-server-ca",
+                    "name": "tls-server-ca",
+                    "readOnly": false,
+                },
+            ],
+        });
+
+        let expected_init_containers = match security_mode {
+            TestSecurityMode::Initializing => json!([expected_init_keystore_container]),
+            TestSecurityMode::Managing => json!([
+                expected_init_keystore_container,
+                expected_create_admin_certificate_container
+            ]),
+            TestSecurityMode::Participating => json!([expected_init_keystore_container]),
+            TestSecurityMode::Disabled => json!([expected_init_keystore_container]),
+        };
+
+        let expected_volumes = match security_mode {
+            TestSecurityMode::Initializing => json!([
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "config"
+                },
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "log-config"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "30Mi"
+                    },
+                    "name": "log"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-internal"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-server"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "action_groups.yml",
+                                "mode": 0o660,
+                                "path": "action_groups.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-actiongroups"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "allow_list.yml",
+                                "mode": 0o660,
+                                "path": "allow_list.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-allowlist"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "audit.yml",
+                                "mode": 0o660,
+                                "path": "audit.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-audit"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "config.yml",
+                                "mode": 0o660,
+                                "path": "config.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-config"
+                },
+                {
+                    "name": "security-config-file-internalusers",
+                    "secret": {
+                        "items": [
+                            {
+                                "key": "internal_users.yml",
+                                "mode": 0o660,
+                                "path": "internal_users.yml"
+                            }
+                        ],
+                        "secretName": "opensearch-security-config"
+                    }
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "nodes_dn.yml",
+                                "mode": 0o660,
+                                "path": "nodes_dn.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-nodesdn"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "roles.yml",
+                                "mode": 0o660,
+                                "path": "roles.yml"
+                            }
+                        ],
+                        "name": "opensearch-security-config"
+                    },
+                    "name": "security-config-file-roles"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "roles_mapping.yml",
+                                "mode": 0o660,
+                                "path": "roles_mapping.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-rolesmapping"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "tenants.yml",
+                                "mode": 0o660,
+                                "path": "tenants.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-tenants"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi"
+                    },
+                    "name": "keystore"
+                },
+                {
+                    "name": "keystore-0",
+                    "secret": {
+                        "defaultMode": 0o660,
+                        "items": [
+                            {
+                                "key": "my-keystore-file",
+                                "path": "my-keystore-file"
+                            }
+                        ],
+                        "secretName": "my-keystore-secret"
+                    }
+                }
+            ]),
+            TestSecurityMode::Managing => json!([
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "config"
+                },
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "log-config"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "30Mi"
+                    },
+                    "name": "log"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-internal"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-server"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "action_groups.yml",
+                                "mode": 0o660,
+                                "path": "action_groups.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-actiongroups"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "allow_list.yml",
+                                "mode": 0o660,
+                                "path": "allow_list.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-allowlist"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "audit.yml",
+                                "mode": 0o660,
+                                "path": "audit.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-audit"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "config.yml",
+                                "mode": 0o660,
+                                "path": "config.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-config"
+                },
+                {
+                    "name": "security-config-file-internalusers",
+                    "secret": {
+                        "items": [
+                            {
+                                "key": "internal_users.yml",
+                                "mode": 0o660,
+                                "path": "internal_users.yml"
+                            }
+                        ],
+                        "secretName": "opensearch-security-config"
+                    }
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "nodes_dn.yml",
+                                "mode": 0o660,
+                                "path": "nodes_dn.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-nodesdn"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "roles.yml",
+                                "mode": 0o660,
+                                "path": "roles.yml"
+                            }
+                        ],
+                        "name": "opensearch-security-config"
+                    },
+                    "name": "security-config-file-roles"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "roles_mapping.yml",
+                                "mode": 0o660,
+                                "path": "roles_mapping.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-rolesmapping"
+                },
+                {
+                    "configMap": {
+                        "items": [
+                            {
+                                "key": "tenants.yml",
+                                "mode": 0o660,
+                                "path": "tenants.yml"
+                            }
+                        ],
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "security-config-file-tenants"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi",
+                    },
+                    "name": "tls-server-ca",
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi",
+                    },
+                    "name": "tls-admin-cert",
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi"
+                    },
+                    "name": "keystore"
+                },
+                {
+                    "name": "keystore-0",
+                    "secret": {
+                        "defaultMode": 0o660,
+                        "items": [
+                            {
+                                "key": "my-keystore-file",
+                                "path": "my-keystore-file"
+                            }
+                        ],
+                        "secretName": "my-keystore-secret"
+                    }
+                }
+            ]),
+            TestSecurityMode::Participating => json!([
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "config"
+                },
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "log-config"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "30Mi"
+                    },
+                    "name": "log"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-internal"
+                },
+                {
+                    "ephemeral": {
+                        "volumeClaimTemplate": {
+                            "metadata": {
+                                "annotations": {
+                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/class": "tls",
+                                    "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
+                                }
+                            },
+                            "spec": {
+                                "accessModes": [
+                                    "ReadWriteOnce"
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "storage": "1"
+                                    }
+                                },
+                                "storageClassName": "secrets.stackable.tech"
+                            }
+                        }
+                    },
+                    "name": "tls-server"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi"
+                    },
+                    "name": "keystore"
+                },
+                {
+                    "name": "keystore-0",
+                    "secret": {
+                        "defaultMode": 0o660,
+                        "items": [
+                            {
+                                "key": "my-keystore-file",
+                                "path": "my-keystore-file"
+                            }
+                        ],
+                        "secretName": "my-keystore-secret"
+                    }
+                }
+            ]),
+            TestSecurityMode::Disabled => json!([
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "config"
+                },
+                {
+                    "configMap": {
+                        "defaultMode": 0o660,
+                        "name": "my-opensearch-cluster-nodes-default"
+                    },
+                    "name": "log-config"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "30Mi"
+                    },
+                    "name": "log"
+                },
+                {
+                    "emptyDir": {
+                        "sizeLimit": "1Mi"
+                    },
+                    "name": "keystore"
+                },
+                {
+                    "name": "keystore-0",
+                    "secret": {
+                        "defaultMode": 0o660,
+                        "items": [
+                            {
+                                "key": "my-keystore-file",
+                                "path": "my-keystore-file"
+                            }
+                        ],
+                        "secretName": "my-keystore-secret"
+                    }
+                }
+            ]),
+        };
 
         assert_eq!(
             json!({
@@ -1557,580 +2957,14 @@ mod tests {
                         },
                         "spec": {
                             "affinity": {},
-                            "containers": [
-                                {
-                                    "args": [
-                                        concat!(
-                                            "\n",
-                                            "prepare_signal_handlers()\n",
-                                            "{\n",
-                                            "    unset term_child_pid\n",
-                                            "    unset term_kill_needed\n",
-                                            "    trap 'handle_term_signal' TERM\n",
-                                            "}\n",
-                                            "\n",
-                                            "handle_term_signal()\n",
-                                            "{\n",
-                                            "    if [ \"${term_child_pid}\" ]; then\n",
-                                            "        kill -TERM \"${term_child_pid}\" 2>/dev/null\n",
-                                            "    else\n",
-                                            "        term_kill_needed=\"yes\"\n",
-                                            "    fi\n",
-                                            "}\n",
-                                            "\n",
-                                            "wait_for_termination()\n",
-                                            "{\n",
-                                            "    set +e\n",
-                                            "    term_child_pid=$1\n",
-                                            "    if [[ -v term_kill_needed ]]; then\n",
-                                            "        kill -TERM \"${term_child_pid}\" 2>/dev/null\n",
-                                            "    fi\n",
-                                            "    wait ${term_child_pid} 2>/dev/null\n",
-                                            "    trap - TERM\n",
-                                            "    wait ${term_child_pid} 2>/dev/null\n",
-                                            "    set -e\n",
-                                            "}\n",
-                                            "\n",
-                                            "rm -f /stackable/log/_vector/shutdown\n",
-                                            "prepare_signal_handlers\n",
-                                            "if command --search containerdebug >/dev/null 2>&1; then\n",
-                                            "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
-                                            "else\n",
-                                            "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",
-                                            "fi\n",
-                                            "./opensearch-docker-entrypoint.sh  &\n",
-                                            "wait_for_termination $!\n",
-                                            "mkdir -p /stackable/log/_vector && touch /stackable/log/_vector/shutdown"
-                                        )
-                                    ],
-                                    "command": [
-                                        "/bin/bash",
-                                        "-x",
-                                        "-euo",
-                                        "pipefail",
-                                        "-c"
-                                    ],
-                                    "env": [
-                                        {
-                                            "name": "_POD_NAME",
-                                            "valueFrom": {
-                                                "fieldRef": {
-                                                    "fieldPath": "metadata.name"
-                                                }
-                                            }
-                                        },
-                                        {
-                                            "name": "discovery.seed_hosts",
-                                            "value": "my-opensearch-cluster-seed-nodes.default.svc.cluster.local"
-                                        },
-                                        {
-                                            "name": "http.publish_host",
-                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
-                                        },
-                                        {
-                                            "name": "network.publish_host",
-                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
-                                        },
-                                        {
-                                            "name": "node.name",
-                                            "valueFrom": {
-                                                "fieldRef": {
-                                                    "fieldPath": "metadata.name"
-                                                }
-                                            }
-                                        },
-                                        {
-                                            "name": "node.roles",
-                                            "value": "cluster_manager,data,ingest,remote_cluster_client"
-                                        },
-                                        {
-                                            "name": "transport.publish_host",
-                                            "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
-                                        },
-                                    ],
-                                    "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
-                                    "imagePullPolicy": "Always",
-                                    "name": "opensearch",
-                                    "ports": [
-                                        {
-                                            "containerPort": 9200,
-                                            "name": "http"
-                                        },
-                                        {
-                                            "containerPort": 9300,
-                                            "name": "transport"
-                                        }
-                                    ],
-                                    "readinessProbe": {
-                                        "failureThreshold": 3,
-                                        "periodSeconds": 5,
-                                        "tcpSocket": {
-                                            "port": "http"
-                                        },
-                                        "timeoutSeconds": 3
-                                    },
-                                    "resources": {},
-                                    "startupProbe": {
-                                        "failureThreshold": 30,
-                                        "initialDelaySeconds": 5,
-                                        "periodSeconds": 10,
-                                        "tcpSocket": {
-                                            "port": "http"
-                                        },
-                                        "timeoutSeconds": 3
-                                    },
-                                    "volumeMounts": [
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch.yml",
-                                            "name": "config",
-                                            "readOnly": true,
-                                            "subPath": "opensearch.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/log4j2.properties",
-                                            "name": "log-config",
-                                            "readOnly": true,
-                                            "subPath": "log4j2.properties"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/data",
-                                            "name": "data"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/listeners/role-group",
-                                            "name": "listener"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/log",
-                                            "name": "log"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/listeners/discovery-service",
-                                            "name": "discovery-service-listener"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/tls/internal",
-                                            "name": "tls-internal"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/tls/server",
-                                            "mountPath": "/stackable/opensearch/config/tls/server/tls.crt",
-                                            "name": "tls-server",
-                                            "subPath": "tls.crt"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/tls/server/tls.key",
-                                            "name": "tls-server",
-                                            "subPath": "tls.key"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/tls/server/ca.crt",
-                                            "name": "tls-server",
-                                            "subPath": "ca.crt"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/action_groups.yml",
-                                            "name": "security-config-file-actiongroups",
-                                            "readOnly": true,
-                                            "subPath": "action_groups.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
-                                            "name": "security-config-file-allowlist",
-                                            "readOnly": true,
-                                            "subPath": "allow_list.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
-                                            "name": "security-config-file-audit",
-                                            "readOnly": true,
-                                            "subPath": "audit.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/config.yml",
-                                            "name": "security-config-file-config",
-                                            "readOnly": true,
-                                            "subPath": "config.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/internal_users.yml",
-                                            "name": "security-config-file-internalusers",
-                                            "readOnly": true,
-                                            "subPath": "internal_users.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/nodes_dn.yml",
-                                            "name": "security-config-file-nodesdn",
-                                            "readOnly": true,
-                                            "subPath": "nodes_dn.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/roles.yml",
-                                            "name": "security-config-file-roles",
-                                            "readOnly": true,
-                                            "subPath": "roles.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/roles_mapping.yml",
-                                            "name": "security-config-file-rolesmapping",
-                                            "readOnly": true,
-                                            "subPath": "roles_mapping.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch-security/tenants.yml",
-                                            "name": "security-config-file-tenants",
-                                            "readOnly": true,
-                                            "subPath": "tenants.yml"
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/config/opensearch.keystore",
-                                            "name": "keystore",
-                                            "readOnly": true,
-                                            "subPath": "opensearch.keystore"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "args": [
-                                        concat!(
-                                            "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n",
-                                            "vector & vector_pid=$!\n",
-                                            "if [ ! -f \"/stackable/log/_vector/shutdown\" ]; then\n",
-                                            "mkdir -p /stackable/log/_vector\n",
-                                            "inotifywait -qq --event create /stackable/log/_vector;\n",
-                                            "fi\n",
-                                            "sleep 1\n",
-                                            "kill $vector_pid"
-                                        ),
-                                    ],
-                                    "command": [
-                                        "/bin/bash",
-                                        "-x",
-                                        "-euo",
-                                        "pipefail",
-                                        "-c"
-                                    ],
-                                    "env": [
-                                        {
-                                            "name": "CLUSTER_NAME",
-                                            "value":"my-opensearch-cluster",
-                                        },
-                                        {
-                                            "name": "LOG_DIR",
-                                            "value": "/stackable/log",
-                                        },
-                                        {
-                                            "name": "NAMESPACE",
-                                            "valueFrom": {
-                                                "fieldRef": {
-                                                    "fieldPath": "metadata.namespace",
-                                                },
-                                            },
-                                        },
-                                        {
-                                            "name": "OPENSEARCH_SERVER_LOG_FILE",
-                                            "value": "opensearch_server.json",
-                                        },
-                                        {
-                                            "name": "ROLE_GROUP_NAME",
-                                            "value": "default",
-                                        },
-                                        {
-                                            "name": "ROLE_NAME",
-                                            "value": "nodes",
-                                        },
-                                        {
-                                            "name": "VECTOR_AGGREGATOR_ADDRESS",
-                                            "valueFrom": {
-                                                "configMapKeyRef": {
-                                                    "key": "ADDRESS",
-                                                    "name": "vector-aggregator",
-                                                },
-                                            },
-                                        },
-                                        {
-                                            "name": "VECTOR_CONFIG_YAML",
-                                            "value": "/stackable/config/vector.yaml",
-                                        },
-                                        {
-                                            "name": "VECTOR_FILE_LOG_LEVEL",
-                                            "value": "info",
-                                        },
-                                        {
-                                            "name": "VECTOR_LOG",
-                                            "value": "info",
-                                        },
-                                    ],
-                                    "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
-                                    "imagePullPolicy": "Always",
-                                    "name": "vector",
-                                    "resources": {
-                                        "limits": {
-                                            "cpu": "500m",
-                                            "memory": "128Mi",
-                                        },
-                                        "requests": {
-                                            "cpu": "250m",
-                                            "memory": "128Mi",
-                                        },
-                                    },
-                                    "volumeMounts": [
-                                        {
-                                            "mountPath": "/stackable/config/vector.yaml",
-                                            "name": "config",
-                                            "readOnly": true,
-                                            "subPath": "vector.yaml",
-                                        },
-                                        {
-                                            "mountPath": "/stackable/log",
-                                            "name": "log",
-                                        },
-                                    ],
-                                },
-                            ],
-                            "initContainers": [
-                                {
-                                    "args": [
-                                        include_str!("scripts/init-keystore.sh")
-                                    ],
-                                    "command": [
-                                        "/bin/bash",
-                                        "-c"
-                                    ],
-                                    "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
-                                    "imagePullPolicy": "Always",
-                                    "name": "init-keystore",
-                                    "resources": {},
-                                    "volumeMounts": [
-                                        {
-                                            "mountPath": "/stackable/opensearch/initialized-keystore",
-                                            "name": "keystore",
-                                        },
-                                        {
-                                            "mountPath": "/stackable/opensearch/keystore-secrets/Keystore1",
-                                            "name": "keystore-0",
-                                            "readOnly": true,
-                                            "subPath": "my-keystore-file"
-                                        }
-                                    ]
-                                }
-                            ],
+                            "containers": expected_containers,
+                            "initContainers": expected_init_containers,
                             "securityContext": {
                                 "fsGroup": 1000
                             },
                             "serviceAccountName": "my-opensearch-cluster-serviceaccount",
                             "terminationGracePeriodSeconds": 30,
-                            "volumes": [
-                                {
-                                    "configMap": {
-                                        "defaultMode": 0o660,
-                                        "name": "my-opensearch-cluster-nodes-default"
-                                    },
-                                    "name": "config"
-                                },
-                                {
-                                    "configMap": {
-                                        "defaultMode": 0o660,
-                                        "name": "my-opensearch-cluster-nodes-default"
-                                    },
-                                    "name": "log-config"
-                                },
-                                {
-                                    "emptyDir": {
-                                        "sizeLimit": "30Mi"
-                                    },
-                                    "name": "log"
-                                },
-                                {
-                                    "ephemeral": {
-                                        "volumeClaimTemplate": {
-                                            "metadata": {
-                                                "annotations": {
-                                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
-                                                    "secrets.stackable.tech/class": "tls",
-                                                    "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
-                                                }
-                                            },
-                                            "spec": {
-                                                "accessModes": [
-                                                    "ReadWriteOnce"
-                                                ],
-                                                "resources": {
-                                                    "requests": {
-                                                        "storage": "1"
-                                                    }
-                                                },
-                                                "storageClassName": "secrets.stackable.tech"
-                                            }
-                                        }
-                                    },
-                                    "name": "tls-internal"
-                                },
-                                {
-                                    "ephemeral": {
-                                        "volumeClaimTemplate": {
-                                            "metadata": {
-                                                "annotations": {
-                                                    "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
-                                                    "secrets.stackable.tech/class": "tls",
-                                                    "secrets.stackable.tech/format": "tls-pem",
-                                                    "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
-                                                }
-                                            },
-                                            "spec": {
-                                                "accessModes": [
-                                                    "ReadWriteOnce"
-                                                ],
-                                                "resources": {
-                                                    "requests": {
-                                                        "storage": "1"
-                                                    }
-                                                },
-                                                "storageClassName": "secrets.stackable.tech"
-                                            }
-                                        }
-                                    },
-                                    "name": "tls-server"
-                                },
-                                {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "action_groups.yml",
-                                               "mode": 0o660,
-                                               "path": "action_groups.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-actiongroups"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "allow_list.yml",
-                                               "mode": 0o660,
-                                               "path": "allow_list.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-allowlist"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "audit.yml",
-                                               "mode": 0o660,
-                                               "path": "audit.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-audit"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "config.yml",
-                                               "mode": 0o660,
-                                               "path": "config.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-config"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "internal_users.yml",
-                                               "mode": 0o660,
-                                               "path": "internal_users.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-internalusers"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "nodes_dn.yml",
-                                               "mode": 0o660,
-                                               "path": "nodes_dn.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-nodesdn"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "roles.yml",
-                                               "mode": 0o660,
-                                               "path": "roles.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-roles"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "roles_mapping.yml",
-                                               "mode": 0o660,
-                                               "path": "roles_mapping.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-rolesmapping"
-                               },
-                               {
-                                   "configMap": {
-                                       "items": [
-                                           {
-                                               "key": "tenants.yml",
-                                               "mode": 0o660,
-                                               "path": "tenants.yml"
-                                           }
-                                       ],
-                                       "name": "my-opensearch-cluster-nodes-default"
-                                   },
-                                   "name": "security-config-file-tenants"
-                               },
-
-                                {
-                                    "emptyDir": {
-                                        "sizeLimit": "1Mi"
-                                    },
-                                    "name": "keystore"
-                                },
-                                {
-                                    "name": "keystore-0",
-                                    "secret": {
-                                        "defaultMode": 0o660,
-                                        "items": [
-                                            {
-                                                "key": "my-keystore-file",
-                                                "path": "my-keystore-file"
-                                            }
-                                        ],
-                                        "secretName": "my-keystore-secret"
-                                    }
-                                }
-                            ]
+                            "volumes": expected_volumes,
                         }
                     },
                     "volumeClaimTemplates": [
@@ -2216,10 +3050,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_build_cluster_manager_labels() {
-        let cluster_manager_labels =
-            RoleGroupBuilder::cluster_manager_labels(&validated_cluster(), &context_names());
+    #[rstest]
+    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
+    #[case::security_mode_managing(TestSecurityMode::Managing)]
+    #[case::security_mode_participating(TestSecurityMode::Participating)]
+    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
+    fn test_build_cluster_manager_labels(#[case] security_mode: TestSecurityMode) {
+        let cluster_manager_labels = RoleGroupBuilder::cluster_manager_labels(
+            &validated_cluster(security_mode),
+            &context_names(),
+        );
 
         assert_eq!(
             BTreeMap::from(
@@ -2235,14 +3075,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_build_headless_service() {
-        let cluster = validated_cluster();
+    #[rstest]
+    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
+    #[case::security_mode_managing(TestSecurityMode::Managing)]
+    #[case::security_mode_participating(TestSecurityMode::Participating)]
+    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
+    fn test_build_headless_service(#[case] security_mode: TestSecurityMode) {
+        let cluster = validated_cluster(security_mode);
         let context_names = context_names();
         let role_group_builder = role_group_builder(&cluster, &context_names);
 
         let headless_service = serde_json::to_value(role_group_builder.build_headless_service())
             .expect("should be serializable");
+
+        let expected_scheme = if security_mode == TestSecurityMode::Disabled {
+            json!("http")
+        } else {
+            json!("https")
+        };
 
         assert_eq!(
             json!({
@@ -2252,7 +3102,7 @@ mod tests {
                     "annotations": {
                         "prometheus.io/path": "/_prometheus/metrics",
                         "prometheus.io/port": "9200",
-                        "prometheus.io/scheme": "https",
+                        "prometheus.io/scheme": expected_scheme,
                         "prometheus.io/scrape": "true"
                     },
                     "labels": {
@@ -2303,9 +3153,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_build_listener() {
-        let cluster = validated_cluster();
+    #[rstest]
+    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
+    #[case::security_mode_managing(TestSecurityMode::Managing)]
+    #[case::security_mode_participating(TestSecurityMode::Participating)]
+    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
+    fn test_build_listener(#[case] security_mode: TestSecurityMode) {
+        let cluster = validated_cluster(security_mode);
         let context_names = context_names();
         let role_group_builder = role_group_builder(&cluster, &context_names);
 

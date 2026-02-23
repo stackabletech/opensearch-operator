@@ -66,7 +66,7 @@ const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
 /// Defines the path for the logs
 /// OpenSearch grants the required access rights, see
-/// https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369
+/// <https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369>
 /// The permissions "write" and "delete" are required for the log file rollover.
 /// Type: string
 const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";

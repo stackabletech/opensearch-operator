@@ -156,55 +156,56 @@ pub mod versioned {
     pub struct SecurityConfig {
         /// User-defined action groups
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml>
         #[serde(default = "security_config_file_type_actiongroups_default")]
         pub action_groups: SecurityConfigFileType,
 
         /// List of allowed HTTP endpoints
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml>
         #[serde(default = "security_config_file_type_allowlist_default")]
         pub allow_list: SecurityConfigFileType,
 
         /// Settings for audit logging
         ///
-        /// see https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml
+        /// see
+        /// <https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml>
         #[serde(default = "security_config_file_type_audit_default")]
         pub audit: SecurityConfigFileType,
 
         /// Configuration of the security backend
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/configuration/
+        /// see <https://docs.opensearch.org/latest/security/configuration/configuration/>
         #[serde(default = "security_config_file_type_config_default")]
         pub config: SecurityConfigFileType,
 
         /// The internal user database
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml>
         #[serde(default = "security_config_file_type_internalusers_default")]
         pub internal_users: SecurityConfigFileType,
 
         /// Distinguished names (DNs) of nodes to allow communication between nodes and clusters
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml>
         #[serde(default = "security_config_file_type_nodesdn_default")]
         pub nodes_dn: SecurityConfigFileType,
 
         /// Definition of roles in the security plugin
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml>
         #[serde(default = "security_config_file_type_roles_default")]
         pub roles: SecurityConfigFileType,
 
         /// Role mappings to users or backend roles
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml>
         #[serde(default = "security_config_file_type_rolesmapping_default")]
         pub roles_mapping: SecurityConfigFileType,
 
         /// OpenSearch Dashboards tenants
         ///
-        /// see https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml>
         #[serde(default = "security_config_file_type_tenants_default")]
         pub tenants: SecurityConfigFileType,
     }
