@@ -324,7 +324,7 @@ spec:
                             description: |-
                               User-defined action groups
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -414,7 +414,7 @@ spec:
                             description: |-
                               List of allowed HTTP endpoints
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -504,7 +504,8 @@ spec:
                             description: |-
                               Settings for audit logging
 
-                              see https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml
+                              see
+                              <https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -597,7 +598,7 @@ spec:
                             description: |-
                               Configuration of the security backend
 
-                              see https://docs.opensearch.org/latest/security/configuration/configuration/
+                              see <https://docs.opensearch.org/latest/security/configuration/configuration/>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -685,7 +686,7 @@ spec:
                             description: |-
                               The internal user database
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -773,7 +774,7 @@ spec:
                             description: |-
                               Distinguished names (DNs) of nodes to allow communication between nodes and clusters
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -861,7 +862,7 @@ spec:
                             description: |-
                               Definition of roles in the security plugin
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -949,7 +950,7 @@ spec:
                             description: |-
                               Role mappings to users or backend roles
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
@@ -1037,7 +1038,7 @@ spec:
                             description: |-
                               OpenSearch Dashboards tenants
 
-                              see https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml>
                             properties:
                               content:
                                 description: The content of the security configuration file
