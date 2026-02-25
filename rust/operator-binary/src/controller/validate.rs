@@ -664,11 +664,11 @@ mod tests {
                 .into(),
                 Some(ValidatedSecurity::ManagedByOperator {
                     managing_role_group: RoleGroupName::from_str_unsafe("default"),
-                    settings: v1alpha1::SecurityConfig {
-                        config: v1alpha1::SecurityConfigFileType {
-                            managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
-                            content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                                v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                    settings: v1alpha1::SecuritySettings {
+                        config: v1alpha1::SecuritySettingsFileType {
+                            managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                            content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                                v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
                                     v1alpha1::ConfigMapKeyRef {
                                         name: ConfigMapName::from_str_unsafe("security-config"),
                                         key: ConfigMapKey::from_str_unsafe("config.yml")
@@ -676,7 +676,7 @@ mod tests {
                                 )
                             )
                         },
-                        ..v1alpha1::SecurityConfig::default()
+                        ..v1alpha1::SecuritySettings::default()
                     },
                     tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
                     tls_internal_secret_class: SecretClassName::from_str_unsafe("tls")
@@ -901,7 +901,7 @@ mod tests {
                     .security
                     .settings
                     .config
-                    .managed_by = v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
+                    .managed_by = v1alpha1::SecuritySettingsFileTypeManagedBy::Operator;
                 cluster.spec.cluster_config.tls.server_secret_class = None;
             },
             ErrorDiscriminants::CheckSecurityConfigTlsSettings,
@@ -954,11 +954,11 @@ mod tests {
                     security: v1alpha1::Security {
                         enabled: true,
                         managing_role_group: RoleGroupName::from_str_unsafe("default"),
-                        settings: v1alpha1::SecurityConfig {
-                            config: v1alpha1::SecurityConfigFileType {
-                                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
-                                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+                        settings: v1alpha1::SecuritySettings {
+                            config: v1alpha1::SecuritySettingsFileType {
+                                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
                                         v1alpha1::ConfigMapKeyRef {
                                             name: ConfigMapName::from_str_unsafe("security-config"),
                                             key: ConfigMapKey::from_str_unsafe("config.yml")
@@ -966,7 +966,7 @@ mod tests {
                                     )
                                 ),
                             },
-                            ..v1alpha1::SecurityConfig::default()
+                            ..v1alpha1::SecuritySettings::default()
                         },
                     },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(

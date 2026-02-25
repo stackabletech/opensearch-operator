@@ -187,14 +187,14 @@ pub enum ValidatedSecurity {
     /// At least one security setting is managed by the operator
     ManagedByOperator {
         managing_role_group: RoleGroupName,
-        settings: v1alpha1::SecurityConfig,
+        settings: v1alpha1::SecuritySettings,
         tls_server_secret_class: SecretClassName,
         tls_internal_secret_class: SecretClassName,
     },
 
     /// All security settings are managed by the API
     ManagedByApi {
-        settings: v1alpha1::SecurityConfig,
+        settings: v1alpha1::SecuritySettings,
         tls_server_secret_class: Option<SecretClassName>,
         tls_internal_secret_class: SecretClassName,
     },
@@ -594,7 +594,7 @@ mod tests {
             ]
             .into(),
             Some(ValidatedSecurity::ManagedByApi {
-                settings: v1alpha1::SecurityConfig::default(),
+                settings: v1alpha1::SecuritySettings::default(),
                 tls_server_secret_class: None,
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),

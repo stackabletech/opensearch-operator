@@ -428,7 +428,7 @@ mod tests {
             )]
             .into(),
             Some(ValidatedSecurity::ManagedByApi {
-                settings: v1alpha1::SecurityConfig::default(),
+                settings: v1alpha1::SecuritySettings::default(),
                 tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),

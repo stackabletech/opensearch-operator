@@ -1,4 +1,4 @@
-use std::{slice, str::FromStr};
+use std::{array, slice, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -27,7 +27,7 @@ use stackable_operator::{
     utils::crds::raw_object_schema,
     versioned::versioned,
 };
-use strum::{Display, EnumIter, IntoEnumIterator};
+use strum::{Display, EnumIter};
 
 use crate::{
     attributed_string_type, constant,
@@ -132,6 +132,7 @@ pub mod versioned {
         pub secret_key_ref: SecretKeyRef,
     }
 
+    /// Configuration of the OpenSearch security plugin
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct Security {
@@ -148,83 +149,86 @@ pub mod versioned {
 
         /// Settings for the OpenSearch security plugin
         #[serde(default)]
-        pub settings: SecurityConfig,
+        pub settings: SecuritySettings,
     }
 
+    /// Configuration files of the OpenSearch security plugin
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct SecurityConfig {
+    pub struct SecuritySettings {
         /// User-defined action groups
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml>
-        #[serde(default = "security_config_file_type_actiongroups_default")]
-        pub action_groups: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_actiongroups")]
+        pub action_groups: SecuritySettingsFileType,
 
         /// List of allowed HTTP endpoints
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml>
-        #[serde(default = "security_config_file_type_allowlist_default")]
-        pub allow_list: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_allowlist")]
+        pub allow_list: SecuritySettingsFileType,
 
         /// Settings for audit logging
         ///
         /// see
         /// <https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml>
-        #[serde(default = "security_config_file_type_audit_default")]
-        pub audit: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_audit")]
+        pub audit: SecuritySettingsFileType,
 
         /// Configuration of the security backend
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/configuration/>
-        #[serde(default = "security_config_file_type_config_default")]
-        pub config: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_config")]
+        pub config: SecuritySettingsFileType,
 
         /// The internal user database
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml>
-        #[serde(default = "security_config_file_type_internalusers_default")]
-        pub internal_users: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_internalusers")]
+        pub internal_users: SecuritySettingsFileType,
 
         /// Distinguished names (DNs) of nodes to allow communication between nodes and clusters
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml>
-        #[serde(default = "security_config_file_type_nodesdn_default")]
-        pub nodes_dn: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_nodesdn")]
+        pub nodes_dn: SecuritySettingsFileType,
 
         /// Definition of roles in the security plugin
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml>
-        #[serde(default = "security_config_file_type_roles_default")]
-        pub roles: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_roles")]
+        pub roles: SecuritySettingsFileType,
 
         /// Role mappings to users or backend roles
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml>
-        #[serde(default = "security_config_file_type_rolesmapping_default")]
-        pub roles_mapping: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_rolesmapping")]
+        pub roles_mapping: SecuritySettingsFileType,
 
         /// OpenSearch Dashboards tenants
         ///
         /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml>
-        #[serde(default = "security_config_file_type_tenants_default")]
-        pub tenants: SecurityConfigFileType,
+        #[serde(default = "security_settings_file_type_default_tenants")]
+        pub tenants: SecuritySettingsFileType,
     }
 
+    /// Specific configuration file of the OpenSearch security plugin
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct SecurityConfigFileType {
+    pub struct SecuritySettingsFileType {
         /// Whether this configuration should only be applied initially and afterwards be managed
         /// via the "API", or managed all the time by the "operator".
         ///
         /// If this configuration is changed later from "API" to "operator", then the changes made
         /// via the API are overridden.
-        // No default, so that the user is aware of!
-        pub managed_by: SecurityConfigFileTypeManagedBy,
+        // There is no default, so that the user is aware of this choice.
+        pub managed_by: SecuritySettingsFileTypeManagedBy,
 
         /// The content of the security configuration file
-        pub content: SecurityConfigFileTypeContent,
+        pub content: SecuritySettingsFileTypeContent,
     }
 
+    /// Responsibility for initializing and updating the security configuration
     #[derive(
         Clone,
         Debug,
@@ -238,7 +242,7 @@ pub mod versioned {
         PartialOrd,
         Serialize,
     )]
-    pub enum SecurityConfigFileTypeManagedBy {
+    pub enum SecuritySettingsFileTypeManagedBy {
         /// Only initially applied by the operator, but afterwards managed via the API.
         #[serde(rename = "API")]
         Api,
@@ -248,26 +252,29 @@ pub mod versioned {
         Operator,
     }
 
+    /// Content of the security configuration file
     #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub enum SecurityConfigFileTypeContent {
+    pub enum SecuritySettingsFileTypeContent {
         /// Security configuration file content defined inline
-        Value(SecurityConfigFileTypeContentValue),
+        Value(SecuritySettingsFileTypeContentValue),
 
         /// Security configuration file content ingested from a ConfigMap or Secret
-        ValueFrom(SecurityConfigFileTypeContentValueFrom),
+        ValueFrom(SecuritySettingsFileTypeContentValueFrom),
     }
 
+    /// Security configuration file content defined inline
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
-    pub struct SecurityConfigFileTypeContentValue {
+    pub struct SecuritySettingsFileTypeContentValue {
         #[serde(flatten)]
         #[schemars(schema_with = "raw_object_schema")]
         value: serde_json::Value,
     }
 
+    /// Security configuration file content ingested from a ConfigMap or Secret
     #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
     #[serde(rename_all = "camelCase")]
-    pub enum SecurityConfigFileTypeContentValueFrom {
+    pub enum SecuritySettingsFileTypeContentValueFrom {
         /// Reference to a key in a ConfigMap
         ConfigMapKeyRef(ConfigMapKeyRef),
 
@@ -275,6 +282,7 @@ pub mod versioned {
         SecretKeyRef(SecretKeyRef),
     }
 
+    /// Reference to a key in a ConfigMap
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     pub struct ConfigMapKeyRef {
         /// Name of the ConfigMap
@@ -284,6 +292,7 @@ pub mod versioned {
         pub key: ConfigMapKey,
     }
 
+    /// Reference to a key in a Secret
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     pub struct SecretKeyRef {
         /// Name of the Secret
@@ -564,217 +573,109 @@ impl Default for v1alpha1::Security {
         Self {
             enabled: security_config_enabled_default(),
             managing_role_group: security_config_managing_role_group(),
-            settings: v1alpha1::SecurityConfig::default(),
+            settings: v1alpha1::SecuritySettings::default(),
         }
     }
 }
 
-impl Default for v1alpha1::SecurityConfig {
+impl v1alpha1::SecuritySettings {
+    pub fn is_only_managed_by_api(&self) -> bool {
+        self.into_iter()
+            .all(|config| *config.managed_by == v1alpha1::SecuritySettingsFileTypeManagedBy::Api)
+    }
+}
+
+impl Default for v1alpha1::SecuritySettings {
     fn default() -> Self {
         Self {
-            action_groups: security_config_file_type_actiongroups_default(),
-            allow_list: security_config_file_type_allowlist_default(),
-            audit: security_config_file_type_audit_default(),
-            config: security_config_file_type_config_default(),
-            internal_users: security_config_file_type_internalusers_default(),
-            nodes_dn: security_config_file_type_nodesdn_default(),
-            roles_mapping: security_config_file_type_rolesmapping_default(),
-            roles: security_config_file_type_roles_default(),
-            tenants: security_config_file_type_tenants_default(),
+            action_groups: security_settings_file_type_default_actiongroups(),
+            allow_list: security_settings_file_type_default_allowlist(),
+            audit: security_settings_file_type_default_audit(),
+            config: security_settings_file_type_default_config(),
+            internal_users: security_settings_file_type_default_internalusers(),
+            nodes_dn: security_settings_file_type_default_nodesdn(),
+            roles_mapping: security_settings_file_type_default_rolesmapping(),
+            roles: security_settings_file_type_default_roles(),
+            tenants: security_settings_file_type_default_tenants(),
         }
     }
 }
 
-#[derive(Clone, Copy, EnumIter)]
-pub enum SecurityConfigFileType {
-    ActionGroups,
-    AllowList,
-    Audit,
-    Config,
-    InternalUsers,
-    NodesDn,
-    Roles,
-    RolesMapping,
-    Tenants,
+/// [`v1alpha1::SecuritySettingsFileType`] extended with ID and filename
+pub struct ExtendedSecuritySettingsFileType<'a> {
+    /// The ID of the file type as set in the `_meta.type` field; can be used to construct
+    /// volume names
+    pub id: &'static str,
+
+    /// The file name as expected by the OpenSearch security plugin
+    pub filename: &'static str,
+
+    pub managed_by: &'a v1alpha1::SecuritySettingsFileTypeManagedBy,
+
+    pub content: &'a v1alpha1::SecuritySettingsFileTypeContent,
 }
 
-impl SecurityConfigFileType {
-    pub fn filename(&self) -> String {
-        match self {
-            SecurityConfigFileType::ActionGroups => "action_groups.yml".to_owned(),
-            SecurityConfigFileType::AllowList => "allow_list.yml".to_owned(),
-            SecurityConfigFileType::Audit => "audit.yml".to_owned(),
-            SecurityConfigFileType::Config => "config.yml".to_owned(),
-            SecurityConfigFileType::InternalUsers => "internal_users.yml".to_owned(),
-            SecurityConfigFileType::NodesDn => "nodes_dn.yml".to_owned(),
-            SecurityConfigFileType::Roles => "roles.yml".to_owned(),
-            SecurityConfigFileType::RolesMapping => "roles_mapping.yml".to_owned(),
-            SecurityConfigFileType::Tenants => "tenants.yml".to_owned(),
-        }
-    }
+impl<'a> IntoIterator for &'a v1alpha1::SecuritySettings {
+    type IntoIter = array::IntoIter<Self::Item, 9>;
+    type Item = ExtendedSecuritySettingsFileType<'a>;
 
-    pub fn volume_name(&self) -> String {
-        match self {
-            SecurityConfigFileType::ActionGroups => "actiongroups".to_owned(),
-            SecurityConfigFileType::AllowList => "allowlist".to_owned(),
-            SecurityConfigFileType::Audit => "audit".to_owned(),
-            SecurityConfigFileType::Config => "config".to_owned(),
-            SecurityConfigFileType::InternalUsers => "internalusers".to_owned(),
-            SecurityConfigFileType::NodesDn => "nodesdn".to_owned(),
-            SecurityConfigFileType::Roles => "roles".to_owned(),
-            SecurityConfigFileType::RolesMapping => "rolesmapping".to_owned(),
-            SecurityConfigFileType::Tenants => "tenants".to_owned(),
-        }
-    }
-
-    fn default_content(&self) -> serde_json::Value {
-        match self {
-            SecurityConfigFileType::ActionGroups => json!({
-              "_meta": {
-                "type": "actiongroups",
-                "config_version": 2
-              }
-            }),
-            SecurityConfigFileType::AllowList => json!({
-              "_meta": {
-                "type": "allowlist",
-                "config_version": 2
-              },
-              "config": {
-                "enabled": false
-              }
-            }),
-            SecurityConfigFileType::Audit => json!({
-              "_meta": {
-                "type": "audit",
-                "config_version": 2
-              },
-              "config": {
-                "enabled": false
-              }
-            }),
-            SecurityConfigFileType::Config => json!({
-              "_meta": {
-                "type": "config",
-                "config_version": 2
-              },
-              "config": {
-                "dynamic": {
-                  "http": {},
-                  "authc": {},
-                  "authz": {}
-                }
-              }
-            }),
-            SecurityConfigFileType::InternalUsers => json!({
-              "_meta": {
-                "type": "internalusers",
-                "config_version": 2
-              }
-            }),
-            SecurityConfigFileType::NodesDn => json!({
-              "_meta": {
-                "type": "nodesdn",
-                "config_version": 2
-              }
-            }),
-            SecurityConfigFileType::Roles => json!({
-              "_meta": {
-                "type": "roles",
-                "config_version": 2
-              }
-            }),
-            SecurityConfigFileType::RolesMapping => json!({
-              "_meta": {
-                "type": "rolesmapping",
-                "config_version": 2
-              }
-            }),
-            SecurityConfigFileType::Tenants => json!({
-              "_meta": {
-                "type": "tenants",
-                "config_version": 2
-              }
-            }),
-        }
-    }
-}
-
-impl v1alpha1::SecurityConfig {
-    pub fn security_config(
-        &self,
-        file_type: SecurityConfigFileType,
-    ) -> &v1alpha1::SecurityConfigFileType {
-        match file_type {
-            SecurityConfigFileType::ActionGroups => &self.action_groups,
-            SecurityConfigFileType::AllowList => &self.allow_list,
-            SecurityConfigFileType::Audit => &self.audit,
-            SecurityConfigFileType::Config => &self.config,
-            SecurityConfigFileType::InternalUsers => &self.internal_users,
-            SecurityConfigFileType::NodesDn => &self.nodes_dn,
-            SecurityConfigFileType::Roles => &self.roles,
-            SecurityConfigFileType::RolesMapping => &self.roles_mapping,
-            SecurityConfigFileType::Tenants => &self.tenants,
-        }
-    }
-
-    pub fn is_only_managed_by_api(&self) -> bool {
-        SecurityConfigFileType::iter()
-            .map(|file_type| self.security_config(file_type))
-            .all(|config| config.managed_by == v1alpha1::SecurityConfigFileTypeManagedBy::Api)
-    }
-
-    pub fn value(&self, file_type: SecurityConfigFileType) -> Option<String> {
-        if let v1alpha1::SecurityConfigFileType {
-            content:
-                v1alpha1::SecurityConfigFileTypeContent::Value(
-                    v1alpha1::SecurityConfigFileTypeContentValue { value },
-                ),
-            ..
-        } = self.security_config(file_type)
-        {
-            Some(value.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn config_map_key_ref(
-        &self,
-        file_type: SecurityConfigFileType,
-    ) -> Option<&v1alpha1::ConfigMapKeyRef> {
-        if let v1alpha1::SecurityConfigFileType {
-            content:
-                v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
-                        config_map_key_ref,
-                    ),
-                ),
-            ..
-        } = self.security_config(file_type)
-        {
-            Some(config_map_key_ref)
-        } else {
-            None
-        }
-    }
-
-    pub fn secret_key_ref(
-        &self,
-        file_type: SecurityConfigFileType,
-    ) -> Option<&v1alpha1::SecretKeyRef> {
-        if let v1alpha1::SecurityConfigFileType {
-            content:
-                v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                    v1alpha1::SecurityConfigFileTypeContentValueFrom::SecretKeyRef(secret_key_ref),
-                ),
-            ..
-        } = self.security_config(file_type)
-        {
-            Some(secret_key_ref)
-        } else {
-            None
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIterator::into_iter([
+            ExtendedSecuritySettingsFileType {
+                id: "actiongroups",
+                filename: "action_groups.yml",
+                managed_by: &self.action_groups.managed_by,
+                content: &self.action_groups.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "allowlist",
+                filename: "allow_list.yml",
+                managed_by: &self.allow_list.managed_by,
+                content: &self.allow_list.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "audit",
+                filename: "audit.yml",
+                managed_by: &self.audit.managed_by,
+                content: &self.audit.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "config",
+                filename: "config.yml",
+                managed_by: &self.config.managed_by,
+                content: &self.config.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "internalusers",
+                filename: "internal_users.yml",
+                managed_by: &self.internal_users.managed_by,
+                content: &self.internal_users.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "nodesdn",
+                filename: "nodes_dn.yml",
+                managed_by: &self.nodes_dn.managed_by,
+                content: &self.nodes_dn.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "roles",
+                filename: "roles.yml",
+                managed_by: &self.roles.managed_by,
+                content: &self.roles.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "rolesmapping",
+                filename: "roles_mapping.yml",
+                managed_by: &self.roles_mapping.managed_by,
+                content: &self.roles_mapping.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "tenants",
+                filename: "tenants.yml",
+                managed_by: &self.tenants.managed_by,
+                content: &self.tenants.content,
+            },
+        ])
     }
 }
 
@@ -786,49 +687,107 @@ fn security_config_managing_role_group() -> RoleGroupName {
     RoleGroupName::from_str("security-config").expect("should be a valid role group name")
 }
 
-fn security_config_file_type_actiongroups_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::ActionGroups)
+fn security_settings_file_type_default_actiongroups() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "actiongroups",
+        "config_version": 2
+      }
+    }))
 }
 
-fn security_config_file_type_allowlist_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::AllowList)
+fn security_settings_file_type_default_allowlist() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "allowlist",
+        "config_version": 2
+      },
+      "config": {
+        "enabled": false
+      }
+    }))
 }
 
-fn security_config_file_type_audit_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::Audit)
+fn security_settings_file_type_default_audit() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "audit",
+        "config_version": 2
+      },
+      "config": {
+        "enabled": false
+      }
+    }))
 }
 
-fn security_config_file_type_config_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::Config)
+fn security_settings_file_type_default_config() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "config",
+        "config_version": 2
+      },
+      "config": {
+        "dynamic": {
+          "http": {},
+          "authc": {},
+          "authz": {}
+        }
+      }
+    }))
 }
 
-fn security_config_file_type_internalusers_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::InternalUsers)
+fn security_settings_file_type_default_internalusers() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "internalusers",
+        "config_version": 2
+      }
+    }))
 }
 
-fn security_config_file_type_nodesdn_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::NodesDn)
+fn security_settings_file_type_default_nodesdn() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "nodesdn",
+        "config_version": 2
+      }
+    }))
 }
 
-fn security_config_file_type_roles_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::Roles)
+fn security_settings_file_type_default_roles() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "roles",
+        "config_version": 2
+      }
+    }))
 }
 
-fn security_config_file_type_rolesmapping_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::RolesMapping)
+fn security_settings_file_type_default_rolesmapping() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "rolesmapping",
+        "config_version": 2
+      }
+    }))
 }
 
-fn security_config_file_type_tenants_default() -> v1alpha1::SecurityConfigFileType {
-    crd_default(SecurityConfigFileType::Tenants)
+fn security_settings_file_type_default_tenants() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "tenants",
+        "config_version": 2
+      }
+    }))
 }
 
-fn crd_default(file_type: SecurityConfigFileType) -> v1alpha1::SecurityConfigFileType {
-    v1alpha1::SecurityConfigFileType {
-        managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Api,
-        content: v1alpha1::SecurityConfigFileTypeContent::Value(
-            v1alpha1::SecurityConfigFileTypeContentValue {
-                value: file_type.default_content(),
-            },
+fn security_settings_file_type_default(
+    value: serde_json::Value,
+) -> v1alpha1::SecuritySettingsFileType {
+    v1alpha1::SecuritySettingsFileType {
+        managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Api,
+        content: v1alpha1::SecuritySettingsFileTypeContent::Value(
+            v1alpha1::SecuritySettingsFileTypeContentValue { value },
         ),
     }
 }

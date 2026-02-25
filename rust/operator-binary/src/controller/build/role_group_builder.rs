@@ -35,7 +35,6 @@ use stackable_operator::{
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
 };
-use strum::IntoEnumIterator;
 
 use super::{
     node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
@@ -52,7 +51,7 @@ use crate::{
             MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
         },
     },
-    crd::{SecurityConfigFileType, v1alpha1},
+    crd::{ExtendedSecuritySettingsFileType, v1alpha1},
     framework::{
         builder::{
             meta::ownerreference_from_resource,
@@ -111,7 +110,7 @@ pub enum RoleGroupSecurityMode {
     /// The security plugin is enabled and all settings are initialized by an arbitrary role group.
     /// The security settings are mounted to the main container for all role groups.
     Initializing {
-        settings: v1alpha1::SecurityConfig,
+        settings: v1alpha1::SecuritySettings,
         tls_server_secret_class: Option<SecretClassName>,
         tls_internal_secret_class: SecretClassName,
     },
@@ -122,7 +121,7 @@ pub enum RoleGroupSecurityMode {
     /// init container and the security settings are mounted to and updated in the
     /// [`v1alpha1::Container::UpdateSecurityConfig`] side-car container.
     Managing {
-        settings: v1alpha1::SecurityConfig,
+        settings: v1alpha1::SecuritySettings,
         tls_server_secret_class: SecretClassName,
         tls_internal_secret_class: SecretClassName,
     },
@@ -298,9 +297,12 @@ impl<'a> RoleGroupBuilder<'a> {
         if let RoleGroupSecurityMode::Initializing { settings, .. }
         | RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode
         {
-            for file_type in SecurityConfigFileType::iter() {
-                if let Some(value) = settings.value(file_type) {
-                    data.insert(file_type.filename(), value.to_string());
+            for file_type in settings {
+                if let v1alpha1::SecuritySettingsFileTypeContent::Value(
+                    v1alpha1::SecuritySettingsFileTypeContentValue { value },
+                ) = &file_type.content
+                {
+                    data.insert(file_type.filename.to_owned(), value.to_string());
                 }
             }
         }
@@ -722,8 +724,8 @@ impl<'a> RoleGroupBuilder<'a> {
             });
         };
 
-        if let RoleGroupSecurityMode::Initializing { .. } = self.security_mode {
-            volume_mounts.extend(self.security_config_volume_mounts());
+        if let RoleGroupSecurityMode::Initializing { settings, .. } = &self.security_mode {
+            volume_mounts.extend(self.security_config_volume_mounts(settings));
         };
 
         if !self.cluster.keystores.is_empty() {
@@ -786,26 +788,35 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the security settings volume mounts for the [`v1alpha1::Container::OpenSearch`]
     /// container or the [`v1alpha1::Container::UpdateSecurityConfig`] container
-    fn security_config_volume_mounts(&self) -> Vec<VolumeMount> {
+    fn security_config_volume_mounts(
+        &self,
+        settings: &v1alpha1::SecuritySettings,
+    ) -> Vec<VolumeMount> {
         let mut volume_mounts = vec![];
 
         let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
-        for file_type in SecurityConfigFileType::iter() {
-            let volume_name = format!("security-config-file-{}", file_type.volume_name());
+        for file_type in settings {
             volume_mounts.push(VolumeMount {
                 mount_path: format!(
                     "{opensearch_path_conf}/opensearch-security/{filename}",
-                    filename = file_type.filename()
+                    filename = file_type.filename.to_owned()
                 ),
-                name: volume_name,
+                name: Self::security_settings_file_type_volume_name(&file_type).to_string(),
                 read_only: Some(true),
-                sub_path: Some(file_type.filename()),
+                sub_path: Some(file_type.filename.to_owned()),
                 ..VolumeMount::default()
             });
         }
 
         volume_mounts
+    }
+
+    fn security_settings_file_type_volume_name(
+        file_type: &ExtendedSecuritySettingsFileType,
+    ) -> VolumeName {
+        VolumeName::from_str(&format!("security-config-file-{}", file_type.id))
+            .expect("should be a valid VolumeName")
     }
 
     /// Builds the [`v1alpha1::Container::Vector`] container for the [`PodTemplateSpec`] if it is
@@ -866,7 +877,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..VolumeMount::default()
             },
         ];
-        volume_mounts.extend(self.security_config_volume_mounts());
+        volume_mounts.extend(self.security_config_volume_mounts(settings));
 
         let mut env_vars = EnvVarSet::new()
             .with_value(
@@ -878,15 +889,12 @@ impl<'a> RoleGroupBuilder<'a> {
                 FieldPathEnvVar::Name,
             );
 
-        for file_type in SecurityConfigFileType::iter() {
-            let managed_by_operator = settings.security_config(file_type).managed_by
-                == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
+        for file_type in settings {
+            let managed_by_operator =
+                *file_type.managed_by == v1alpha1::SecuritySettingsFileTypeManagedBy::Operator;
 
             env_vars = env_vars.with_value(
-                &EnvVarName::from_str_unsafe(&format!(
-                    "MANAGE_{}",
-                    file_type.volume_name().to_uppercase()
-                )),
+                &EnvVarName::from_str_unsafe(&format!("MANAGE_{}", file_type.id.to_uppercase())),
                 managed_by_operator.to_string(),
             );
         }
@@ -1091,61 +1099,66 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the security settings volumes for the [`PodTemplateSpec`]
     /// It is not checked if these volumes are required in this role group.
-    fn build_security_settings_volumes(&self, settings: &v1alpha1::SecurityConfig) -> Vec<Volume> {
+    fn build_security_settings_volumes(
+        &self,
+        settings: &v1alpha1::SecuritySettings,
+    ) -> Vec<Volume> {
         let mut volumes = vec![];
 
-        for file_type in SecurityConfigFileType::iter() {
-            let volume_name = format!("security-config-file-{}", file_type.volume_name());
-            if settings.value(file_type).is_some() {
-                let volume = Volume {
+        for file_type in settings {
+            let volume_name = Self::security_settings_file_type_volume_name(&file_type).to_string();
+
+            let volume = match &file_type.content {
+                v1alpha1::SecuritySettingsFileTypeContent::Value(_) => Volume {
                     name: volume_name,
                     config_map: Some(ConfigMapVolumeSource {
                         items: Some(vec![KeyToPath {
-                            key: file_type.filename(),
+                            key: file_type.filename.to_owned(),
                             mode: Some(0o660),
-                            path: file_type.filename(),
+                            path: file_type.filename.to_owned(),
                         }]),
                         name: self.resource_names.role_group_config_map().to_string(),
                         ..Default::default()
                     }),
                     ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
-                settings.config_map_key_ref(file_type)
-            {
-                let volume = Volume {
+                },
+                v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                        v1alpha1::ConfigMapKeyRef { name, key },
+                    ),
+                ) => Volume {
                     name: volume_name,
                     config_map: Some(ConfigMapVolumeSource {
                         items: Some(vec![KeyToPath {
                             key: key.to_string(),
                             mode: Some(0o660),
-                            path: file_type.filename(),
+                            path: file_type.filename.to_owned(),
                         }]),
                         name: name.to_string(),
                         ..ConfigMapVolumeSource::default()
                     }),
                     ..Volume::default()
-                };
-                volumes.push(volume);
-            } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
-                settings.secret_key_ref(file_type)
-            {
-                let volume = Volume {
+                },
+                v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::SecretKeyRef(
+                        v1alpha1::SecretKeyRef { name, key },
+                    ),
+                ) => Volume {
                     name: volume_name,
                     secret: Some(SecretVolumeSource {
                         items: Some(vec![KeyToPath {
                             key: key.to_string(),
                             mode: Some(0o660),
-                            path: file_type.filename(),
+                            path: file_type.filename.to_owned(),
                         }]),
                         secret_name: Some(name.to_string()),
                         ..SecretVolumeSource::default()
                     }),
                     ..Volume::default()
-                };
-                volumes.push(volume);
-            }
+                },
+            };
+
+            volumes.push(volume);
         }
 
         volumes
@@ -1406,6 +1419,16 @@ mod tests {
         let _ = OPENSEARCH_KEYSTORE_VOLUME_NAME;
     }
 
+    #[test]
+    fn test_security_settings_file_type_volume_name() {
+        let security_settings = v1alpha1::SecuritySettings::default();
+
+        for file_type in &security_settings {
+            // Test that the function does not panic
+            let _ = RoleGroupBuilder::security_settings_file_type_volume_name(&file_type);
+        }
+    }
+
     fn context_names() -> ContextNames {
         ContextNames {
             product_name: ProductName::from_str_unsafe("opensearch"),
@@ -1471,11 +1494,11 @@ mod tests {
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
         };
 
-        let security_settings = v1alpha1::SecurityConfig {
-            config: v1alpha1::SecurityConfigFileType {
-                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
-                content: v1alpha1::SecurityConfigFileTypeContent::Value(
-                    v1alpha1::SecurityConfigFileTypeContentValue {
+        let security_settings = v1alpha1::SecuritySettings {
+            config: v1alpha1::SecuritySettingsFileType {
+                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                content: v1alpha1::SecuritySettingsFileTypeContent::Value(
+                    v1alpha1::SecuritySettingsFileTypeContentValue {
                         value: json!({
                             "_meta": {
                               "type": "config",
@@ -1492,10 +1515,10 @@ mod tests {
                     },
                 ),
             },
-            internal_users: v1alpha1::SecurityConfigFileType {
-                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Api,
-                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                    v1alpha1::SecurityConfigFileTypeContentValueFrom::SecretKeyRef(
+            internal_users: v1alpha1::SecuritySettingsFileType {
+                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Api,
+                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::SecretKeyRef(
                         v1alpha1::SecretKeyRef {
                             name: SecretName::from_str_unsafe("opensearch-security-config"),
                             key: SecretKey::from_str_unsafe("internal_users.yml"),
@@ -1503,10 +1526,10 @@ mod tests {
                     ),
                 ),
             },
-            roles: v1alpha1::SecurityConfigFileType {
-                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Api,
-                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+            roles: v1alpha1::SecuritySettingsFileType {
+                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Api,
+                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
                         v1alpha1::ConfigMapKeyRef {
                             name: ConfigMapName::from_str_unsafe("opensearch-security-config"),
                             key: ConfigMapKey::from_str_unsafe("roles.yml"),
@@ -1514,7 +1537,7 @@ mod tests {
                     ),
                 ),
             },
-            ..v1alpha1::SecurityConfig::default()
+            ..v1alpha1::SecuritySettings::default()
         };
 
         let security = match security_mode {

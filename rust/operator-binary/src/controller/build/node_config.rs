@@ -623,11 +623,11 @@ mod tests {
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
         };
 
-        let security_settings = v1alpha1::SecurityConfig {
-            config: v1alpha1::SecurityConfigFileType {
-                managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
-                content: v1alpha1::SecurityConfigFileTypeContent::ValueFrom(
-                    v1alpha1::SecurityConfigFileTypeContentValueFrom::ConfigMapKeyRef(
+        let security_settings = v1alpha1::SecuritySettings {
+            config: v1alpha1::SecuritySettingsFileType {
+                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
                         v1alpha1::ConfigMapKeyRef {
                             name: ConfigMapName::from_str_unsafe("security-config"),
                             key: ConfigMapKey::from_str_unsafe("config.yml"),
@@ -635,7 +635,7 @@ mod tests {
                     ),
                 ),
             },
-            ..v1alpha1::SecurityConfig::default()
+            ..v1alpha1::SecuritySettings::default()
         };
         let tls_server_secret_class = SecretClassName::from_str_unsafe("tls");
         let tls_internal_secret_class = SecretClassName::from_str_unsafe("tls");
