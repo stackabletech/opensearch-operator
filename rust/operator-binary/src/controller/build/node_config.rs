@@ -279,7 +279,6 @@ impl NodeConfig {
             .tls_internal_secret_class()
             .is_some()
         {
-            // TLS config for TRANSPORT port which is always enabled.
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
                 json!(true),
@@ -718,6 +717,23 @@ mod tests {
             .to_owned(),
             node_config.opensearch_config_file_content()
         );
+    }
+
+    #[test]
+    pub fn test_super_admin_dn() {
+        let node_config = node_config(TestConfig::default());
+
+        let super_admin_dn = node_config.super_admin_dn();
+        let parts: Vec<&str> = super_admin_dn.split("=").collect();
+
+        assert_eq!(
+            vec![
+                "CN",
+                "update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+            ],
+            parts
+        );
+        assert!(parts[1].len() <= 64);
     }
 
     #[test]
