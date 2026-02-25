@@ -349,7 +349,7 @@ mod tests {
                 common::Port,
                 kubernetes::{
                     ConfigMapName, Hostname, ListenerClassName, ListenerName, NamespaceName,
-                    ServiceName,
+                    SecretClassName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -427,10 +427,10 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            Some(ValidatedSecurity {
-                managing_role_group: None,
+            Some(ValidatedSecurity::ManagedByApi {
                 settings: v1alpha1::SecurityConfig::default(),
-                tls: v1alpha1::OpenSearchTls::default(),
+                tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),
             vec![],
             Some(ValidatedDiscoveryEndpoint {

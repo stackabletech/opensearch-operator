@@ -68,8 +68,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ListenerName, PersistentVolumeClaimName, ServiceAccountName, ServiceName,
-                VolumeName,
+                ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
+                ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -106,24 +106,80 @@ constant!(OPENSEARCH_KEYSTORE_VOLUME_NAME: VolumeName = "keystore");
 const OPENSEARCH_KEYSTORE_VOLUME_SIZE: &str = "1Mi";
 
 /// Depending on the security settings, the role group builder operates in one of these modes.
-enum RoleGroupBuilderSecurityMode<'a> {
+#[derive(Clone, Debug)]
+pub enum RoleGroupSecurityMode {
     /// The security plugin is enabled and all settings are initialized by an arbitrary role group.
     /// The security settings are mounted to the main container for all role groups.
-    Initializing(&'a ValidatedSecurity),
+    Initializing {
+        settings: v1alpha1::SecurityConfig,
+        tls_server_secret_class: Option<SecretClassName>,
+        tls_internal_secret_class: SecretClassName,
+    },
 
     /// The security plugin is enabled and some or all settings are initialized and updated by this
     /// role group.
     /// The admin certificate is created in the [`v1alpha1::Container::CreateAdminCertificate`]
     /// init container and the security settings are mounted to and updated in the
     /// [`v1alpha1::Container::UpdateSecurityConfig`] side-car container.
-    Managing(&'a ValidatedSecurity),
+    Managing {
+        settings: v1alpha1::SecurityConfig,
+        tls_server_secret_class: SecretClassName,
+        tls_internal_secret_class: SecretClassName,
+    },
 
     /// The security plugin is enabled and the settings are managed by another role group.
     /// The security settings are not mounted.
-    Participating(&'a ValidatedSecurity),
+    Participating {
+        tls_server_secret_class: SecretClassName,
+        tls_internal_secret_class: SecretClassName,
+    },
 
     /// The security plugin is disabled.
     Disabled,
+}
+
+impl RoleGroupSecurityMode {
+    /// Return the TLS server SecretClass if set
+    pub fn tls_server_secret_class(&self) -> Option<SecretClassName> {
+        if let RoleGroupSecurityMode::Initializing {
+            tls_server_secret_class: Some(tls_server_secret_class),
+            ..
+        }
+        | RoleGroupSecurityMode::Managing {
+            tls_server_secret_class,
+            ..
+        }
+        | RoleGroupSecurityMode::Participating {
+            tls_server_secret_class,
+            ..
+        } = self
+        {
+            Some(tls_server_secret_class.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Return the TLS internal SecretClass if set
+    pub fn tls_internal_secret_class(&self) -> Option<SecretClassName> {
+        if let RoleGroupSecurityMode::Initializing {
+            tls_internal_secret_class,
+            ..
+        }
+        | RoleGroupSecurityMode::Managing {
+            tls_internal_secret_class,
+            ..
+        }
+        | RoleGroupSecurityMode::Participating {
+            tls_internal_secret_class,
+            ..
+        } = self
+        {
+            Some(tls_internal_secret_class.clone())
+        } else {
+            None
+        }
+    }
 }
 
 /// Builder for role group resources
@@ -136,7 +192,7 @@ pub struct RoleGroupBuilder<'a> {
     context_names: &'a ContextNames,
     resource_names: ResourceNames,
     discovery_service_listener_name: ListenerName,
-    security_mode: RoleGroupBuilderSecurityMode<'a>,
+    security_mode: RoleGroupSecurityMode,
 }
 
 impl<'a> RoleGroupBuilder<'a> {
@@ -155,26 +211,35 @@ impl<'a> RoleGroupBuilder<'a> {
             role_group_name: role_group_name.clone(),
         };
 
-        let security_mode = match &cluster.security {
-            Some(
-                security @ ValidatedSecurity {
-                    managing_role_group: None,
-                    ..
-                },
-            ) => RoleGroupBuilderSecurityMode::Initializing(security),
-            Some(
-                security @ ValidatedSecurity {
-                    managing_role_group: Some(role_group),
-                    ..
-                },
-            ) if role_group == &role_group_name => RoleGroupBuilderSecurityMode::Managing(security),
-            Some(
-                security @ ValidatedSecurity {
-                    managing_role_group: Some(_),
-                    ..
-                },
-            ) => RoleGroupBuilderSecurityMode::Participating(security),
-            None => RoleGroupBuilderSecurityMode::Disabled,
+        let security_mode = match cluster.security.clone() {
+            Some(ValidatedSecurity::ManagedByApi {
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            }) => RoleGroupSecurityMode::Initializing {
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            },
+            Some(ValidatedSecurity::ManagedByOperator {
+                managing_role_group,
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            }) if managing_role_group == role_group_name => RoleGroupSecurityMode::Managing {
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            },
+            Some(ValidatedSecurity::ManagedByOperator {
+                tls_server_secret_class,
+                tls_internal_secret_class,
+                ..
+            }) => RoleGroupSecurityMode::Participating {
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            },
+            None => RoleGroupSecurityMode::Disabled,
         };
 
         RoleGroupBuilder {
@@ -184,6 +249,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 cluster.clone(),
                 role_group_name.clone(),
                 role_group_config.clone(),
+                security_mode.clone(),
                 seed_nodes_service_name,
                 context_names.cluster_domain_name.clone(),
                 resource_names.headless_service_name(),
@@ -229,11 +295,11 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if let RoleGroupBuilderSecurityMode::Initializing(security)
-        | RoleGroupBuilderSecurityMode::Managing(security) = self.security_mode
+        if let RoleGroupSecurityMode::Initializing { settings, .. }
+        | RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode
         {
             for file_type in SecurityConfigFileType::iter() {
-                if let Some(value) = security.settings.value(file_type) {
+                if let Some(value) = settings.value(file_type) {
                     data.insert(file_type.filename(), value.to_string());
                 }
             }
@@ -488,7 +554,7 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`v1alpha1::Container::CreateAdminCertificate`] init container for the
     /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
     fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
-        let RoleGroupBuilderSecurityMode::Managing(_) = self.security_mode else {
+        let RoleGroupSecurityMode::Managing { .. } = self.security_mode else {
             return None;
         };
 
@@ -623,42 +689,42 @@ impl<'a> RoleGroupBuilder<'a> {
             });
         }
 
-        if let Some(security) = &self.cluster.security {
+        if self.security_mode.tls_internal_secret_class().is_some() {
             volume_mounts.push(VolumeMount {
                 mount_path: format!("{opensearch_path_conf}/tls/internal"),
                 name: TLS_INTERNAL_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             });
+        };
 
-            if security.tls.server_secret_class.is_some() {
-                volume_mounts.push(VolumeMount {
-                    mount_path: format!("{opensearch_path_conf}/tls/server/tls.crt"),
-                    name: TLS_SERVER_VOLUME_NAME.to_string(),
-                    sub_path: Some("tls.crt".to_owned()),
-                    ..VolumeMount::default()
-                });
-                volume_mounts.push(VolumeMount {
-                    mount_path: format!("{opensearch_path_conf}/tls/server/tls.key"),
-                    name: TLS_SERVER_VOLUME_NAME.to_string(),
-                    sub_path: Some("tls.key".to_owned()),
-                    ..VolumeMount::default()
-                });
-                volume_mounts.push(VolumeMount {
-                    mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
-                    name: if let RoleGroupBuilderSecurityMode::Managing(_) = self.security_mode {
-                        TLS_SERVER_CA_VOLUME_NAME.to_string()
-                    } else {
-                        TLS_SERVER_VOLUME_NAME.to_string()
-                    },
-                    sub_path: Some("ca.crt".to_owned()),
-                    ..VolumeMount::default()
-                });
-            }
+        if self.security_mode.tls_server_secret_class().is_some() {
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server/tls.crt"),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
+                sub_path: Some("tls.crt".to_owned()),
+                ..VolumeMount::default()
+            });
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server/tls.key"),
+                name: TLS_SERVER_VOLUME_NAME.to_string(),
+                sub_path: Some("tls.key".to_owned()),
+                ..VolumeMount::default()
+            });
+            volume_mounts.push(VolumeMount {
+                mount_path: format!("{opensearch_path_conf}/tls/server/ca.crt"),
+                name: if let RoleGroupSecurityMode::Managing { .. } = self.security_mode {
+                    TLS_SERVER_CA_VOLUME_NAME.to_string()
+                } else {
+                    TLS_SERVER_VOLUME_NAME.to_string()
+                },
+                sub_path: Some("ca.crt".to_owned()),
+                ..VolumeMount::default()
+            });
+        };
 
-            if let RoleGroupBuilderSecurityMode::Initializing(_) = self.security_mode {
-                volume_mounts.extend(self.security_config_volume_mounts());
-            }
-        }
+        if let RoleGroupSecurityMode::Initializing { .. } = self.security_mode {
+            volume_mounts.extend(self.security_config_volume_mounts());
+        };
 
         if !self.cluster.keystores.is_empty() {
             volume_mounts.push(VolumeMount {
@@ -766,7 +832,7 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the [`v1alpha1::Container::UpdateSecurityConfig`] container for the
     /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
     fn build_maybe_security_config_container(&self) -> Option<Container> {
-        let RoleGroupBuilderSecurityMode::Managing(security) = self.security_mode else {
+        let RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode else {
             return None;
         };
 
@@ -813,7 +879,7 @@ impl<'a> RoleGroupBuilder<'a> {
             );
 
         for file_type in SecurityConfigFileType::iter() {
-            let managed_by_operator = security.settings.security_config(file_type).managed_by
+            let managed_by_operator = settings.security_config(file_type).managed_by
                 == v1alpha1::SecurityConfigFileTypeManagedBy::Operator;
 
             env_vars = env_vars.with_value(
@@ -904,33 +970,54 @@ impl<'a> RoleGroupBuilder<'a> {
     /// Builds the security volumes for the [`PodTemplateSpec`] depending on the
     /// [`RoleGroupBuilderSecurityMode`]
     fn build_security_volumes(&self) -> Vec<Volume> {
-        let volumes = match self.security_mode {
-            RoleGroupBuilderSecurityMode::Initializing(security) => vec![
-                self.build_security_internal_tls_volumes(security),
-                self.build_security_server_tls_volumes(security),
-                self.build_security_settings_volumes(security),
-            ],
-            RoleGroupBuilderSecurityMode::Managing(security) => vec![
-                self.build_security_internal_tls_volumes(security),
-                self.build_security_server_tls_volumes(security),
-                self.build_security_settings_volumes(security),
+        let volumes = match &self.security_mode {
+            RoleGroupSecurityMode::Initializing {
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            } => vec![
+                Some(self.build_security_internal_tls_volumes(tls_internal_secret_class)),
+                tls_server_secret_class
+                    .as_ref()
+                    .map(|tls_server_secret_class| {
+                        self.build_security_server_tls_volumes(tls_server_secret_class)
+                    }),
+                Some(self.build_security_settings_volumes(settings)),
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+            RoleGroupSecurityMode::Managing {
+                settings,
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            } => vec![
+                self.build_security_internal_tls_volumes(tls_internal_secret_class),
+                self.build_security_server_tls_volumes(tls_server_secret_class),
+                self.build_security_settings_volumes(settings),
                 self.build_security_server_tls_ca_volumes(),
                 self.build_security_admin_cert_volumes(),
             ],
-            RoleGroupBuilderSecurityMode::Participating(security) => vec![
-                self.build_security_internal_tls_volumes(security),
-                self.build_security_server_tls_volumes(security),
+            RoleGroupSecurityMode::Participating {
+                tls_server_secret_class,
+                tls_internal_secret_class,
+            } => vec![
+                self.build_security_internal_tls_volumes(tls_internal_secret_class),
+                self.build_security_server_tls_volumes(tls_server_secret_class),
             ],
-            RoleGroupBuilderSecurityMode::Disabled => vec![],
+            RoleGroupSecurityMode::Disabled => vec![],
         };
 
         volumes.into_iter().flatten().collect()
     }
 
     /// Builds the internal TLS volumes for the [`PodTemplateSpec`]
-    fn build_security_internal_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+    fn build_security_internal_tls_volumes(
+        &self,
+        tls_internal_secret_class: &SecretClassName,
+    ) -> Vec<Volume> {
         let mut volume_source_builder =
-            SecretOperatorVolumeSourceBuilder::new(&security.tls.internal_secret_class);
+            SecretOperatorVolumeSourceBuilder::new(tls_internal_secret_class);
 
         volume_source_builder
             .with_pod_scope()
@@ -960,11 +1047,10 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the server TLS volumes for the [`PodTemplateSpec`] if a TLS server secret class is
     /// defined
-    fn build_security_server_tls_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
-        let Some(tls_server_secret_class) = &security.tls.server_secret_class else {
-            return vec![];
-        };
-
+    fn build_security_server_tls_volumes(
+        &self,
+        tls_server_secret_class: &SecretClassName,
+    ) -> Vec<Volume> {
         let mut volume_source_builder =
             SecretOperatorVolumeSourceBuilder::new(tls_server_secret_class);
 
@@ -1005,12 +1091,12 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the security settings volumes for the [`PodTemplateSpec`]
     /// It is not checked if these volumes are required in this role group.
-    fn build_security_settings_volumes(&self, security: &ValidatedSecurity) -> Vec<Volume> {
+    fn build_security_settings_volumes(&self, settings: &v1alpha1::SecurityConfig) -> Vec<Volume> {
         let mut volumes = vec![];
 
         for file_type in SecurityConfigFileType::iter() {
             let volume_name = format!("security-config-file-{}", file_type.volume_name());
-            if security.settings.value(file_type).is_some() {
+            if settings.value(file_type).is_some() {
                 let volume = Volume {
                     name: volume_name,
                     config_map: Some(ConfigMapVolumeSource {
@@ -1026,7 +1112,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 };
                 volumes.push(volume);
             } else if let Some(v1alpha1::ConfigMapKeyRef { name, key }) =
-                security.settings.config_map_key_ref(file_type)
+                settings.config_map_key_ref(file_type)
             {
                 let volume = Volume {
                     name: volume_name,
@@ -1043,7 +1129,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 };
                 volumes.push(volume);
             } else if let Some(v1alpha1::SecretKeyRef { name, key }) =
-                security.settings.secret_key_ref(file_type)
+                settings.secret_key_ref(file_type)
             {
                 let volume = Volume {
                     name: volume_name,
@@ -1119,7 +1205,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .common_metadata(self.resource_names.headless_service_name())
             .with_labels(Self::prometheus_labels())
             .with_annotations(Self::prometheus_annotations(
-                self.cluster.is_server_tls_enabled(),
+                self.security_mode.tls_server_secret_class().is_some(),
             ))
             .build();
 
@@ -1295,7 +1381,7 @@ mod tests {
             types::{
                 kubernetes::{
                     ConfigMapKey, ConfigMapName, ListenerClassName, ListenerName, NamespaceName,
-                    SecretKey, SecretName, ServiceAccountName, ServiceName,
+                    SecretClassName, SecretKey, SecretName, ServiceAccountName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -1432,20 +1518,22 @@ mod tests {
         };
 
         let security = match security_mode {
-            TestSecurityMode::Initializing => Some(ValidatedSecurity {
-                managing_role_group: None,
+            TestSecurityMode::Initializing => Some(ValidatedSecurity::ManagedByApi {
                 settings: security_settings,
-                tls: v1alpha1::OpenSearchTls::default(),
+                tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),
-            TestSecurityMode::Managing => Some(ValidatedSecurity {
-                managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
+            TestSecurityMode::Managing => Some(ValidatedSecurity::ManagedByOperator {
+                managing_role_group: RoleGroupName::from_str_unsafe("default"),
                 settings: security_settings,
-                tls: v1alpha1::OpenSearchTls::default(),
+                tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),
-            TestSecurityMode::Participating => Some(ValidatedSecurity {
-                managing_role_group: Some(RoleGroupName::from_str_unsafe("other")),
+            TestSecurityMode::Participating => Some(ValidatedSecurity::ManagedByOperator {
+                managing_role_group: RoleGroupName::from_str_unsafe("other"),
                 settings: security_settings,
-                tls: v1alpha1::OpenSearchTls::default(),
+                tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),
             TestSecurityMode::Disabled => None,
         };

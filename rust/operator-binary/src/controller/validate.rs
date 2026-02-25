@@ -283,12 +283,18 @@ fn validate_security_config(
     spec: &v1alpha1::OpenSearchClusterSpec,
 ) -> Result<Option<ValidatedSecurity>> {
     let security = if spec.cluster_config.security.enabled {
-        let managing_role_group = if !spec
+        if spec
             .cluster_config
             .security
             .settings
             .is_only_managed_by_api()
         {
+            Some(ValidatedSecurity::ManagedByApi {
+                settings: spec.cluster_config.security.settings.clone(),
+                tls_server_secret_class: spec.cluster_config.tls.server_secret_class.clone(),
+                tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
+            })
+        } else {
             let managing_role_group = spec.cluster_config.security.managing_role_group.clone();
 
             ensure!(
@@ -301,21 +307,20 @@ fn validate_security_config(
             );
 
             // The role group requires server TLS to communicate with the cluster.
-            ensure!(
-                spec.cluster_config.tls.server_secret_class.is_some(),
-                CheckSecurityConfigTlsSettingsSnafu {}
-            );
+            let tls_server_secret_class = spec
+                .cluster_config
+                .tls
+                .server_secret_class
+                .clone()
+                .context(CheckSecurityConfigTlsSettingsSnafu)?;
 
-            Some(managing_role_group)
-        } else {
-            None
-        };
-
-        Some(ValidatedSecurity {
-            managing_role_group,
-            settings: spec.cluster_config.security.settings.clone(),
-            tls: spec.cluster_config.tls.clone(),
-        })
+            Some(ValidatedSecurity::ManagedByOperator {
+                managing_role_group,
+                settings: spec.cluster_config.security.settings.clone(),
+                tls_server_secret_class,
+                tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
+            })
+        }
     } else {
         None
     };
@@ -657,8 +662,8 @@ mod tests {
                     }
                 )]
                 .into(),
-                Some(ValidatedSecurity {
-                    managing_role_group: Some(RoleGroupName::from_str_unsafe("default")),
+                Some(ValidatedSecurity::ManagedByOperator {
+                    managing_role_group: RoleGroupName::from_str_unsafe("default"),
                     settings: v1alpha1::SecurityConfig {
                         config: v1alpha1::SecurityConfigFileType {
                             managed_by: v1alpha1::SecurityConfigFileTypeManagedBy::Operator,
@@ -673,10 +678,8 @@ mod tests {
                         },
                         ..v1alpha1::SecurityConfig::default()
                     },
-                    tls: v1alpha1::OpenSearchTls {
-                        server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
-                        internal_secret_class: SecretClassName::from_str_unsafe("tls")
-                    },
+                    tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
+                    tls_internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 }),
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),

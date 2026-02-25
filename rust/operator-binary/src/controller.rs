@@ -39,7 +39,7 @@ use crate::{
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         types::{
             common::Port,
-            kubernetes::{Hostname, ListenerClassName, NamespaceName, Uid},
+            kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -181,11 +181,23 @@ impl ValidatedLogging {
     }
 }
 
+/// Validated security configuration
 #[derive(Clone, Debug, PartialEq)]
-pub struct ValidatedSecurity {
-    pub managing_role_group: Option<RoleGroupName>,
-    pub settings: v1alpha1::SecurityConfig,
-    pub tls: v1alpha1::OpenSearchTls,
+pub enum ValidatedSecurity {
+    /// At least one security setting is managed by the operator
+    ManagedByOperator {
+        managing_role_group: RoleGroupName,
+        settings: v1alpha1::SecurityConfig,
+        tls_server_secret_class: SecretClassName,
+        tls_internal_secret_class: SecretClassName,
+    },
+
+    /// All security settings are managed by the API
+    ManagedByApi {
+        settings: v1alpha1::SecurityConfig,
+        tls_server_secret_class: Option<SecretClassName>,
+        tls_internal_secret_class: SecretClassName,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -284,10 +296,16 @@ impl ValidatedCluster {
 
     /// Whether security is enabled and a server TLS class is defined or not.
     pub fn is_server_tls_enabled(&self) -> bool {
-        self.security
-            .as_ref()
-            .and_then(|security| security.tls.server_secret_class.as_ref())
-            .is_some()
+        matches!(
+            self.security,
+            Some(ValidatedSecurity::ManagedByApi {
+                tls_server_secret_class: Some(_),
+                ..
+            }) | Some(ValidatedSecurity::ManagedByOperator {
+                tls_server_secret_class: _,
+                ..
+            })
+        )
     }
 }
 
@@ -459,7 +477,7 @@ mod tests {
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
             },
         },
@@ -575,10 +593,10 @@ mod tests {
                 ),
             ]
             .into(),
-            Some(ValidatedSecurity {
-                managing_role_group: None,
+            Some(ValidatedSecurity::ManagedByApi {
                 settings: v1alpha1::SecurityConfig::default(),
-                tls: v1alpha1::OpenSearchTls::default(),
+                tls_server_secret_class: None,
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
             }),
             vec![],
             None,

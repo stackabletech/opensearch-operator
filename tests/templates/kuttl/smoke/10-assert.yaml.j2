@@ -965,7 +965,6 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.disabled: false
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
@@ -1016,7 +1015,6 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.disabled: false
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
