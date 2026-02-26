@@ -554,7 +554,7 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     /// Builds the [`v1alpha1::Container::CreateAdminCertificate`] init container for the
-    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
+    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupSecurityMode::Managing`]
     fn build_maybe_admin_certificate_init_container(&self) -> Option<Container> {
         let RoleGroupSecurityMode::Managing { .. } = self.security_mode else {
             return None;
@@ -841,7 +841,7 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     /// Builds the [`v1alpha1::Container::UpdateSecurityConfig`] container for the
-    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupBuilderSecurityMode::Managing`]
+    /// [`PodTemplateSpec`] if the security mode is [`RoleGroupSecurityMode::Managing`]
     fn build_maybe_security_config_container(&self) -> Option<Container> {
         let RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode else {
             return None;
@@ -976,7 +976,7 @@ impl<'a> RoleGroupBuilder<'a> {
     }
 
     /// Builds the security volumes for the [`PodTemplateSpec`] depending on the
-    /// [`RoleGroupBuilderSecurityMode`]
+    /// [`RoleGroupSecurityMode`]
     fn build_security_volumes(&self) -> Vec<Volume> {
         let volumes = match &self.security_mode {
             RoleGroupSecurityMode::Initializing {
