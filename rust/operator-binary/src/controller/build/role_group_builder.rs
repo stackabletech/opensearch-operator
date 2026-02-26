@@ -894,7 +894,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 *file_type.managed_by == v1alpha1::SecuritySettingsFileTypeManagedBy::Operator;
 
             env_vars = env_vars.with_value(
-                &EnvVarName::from_str_unsafe(&format!("MANAGE_{}", file_type.id.to_uppercase())),
+                &Self::security_settings_file_type_managed_by_env_var(&file_type),
                 managed_by_operator.to_string(),
             );
         }
@@ -926,6 +926,14 @@ impl<'a> RoleGroupBuilder<'a> {
                 .build();
 
         Some(container)
+    }
+
+    /// Environment variable which is used in the `update-security-config.sh` script to determine
+    /// if a security settings file type is managed by the operator
+    fn security_settings_file_type_managed_by_env_var(
+        file_type: &ExtendedSecuritySettingsFileType,
+    ) -> EnvVarName {
+        EnvVarName::from_str_unsafe(&format!("MANAGE_{}", file_type.id.to_uppercase()))
     }
 
     /// Builds the config volumes for the [`PodTemplateSpec`]
@@ -1426,6 +1434,16 @@ mod tests {
         for file_type in &security_settings {
             // Test that the function does not panic
             let _ = RoleGroupBuilder::security_settings_file_type_volume_name(&file_type);
+        }
+    }
+
+    #[test]
+    fn test_security_settings_file_type_managed_by_env_var() {
+        let security_settings = v1alpha1::SecuritySettings::default();
+
+        for file_type in &security_settings {
+            // Test that the function does not panic
+            let _ = RoleGroupBuilder::security_settings_file_type_managed_by_env_var(&file_type);
         }
     }
 
