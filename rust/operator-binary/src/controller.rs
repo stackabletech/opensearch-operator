@@ -123,9 +123,6 @@ pub enum Error {
     #[snafu(display("failed to dereference resources"))]
     Dereference { source: dereference::Error },
 
-    #[snafu(display("failed to preprocess cluster"))]
-    Preprocess { source: preprocess::Error },
-
     #[snafu(display("failed to validate cluster"))]
     ValidateCluster { source: validate::Error },
 
@@ -396,10 +393,14 @@ pub fn error_policy(
 /// Reconcile function of the OpenSearchCluster controller
 ///
 /// The reconcile function performs the following steps:
-/// 1. Validate the given cluster specification and return a [`ValidatedCluster`] if successful.
-/// 2. Build Kubernetes resource specifications from the validated cluster.
-/// 3. Apply the Kubernetes resource specifications
-/// 4. Update the cluster status
+/// 1. Dereference objects which are referenced in the OpenSearchCluster.
+/// 2. Preprocess the OpenSearchCluster specification and add configurations that the user is
+///    allowed to leave out.
+/// 3. Validate the preprocessed cluster specification and the dereferenced objects and return a
+///    [`ValidatedCluster`] if successful.
+/// 4. Build Kubernetes resource specifications from the validated cluster.
+/// 5. Apply the Kubernetes resource specifications
+/// 6. Update the cluster status
 pub async fn reconcile(
     object: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
     context: Arc<Context>,
@@ -410,15 +411,16 @@ pub async fn reconcile(
         .0
         .as_ref()
         .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
-        .context(DeserializeClusterDefinitionSnafu)?;
+        .context(DeserializeClusterDefinitionSnafu)?
+        .clone();
 
     // dereference (client required)
-    let dereferenced_objects = dereference(&context.client, cluster)
+    let dereferenced_objects = dereference(&context.client, &cluster)
         .await
         .context(DereferenceSnafu)?;
 
     // preprocess (no client required)
-    let preprocessed_cluster = preprocess(cluster.clone()).context(PreprocessSnafu)?;
+    let preprocessed_cluster = preprocess(cluster);
 
     // validate (no client required)
     let validated_cluster = validate(&context.names, &preprocessed_cluster, &dereferenced_objects)
@@ -428,7 +430,8 @@ pub async fn reconcile(
     let prepared_resources = build(&context.names, validated_cluster.clone());
 
     // apply (client required)
-    let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
+    let apply_strategy =
+        ClusterResourceApplyStrategy::from(&preprocessed_cluster.spec.cluster_operation);
     let applied_resources = Applier::new(
         &context.client,
         &context.names,
@@ -436,7 +439,7 @@ pub async fn reconcile(
         &validated_cluster.namespace,
         &validated_cluster.uid,
         apply_strategy,
-        &cluster.spec.object_overrides,
+        &preprocessed_cluster.spec.object_overrides,
     )
     .apply(prepared_resources)
     .await
@@ -445,9 +448,14 @@ pub async fn reconcile(
     // not necessary in this controller: create discovery ConfigMap based on the applied resources (client required)
 
     // update status (client required)
-    update_status(&context.client, &context.names, cluster, applied_resources)
-        .await
-        .context(UpdateStatusSnafu)?;
+    update_status(
+        &context.client,
+        &context.names,
+        &preprocessed_cluster,
+        applied_resources,
+    )
+    .await
+    .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }

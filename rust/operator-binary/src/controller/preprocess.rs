@@ -1,10 +1,10 @@
-use snafu::Snafu;
+//! The preprocess step in the OpenSearchCluster controller
+
 use stackable_operator::{
     commons::resources::{PvcConfigFragment, ResourcesFragment},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
     role_utils::{CommonConfiguration, RoleGroup},
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
 use tracing::info;
 
 use crate::{
@@ -12,18 +12,18 @@ use crate::{
     framework::role_utils::GenericProductSpecificCommonConfig,
 };
 
-#[derive(Snafu, Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(IntoStaticStr))]
-pub enum Error {
-    #[snafu(display("failed to get the cluster name"))]
-    GetClusterName {
-        source: crate::framework::controller_utils::Error,
-    },
+/// Preprocesses the OpenSearchCluster and adds configurations that the user is allowed to leave
+/// out
+pub fn preprocess(cluster: v1alpha1::OpenSearchCluster) -> v1alpha1::OpenSearchCluster {
+    preprocess_security_managing_role_group(cluster)
 }
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub fn preprocess(mut cluster: v1alpha1::OpenSearchCluster) -> Result<v1alpha1::OpenSearchCluster> {
+/// Adds the role group defined in [`v1alpha1::Security::managing_role_group`] if the OpenSearch
+/// security plugin is enabled, some security settings are managed by the operator and the defined
+/// role group does not exist yet
+pub fn preprocess_security_managing_role_group(
+    mut cluster: v1alpha1::OpenSearchCluster,
+) -> v1alpha1::OpenSearchCluster {
     let security = &cluster.spec.cluster_config.security;
     if security.enabled
         && !security.settings.is_only_managed_by_api()
@@ -68,5 +68,88 @@ pub fn preprocess(mut cluster: v1alpha1::OpenSearchCluster) -> Result<v1alpha1::
             .insert(security.managing_role_group.to_string(), role_group);
     }
 
-    Ok(cluster)
+    cluster
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    use crate::controller::preprocess::preprocess;
+
+    #[test]
+    fn test_preprocess_security_managing_role_group() {
+        let cluster_spec = json!({
+            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+            "kind": "OpenSearchCluster",
+            "metadata": {
+                "name": "opensearch",
+                "namespace": "default",
+                "uid": "e6ac237d-a6d4-43a1-8135-f36506110912"
+            },
+            "spec": {
+                "image": {
+                    "productVersion": "3.4.0"
+                },
+                "clusterConfig": {
+                    "security": {
+                        "managingRoleGroup": "security-manager",
+                        "settings": {
+                            "config": {
+                                "managedBy": "operator",
+                                "content": {
+                                    "valueFrom": {
+                                        "configMapKeyRef": {
+                                            "name": "opensearch-security-config",
+                                            "key": "config.yml"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "nodes": {
+                    "roleGroups": {
+                        "default": {
+                            "replicas": 1
+                        }
+                    }
+                }
+            }
+        });
+
+        let cluster = serde_json::from_value(cluster_spec).expect("should be deserializable");
+        let prepocessed_cluster = preprocess(cluster);
+
+        let expected_role_groups_spec = json!({
+            "default": {
+                "replicas": 1
+            },
+            "security-manager": {
+                "config" : {
+                    "discoveryServiceExposed": false,
+                    "nodeRoles": [],
+                    "resources": {
+                        "storage": {
+                            "data": {
+                                "capacity": "100Mi"
+                            }
+                        }
+                    }
+                },
+                "replicas": 1
+            }
+        });
+        let expected_role_groups: HashMap<_, _> =
+            serde_json::from_value(expected_role_groups_spec).expect("should be deserializable");
+
+        assert_eq!(
+            expected_role_groups,
+            prepocessed_cluster.spec.nodes.role_groups
+        );
+    }
 }
