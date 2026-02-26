@@ -82,7 +82,7 @@ mod tests {
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedOpenSearchConfig,
+            ValidatedOpenSearchConfig, ValidatedSecurity,
         },
         crd::{NodeRoles, v1alpha1},
         framework::{
@@ -209,7 +209,7 @@ mod tests {
                 ),
             ]
             .into(),
-            None,
+            ValidatedSecurity::Disabled,
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),

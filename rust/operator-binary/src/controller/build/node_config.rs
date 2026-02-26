@@ -666,7 +666,7 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            Some(validated_security),
+            validated_security,
             vec![],
             None,
         );

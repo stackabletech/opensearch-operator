@@ -198,6 +198,9 @@ pub enum ValidatedSecurity {
         tls_server_secret_class: Option<SecretClassName>,
         tls_internal_secret_class: SecretClassName,
     },
+
+    /// The OpenSearch security plugin is disabled.
+    Disabled,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -224,7 +227,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: v1alpha1::OpenSearchRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-    pub security: Option<ValidatedSecurity>,
+    pub security: ValidatedSecurity,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
     pub discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
 }
@@ -239,7 +242,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: v1alpha1::OpenSearchRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-        security: Option<ValidatedSecurity>,
+        security: ValidatedSecurity,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
         discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
     ) -> Self {
@@ -298,13 +301,13 @@ impl ValidatedCluster {
     pub fn is_server_tls_enabled(&self) -> bool {
         matches!(
             self.security,
-            Some(ValidatedSecurity::ManagedByApi {
+            ValidatedSecurity::ManagedByApi {
                 tls_server_secret_class: Some(_),
                 ..
-            }) | Some(ValidatedSecurity::ManagedByOperator {
+            } | ValidatedSecurity::ManagedByOperator {
                 tls_server_secret_class: _,
                 ..
-            })
+            }
         )
     }
 }
@@ -593,11 +596,11 @@ mod tests {
                 ),
             ]
             .into(),
-            Some(ValidatedSecurity::ManagedByApi {
+            ValidatedSecurity::ManagedByApi {
                 settings: v1alpha1::SecuritySettings::default(),
                 tls_server_secret_class: None,
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
-            }),
+            },
             vec![],
             None,
         )

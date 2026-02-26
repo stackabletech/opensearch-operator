@@ -427,11 +427,11 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            Some(ValidatedSecurity::ManagedByApi {
+            ValidatedSecurity::ManagedByApi {
                 settings: v1alpha1::SecuritySettings::default(),
                 tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
-            }),
+            },
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),

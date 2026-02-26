@@ -211,34 +211,34 @@ impl<'a> RoleGroupBuilder<'a> {
         };
 
         let security_mode = match cluster.security.clone() {
-            Some(ValidatedSecurity::ManagedByApi {
+            ValidatedSecurity::ManagedByApi {
                 settings,
                 tls_server_secret_class,
                 tls_internal_secret_class,
-            }) => RoleGroupSecurityMode::Initializing {
+            } => RoleGroupSecurityMode::Initializing {
                 settings,
                 tls_server_secret_class,
                 tls_internal_secret_class,
             },
-            Some(ValidatedSecurity::ManagedByOperator {
+            ValidatedSecurity::ManagedByOperator {
                 managing_role_group,
                 settings,
                 tls_server_secret_class,
                 tls_internal_secret_class,
-            }) if managing_role_group == role_group_name => RoleGroupSecurityMode::Managing {
+            } if managing_role_group == role_group_name => RoleGroupSecurityMode::Managing {
                 settings,
                 tls_server_secret_class,
                 tls_internal_secret_class,
             },
-            Some(ValidatedSecurity::ManagedByOperator {
+            ValidatedSecurity::ManagedByOperator {
                 tls_server_secret_class,
                 tls_internal_secret_class,
                 ..
-            }) => RoleGroupSecurityMode::Participating {
+            } => RoleGroupSecurityMode::Participating {
                 tls_server_secret_class,
                 tls_internal_secret_class,
             },
-            None => RoleGroupSecurityMode::Disabled,
+            ValidatedSecurity::Disabled => RoleGroupSecurityMode::Disabled,
         };
 
         RoleGroupBuilder {
@@ -1559,24 +1559,24 @@ mod tests {
         };
 
         let security = match security_mode {
-            TestSecurityMode::Initializing => Some(ValidatedSecurity::ManagedByApi {
+            TestSecurityMode::Initializing => ValidatedSecurity::ManagedByApi {
                 settings: security_settings,
                 tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
-            }),
-            TestSecurityMode::Managing => Some(ValidatedSecurity::ManagedByOperator {
+            },
+            TestSecurityMode::Managing => ValidatedSecurity::ManagedByOperator {
                 managing_role_group: RoleGroupName::from_str_unsafe("default"),
                 settings: security_settings,
                 tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
-            }),
-            TestSecurityMode::Participating => Some(ValidatedSecurity::ManagedByOperator {
+            },
+            TestSecurityMode::Participating => ValidatedSecurity::ManagedByOperator {
                 managing_role_group: RoleGroupName::from_str_unsafe("other"),
                 settings: security_settings,
                 tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
                 tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
-            }),
-            TestSecurityMode::Disabled => None,
+            },
+            TestSecurityMode::Disabled => ValidatedSecurity::Disabled,
         };
 
         ValidatedCluster::new(

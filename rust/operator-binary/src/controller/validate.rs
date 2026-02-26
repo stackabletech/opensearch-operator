@@ -279,9 +279,7 @@ fn validate_logging_configuration(
     })
 }
 
-fn validate_security_config(
-    spec: &v1alpha1::OpenSearchClusterSpec,
-) -> Result<Option<ValidatedSecurity>> {
+fn validate_security_config(spec: &v1alpha1::OpenSearchClusterSpec) -> Result<ValidatedSecurity> {
     let security = if spec.cluster_config.security.enabled {
         if spec
             .cluster_config
@@ -289,11 +287,11 @@ fn validate_security_config(
             .settings
             .is_only_managed_by_api()
         {
-            Some(ValidatedSecurity::ManagedByApi {
+            ValidatedSecurity::ManagedByApi {
                 settings: spec.cluster_config.security.settings.clone(),
                 tls_server_secret_class: spec.cluster_config.tls.server_secret_class.clone(),
                 tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
-            })
+            }
         } else {
             let managing_role_group = spec.cluster_config.security.managing_role_group.clone();
 
@@ -314,15 +312,15 @@ fn validate_security_config(
                 .clone()
                 .context(CheckSecurityConfigTlsSettingsSnafu)?;
 
-            Some(ValidatedSecurity::ManagedByOperator {
+            ValidatedSecurity::ManagedByOperator {
                 managing_role_group,
                 settings: spec.cluster_config.security.settings.clone(),
                 tls_server_secret_class,
                 tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
-            })
+            }
         }
     } else {
-        None
+        ValidatedSecurity::Disabled
     };
 
     Ok(security)
@@ -662,7 +660,7 @@ mod tests {
                     }
                 )]
                 .into(),
-                Some(ValidatedSecurity::ManagedByOperator {
+                ValidatedSecurity::ManagedByOperator {
                     managing_role_group: RoleGroupName::from_str_unsafe("default"),
                     settings: v1alpha1::SecuritySettings {
                         config: v1alpha1::SecuritySettingsFileType {
@@ -680,7 +678,7 @@ mod tests {
                     },
                     tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
                     tls_internal_secret_class: SecretClassName::from_str_unsafe("tls")
-                }),
+                },
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
                     secret_key_ref: v1alpha1::SecretKeyRef {
