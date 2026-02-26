@@ -19,7 +19,7 @@ pub fn preprocess(cluster: v1alpha1::OpenSearchCluster) -> v1alpha1::OpenSearchC
 }
 
 /// Adds the role group defined in [`v1alpha1::Security::managing_role_group`] if the OpenSearch
-/// security plugin is enabled, some security settings are managed by the operator and the defined
+/// security plugin is enabled, any security settings are managed by the operator and the defined
 /// role group does not exist yet
 pub fn preprocess_security_managing_role_group(
     mut cluster: v1alpha1::OpenSearchCluster,

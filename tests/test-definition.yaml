@@ -59,12 +59,10 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
-      - release
   - name: security-disabled
     dimensions:
       - opensearch
       - opensearch_home
-      - release
 suites:
   - name: nightly
     patch:
