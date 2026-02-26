@@ -144,7 +144,7 @@ pub mod versioned {
         pub enabled: bool,
 
         /// The role group that updates the security index if any setting is managed by the operator.
-        #[serde(default = "security_config_managing_role_group")]
+        #[serde(default = "security_config_managing_role_group_default")]
         pub managing_role_group: RoleGroupName,
 
         /// Settings for the OpenSearch security plugin
@@ -572,7 +572,7 @@ impl Default for v1alpha1::Security {
     fn default() -> Self {
         Self {
             enabled: security_config_enabled_default(),
-            managing_role_group: security_config_managing_role_group(),
+            managing_role_group: security_config_managing_role_group_default(),
             settings: v1alpha1::SecuritySettings::default(),
         }
     }
@@ -683,7 +683,7 @@ fn security_config_enabled_default() -> bool {
     true
 }
 
-fn security_config_managing_role_group() -> RoleGroupName {
+fn security_config_managing_role_group_default() -> RoleGroupName {
     RoleGroupName::from_str("security-config").expect("should be a valid role group name")
 }
 
@@ -867,7 +867,7 @@ attributed_string_type! {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::crd::v1alpha1;
+    use crate::crd::{security_config_managing_role_group_default, v1alpha1};
 
     #[test]
     fn test_node_role() {
@@ -896,5 +896,11 @@ mod tests {
             // Test that the function does not panic
             container.to_container_name();
         }
+    }
+
+    #[test]
+    fn test_security_config_managing_role_group_default() {
+        // Test that the function does not panic
+        security_config_managing_role_group_default();
     }
 }
