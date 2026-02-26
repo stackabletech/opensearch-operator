@@ -89,12 +89,6 @@ spec:
               data:
                 capacity: 2Gi
         replicas: 2
-    envOverrides:
-      # Only required for the official image
-      # The official image (built with https://github.com/opensearch-project/opensearch-build)
-      # installs a demo configuration if not disabled explicitly.
-      DISABLE_INSTALL_DEMO_CONFIG: "true"
-      OPENSEARCH_HOME: {{ test_scenario['values']['opensearch_home'] }}
     configOverrides:
       opensearch.yml:
         # Disable memory mapping in this test; If memory mapping were activated, the kernel setting

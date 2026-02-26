@@ -31,7 +31,8 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
-  # requires an image with the OpenSearch Prometheus exporter
+  # The test case "metrics" does not work with the original image because it requires the OpenSearch
+  # Prometheus exporter.
   - name: metrics
     dimensions:
       - opensearch
@@ -39,7 +40,7 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
-  # requires an image with Vector
+  # The test case "logging" does not work with the original image because it requires Vector.
   - name: logging
     dimensions:
       - opensearch
@@ -49,16 +50,18 @@ tests:
       - opensearch_home
       - server-use-tls
       - release
-  # requires the repository-s3 plugin
+  # The test case "backup-restore" does not work with the original image because it requires the
+  # repository-s3 plugin.
   - name: backup-restore
     dimensions:
       - opensearch
       - release
       - s3-use-tls
+  # The test case "security-config" does not work with the original image because it requires
+  # openssl.
   - name: security-config
     dimensions:
       - opensearch
-      - opensearch_home
   - name: security-disabled
     dimensions:
       - opensearch
@@ -89,7 +92,6 @@ suites:
       - external-access
       - ldap
       - opensearch-dashboards
-      - security-config
       - security-disabled
     patch:
       - dimensions:
