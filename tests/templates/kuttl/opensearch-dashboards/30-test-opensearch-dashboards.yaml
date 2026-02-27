@@ -56,6 +56,7 @@ spec:
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+  backoffLimit: 10
 ---
 apiVersion: secrets.stackable.tech/v1alpha1
 kind: TrustStore

@@ -35,3 +35,4 @@ spec:
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+  backoffLimit: 10
