@@ -68,10 +68,12 @@ transforms:
         level, err = string(event.level)
         if err != null {
           .errors = push(.errors, "Level not found, using \"" + .level + "\" instead.")
-        } else if !includes(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"], level) {
-          .errors = push(.errors, "Level \"" + level + "\" unknown, using \"" + .level + "\" instead.")
-        } else {
+        } else if level == "DEPRECATION"  {
+          .level = "WARN"
+        } else if includes(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"], level) {
           .level = level
+        } else {
+          .errors = push(.errors, "Level \"" + level + "\" unknown, using \"" + .level + "\" instead.")
         }
 
         .message, err = string(event.message)
