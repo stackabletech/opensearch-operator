@@ -2,20 +2,13 @@
 
 Once you have followed the steps in  xref:getting_started/installation.adoc[] for the operator and its dependencies, you will now go through the steps to set up and connect to an OpenSearch instance.
 
-== Security plugin configuration
+== User configuration
 
-The configuration for the OpenSearch security plugin must be provided in a separate resource, e.g. a Secret:
+Let's begin by defining the users with passwords and their corresponding mappings to back-end roles within a Secret:
 
 [source,yaml]
 ----
-include::example$getting_started/opensearch-security-config.yaml[]
-----
-
-Apply the Secret:
-
-[source,bash]
-----
-include::example$getting_started/getting_started.sh[tag=apply-security-config]
+include::example$getting_started/initial-opensearch-security-config.yaml[]
 ----
 
 The passwords in `internal_users.yml` are hashes using the bcrypt algorithm.
@@ -30,9 +23,17 @@ $ htpasswd -nbBC 10 kibanaserver E4kENuEmkqH3jyHC
 kibanaserver:$2y$10$vPgQ/6ilKDM5utawBqxoR.7euhVQ0qeGl8mPTeKhmFT475WUDrfQS
 ----
 
-== Creation of OpenSearch nodes
+Now apply the Secret:
 
-OpenSearch nodes must be created as a custom resource; Create a file called `opensearch.yaml`:
+[source,bash]
+----
+include::example$getting_started/getting_started.sh[tag=apply-security-config]
+----
+
+== OpenSearch cluster definition
+
+OpenSearch nodes must be created as a custom resource;
+Create a file called `opensearch.yaml`:
 
 [source,yaml]
 ----
@@ -47,8 +48,6 @@ include::example$getting_started/getting_started.sh[tag=apply-cluster]
 ----
 
 `metadata.name` contains the name of the OpenSearch cluster.
-
-The previously created security plugin configuration must be referenced via `podOverrides`.
 
 You need to wait for the OpenSearch nodes to finish deploying.
 You can do so with this command:

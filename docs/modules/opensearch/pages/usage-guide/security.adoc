@@ -1,8 +1,152 @@
 = Security
-:description: Configure TLS encryption for OpenSearch with the Stackable Operator.
+:description: Configure the OpenSearch security plugin with the Stackable Operator.
+
+Security in OpenSearch is managed by the OpenSearch security plugin.
+The security plugin can be configured in `spec.clusterConfig.security` and is enabled by default:
+
+[source,yaml]
+----
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  clusterConfig:
+    security:
+      enabled: true
+----
+
+== Settings
+
+The configuration of the security plugin is stored in the security index.
+When a new cluster is created, the security index is initialized from the following configuration files:
+
+* https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml[action_groups.yml{external-link-icon}^]:
+  user-defined action groups
+* https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml[allowlist.yml{external-link-icon}^]:
+  list of allowed HTTP endpoints
+* https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml[audit.yml{external-link-icon}^]:
+  settings for audit logging
+* https://docs.opensearch.org/latest/security/configuration/configuration/[config.yml{external-link-icon}^]:
+  configuration of the security backend
+* https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml[internal_users.yml{external-link-icon}^]:
+  the internal users database
+* https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml[nodes_dn.yml{external-link-icon}^]:
+  distinguished names (DNs) of nodes to allow communication between nodes and clusters
+* https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml[roles.yml{external-link-icon}^]:
+  definition of roles in the security plugin
+* https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml[roles_mapping.yml{external-link-icon}^]:
+  Role mappings to users or backend roles
+* https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml[tenants.yml{external-link-icon}^]:
+  OpenSearch Dashboards tenants
+
+These configuration files can be specified in `spec.clusterConfig.security.settings`:
+
+[source,yaml]
+----
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  clusterConfig:
+    security:
+      settings:
+        actionGroups: ...
+        allowList: ...
+        audit: ...
+        config: ...
+        internalUsers: ...
+        nodesDn: ...
+        roles: ...
+        rolesMapping: ...
+        tenants: ...
+----
+
+If a setting is undefined, then a default configuration is deployed with no permissions.
+Therefore, it is okay to only define some settings and leave the others unspecified.
+
+A setting can be defined either inline, via Secret or ConfigMap:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    security:
+      settings:
+        config:
+          managedBy: API
+          content:
+            value: # defined inline
+              _meta:
+                type: config
+                config_version: 2
+              ...
+        internalUsers:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef: # defined via Secret
+                name: opensearch-security-config-secret
+                key: internal_users.yml
+        rolesMapping:
+          managedBy: API
+          content:
+            valueFrom:
+              configMapKeyRef: # defined via ConfigMap
+                name: opensearch-security-config-configmap
+                key: roles_mapping.yml
+----
+
+By default, the security settings are only used to initialize the security index:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    security:
+      settings:
+        config:
+          managedBy: API
+          ...
+----
+
+Later changes are ignored, because usually, the index is managed via the https://docs.opensearch.org/latest/api-reference/security/configuration/index/[security configuration API{external-link-icon}^] and it should not be overridden by the operator.
+However, if you prefer to manage some settings in the OpenSearchCluster specification, you can set `managedBy` to `operator`:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    security:
+      settings:
+        config:
+          managedBy: operator
+          ...
+----
+
+[WARNING]
+====
+It is possible to change `managedBy` from `API` to `operator` after the cluster was created, but be aware that all changes made via the API are lost.
+====
+
+All settings managed by the operator are updated by the role group defined in `spec.clusterConfig.security.managingRoleGroup` which defaults to `security-config`:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    security:
+      managingRoleGroup: security-config
+----
+
+If this role group is not defined, it will be created by the operator.
 
 == TLS
 
+TLS is also managed by the OpenSearch security plugin, therefore TLS is only available if the security plugin was not disabled.
 The internal and client communication at the REST API can be encrypted with TLS.
 This requires the xref:secret-operator:index.adoc[Secret Operator] to be running in the Kubernetes cluster providing certificates.
 The used certificates can be changed in a cluster-wide config and are configured using xref:secret-operator:secretclass.adoc[SecretClasses].
@@ -36,5 +180,34 @@ Defaults to the `tls` SecretClass and can't be disabled.
 <3> The lifetime for autoTls certificates generated by the secret operator.
 Only a lifetime up to the `maxCertificateLifetime` setting in the SecretClass is applied.
 
-Important: The operator sets the configuration `plugins.security.nodes_dn` to `["CN=generated certificate for pod"]` which provides weak authentication between nodes.
+[WARNING]
+====
+The operator sets the configuration `plugins.security.nodes_dn` to `["CN=generated certificate for pod"]` which provides weak authentication between nodes.
 If you want to increase security and use certificates which identify the OpenSearch nodes specifically, you must also adapt the `plugins.security.nodes_dn` setting via configOverrides.
+====
+
+== Disabling security
+
+The OpenSearch security plugin can be disabled as follows:
+
+[source,yaml]
+----
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  clusterConfig:
+    security:
+      enabled: false
+----
+
+All other security settings as well as the TLS settings are then ignored.
+
+[WARNING]
+====
+If the security plugin was enabled before disabling it, then the security index is exposed to the public.
+====
+
+OpenSearch Dashboards require an enabled security plugin.

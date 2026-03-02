@@ -47,7 +47,7 @@ esac
 
 echo "Creating OpenSearch security plugin configuration"
 # tag::apply-security-config[]
-kubectl apply -f opensearch-security-config.yaml
+kubectl apply -f initial-opensearch-security-config.yaml
 # end::apply-security-config[]
 
 echo "Creating OpenSearch cluster"
@@ -91,8 +91,21 @@ curl \
     --json '{"name": "Stackable"}' \
     "$OPENSEARCH_HOST/sample_index/_doc/1"
 
-# Output:
-# {"_index":"sample_index","_id":"1","_version":1,"result":"created","_shards":{"total":2,"successful":1,"failed":0},"_seq_no":0,"_primary_term":1}
+# Formatted output:
+# {
+#   "_index": "sample_index",
+#   "_id": "1",
+#   "_version": 1,
+#   "result": "created",
+#   "_shards": {
+#     "total": 2,
+#     "successful": 1,
+#     "failed": 0
+#   },
+#   "_seq_no": 0,
+#   "_primary_term": 1
+# }
+
 
 curl \
     --insecure \
@@ -100,8 +113,18 @@ curl \
     --request GET \
     "$OPENSEARCH_HOST/sample_index/_doc/1"
 
-# Output:
-# {"_index":"sample_index","_id":"1","_version":1,"_seq_no":0,"_primary_term":1,"found":true,"_source":{"name": "Stackable"}}
+# Formatted output:
+# {
+#   "_index": "sample_index",
+#   "_id": "1",
+#   "_version": 1,
+#   "_seq_no": 0,
+#   "_primary_term": 1,
+#   "found": true,
+#   "_source": {
+#     "name": "Stackable"
+#   }
+# }
 # end::rest-api[]
 
 echo

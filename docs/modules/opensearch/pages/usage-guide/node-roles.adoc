@@ -11,10 +11,10 @@ The role configuration already defaults to a set of node roles:
 nodes:
   config:
     nodeRoles:
-      - cluster_manager
-      - data
-      - ingest
-      - remote_cluster_client
+    - cluster_manager
+    - data
+    - ingest
+    - remote_cluster_client
 ----
 
 If you deploy a cluster with the following specification, then 3 replicas with the roles `cluster_manager`, `data`, `ingest` and `remote_cluster_client` are deployed:
@@ -40,18 +40,18 @@ nodes:
     cluster-manager:
       config:
         nodeRoles:
-          - cluster_manager
+        - cluster_manager
       replicas: 1
     coordinating:
       config:
         nodeRoles:
-          - coordinating_only
+        - coordinating_only
       replicas: 1
     data:
       config:
         nodeRoles:
-          - data
-          - ingest
+        - data
+        - ingest
       replicas: 2
 ----
 
@@ -64,5 +64,14 @@ The following roles are currently supported by the operator:
 * `remote_cluster_client`
 * `search`
 * `warm`
+
+The node role `coordinating_only` cannot be combined with other roles.
+`nodeRoles: []` also defines a `coordinating_only` node.
+
+[WARNING]
+====
+Do not remove the `data` node role from an existing role group!
+Otherwise you have to repurpose the node to another role manually.
+====
 
 We refer to https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/configuration-system/[the OpenSearch documentation{external-link-icon}^] for an explanation of the roles.
