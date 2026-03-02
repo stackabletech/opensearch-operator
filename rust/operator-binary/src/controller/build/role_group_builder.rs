@@ -1652,7 +1652,7 @@ mod tests {
         let expected_data = match security_mode {
             TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
                "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
-               "allow_list.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
+               "allowlist.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
                "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
                "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
                "log4j2.properties": null,
@@ -1771,10 +1771,10 @@ mod tests {
                     "subPath": "action_groups.yml"
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/allowlist.yml",
                     "name": "security-config-file-allowlist",
                     "readOnly": true,
-                    "subPath": "allow_list.yml"
+                    "subPath": "allowlist.yml"
                 },
                 {
                     "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
@@ -2298,10 +2298,10 @@ mod tests {
                     "subPath": "action_groups.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/allow_list.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/allowlist.yml",
                     "name": "security-config-file-allowlist",
                     "readOnly": true,
-                    "subPath": "allow_list.yml",
+                    "subPath": "allowlist.yml",
                 },
                 {
                     "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
@@ -2549,9 +2549,9 @@ mod tests {
                     "configMap": {
                         "items": [
                             {
-                                "key": "allow_list.yml",
+                                "key": "allowlist.yml",
                                 "mode": 0o660,
-                                "path": "allow_list.yml"
+                                "path": "allowlist.yml"
                             }
                         ],
                         "name": "my-opensearch-cluster-nodes-default"
@@ -2759,9 +2759,9 @@ mod tests {
                     "configMap": {
                         "items": [
                             {
-                                "key": "allow_list.yml",
+                                "key": "allowlist.yml",
                                 "mode": 0o660,
-                                "path": "allow_list.yml"
+                                "path": "allowlist.yml"
                             }
                         ],
                         "name": "my-opensearch-cluster-nodes-default"

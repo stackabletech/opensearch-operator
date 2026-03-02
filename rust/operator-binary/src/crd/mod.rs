@@ -629,7 +629,7 @@ impl<'a> IntoIterator for &'a v1alpha1::SecuritySettings {
             },
             ExtendedSecuritySettingsFileType {
                 id: "allowlist",
-                filename: "allow_list.yml",
+                filename: "allowlist.yml",
                 managed_by: &self.allow_list.managed_by,
                 content: &self.allow_list.content,
             },

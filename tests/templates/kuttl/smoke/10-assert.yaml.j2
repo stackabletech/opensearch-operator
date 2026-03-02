@@ -201,10 +201,10 @@ spec:
           name: security-config-file-actiongroups
           readOnly: true
           subPath: action_groups.yml
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allow_list.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allowlist.yml
           name: security-config-file-allowlist
           readOnly: true
-          subPath: allow_list.yml
+          subPath: allowlist.yml
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/audit.yml
           name: security-config-file-audit
           readOnly: true
@@ -360,9 +360,9 @@ spec:
       - configMap:
           defaultMode: 420
           items:
-          - key: allow_list.yml
+          - key: allowlist.yml
             mode: 432
-            path: allow_list.yml
+            path: allowlist.yml
           name: opensearch-nodes-cluster-manager
         name: security-config-file-allowlist
       - configMap:
@@ -674,10 +674,10 @@ spec:
           name: security-config-file-actiongroups
           readOnly: true
           subPath: action_groups.yml
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allow_list.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allowlist.yml
           name: security-config-file-allowlist
           readOnly: true
-          subPath: allow_list.yml
+          subPath: allowlist.yml
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/audit.yml
           name: security-config-file-audit
           readOnly: true
@@ -833,9 +833,9 @@ spec:
       - configMap:
           defaultMode: 420
           items:
-          - key: allow_list.yml
+          - key: allowlist.yml
             mode: 432
-            path: allow_list.yml
+            path: allowlist.yml
           name: opensearch-nodes-data
         name: security-config-file-allowlist
       - configMap:
@@ -951,7 +951,7 @@ metadata:
     name: opensearch
 data:
   action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allow_list.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
+  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
   audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
   config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
   internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
@@ -1001,7 +1001,7 @@ metadata:
     name: opensearch
 data:
   action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allow_list.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
+  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
   audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
   config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
   internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
