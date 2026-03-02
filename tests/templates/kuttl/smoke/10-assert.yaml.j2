@@ -608,7 +608,7 @@ spec:
               apiVersion: v1
               fieldPath: metadata.name
         - name: node.roles
-          value: ingest,data,remote_cluster_client
+          value: data,ingest,remote_cluster_client
         - name: transport.publish_host
           # value: $(_POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
         imagePullPolicy: IfNotPresent
