@@ -44,7 +44,7 @@ pub fn preprocess_security_managing_role_group(
                 config: CommonConfiguration {
                     config: v1alpha1::OpenSearchConfigFragment {
                         discovery_service_exposed: Some(false),
-                        node_roles: Some(NodeRoles(vec![])),
+                        node_roles: Some(NodeRoles(vec![v1alpha1::NodeRole::CoordinatingOnly])),
                         resources: ResourcesFragment {
                             storage: v1alpha1::StorageConfigFragment {
                                 data: PvcConfigFragment {
@@ -132,7 +132,9 @@ mod tests {
             "security-manager": {
                 "config" : {
                     "discoveryServiceExposed": false,
-                    "nodeRoles": [],
+                    "nodeRoles": [
+                        "coordinating_only"
+                    ],
                     "resources": {
                         "storage": {
                             "data": {

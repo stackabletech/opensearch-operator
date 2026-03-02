@@ -3,7 +3,12 @@
 //! The cluster specification is validated, Kubernetes resource specifications are created and
 //! applied and the cluster status is updated.
 
-use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    marker::PhantomData,
+    str::FromStr,
+    sync::Arc,
+};
 
 use apply::Applier;
 use build::build;
@@ -26,13 +31,13 @@ use stackable_operator::{
     logging::controller::ReconcilerError,
     shared::time::Duration,
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
 use update_status::update_status;
 use validate::validate;
 
 use crate::{
     controller::preprocess::preprocess,
-    crd::{NodeRoles, v1alpha1},
+    crd::v1alpha1,
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
@@ -159,7 +164,7 @@ pub struct ValidatedOpenSearchConfig {
     pub discovery_service_exposed: bool,
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
-    pub node_roles: NodeRoles,
+    pub node_roles: ValidatedNodeRoles,
     pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
@@ -176,6 +181,23 @@ impl ValidatedLogging {
     pub fn is_vector_agent_enabled(&self) -> bool {
         self.vector_container.is_some()
     }
+}
+
+/// Set of validated node roles
+///
+/// An empty set specifies a coordinating only node.
+type ValidatedNodeRoles = BTreeSet<ValidatedNodeRole>;
+
+/// Validated node role
+#[derive(Clone, Copy, Debug, Display, EnumIter, Eq, PartialEq, PartialOrd, Ord)]
+#[strum(serialize_all = "snake_case")]
+pub enum ValidatedNodeRole {
+    ClusterManager,
+    Data,
+    Ingest,
+    RemoteClusterClient,
+    Search,
+    Warm,
 }
 
 /// Validated security configuration
@@ -285,7 +307,7 @@ impl ValidatedCluster {
     /// Returns all role-group configurations which contain the given node role
     pub fn role_group_configs_filtered_by_node_role(
         &self,
-        node_role: &v1alpha1::NodeRole,
+        node_role: &ValidatedNodeRole,
     ) -> BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig> {
         self.role_group_configs
             .clone()
@@ -481,8 +503,11 @@ mod tests {
 
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
-        controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig, ValidatedSecurity},
-        crd::{NodeRoles, v1alpha1},
+        controller::{
+            OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
+            ValidatedOpenSearchConfig, ValidatedSecurity,
+        },
+        crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
@@ -533,10 +558,10 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data1"),
                     role_group_config(
                         4,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
@@ -544,15 +569,15 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data2"),
                     role_group_config(
                         6,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
             ]),
-            validated_cluster.role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::Data)
+            validated_cluster.role_group_configs_filtered_by_node_role(&ValidatedNodeRole::Data)
         );
     }
 
@@ -574,20 +599,20 @@ mod tests {
             [
                 (
                     RoleGroupName::from_str_unsafe("coordinating"),
-                    role_group_config(5, &[v1alpha1::NodeRole::CoordinatingOnly]),
+                    role_group_config(5, []),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("cluster-manager"),
-                    role_group_config(3, &[v1alpha1::NodeRole::ClusterManager]),
+                    role_group_config(3, [ValidatedNodeRole::ClusterManager]),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("data1"),
                     role_group_config(
                         4,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
@@ -595,10 +620,10 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data2"),
                     role_group_config(
                         6,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
@@ -616,7 +641,7 @@ mod tests {
 
     fn role_group_config(
         replicas: u16,
-        node_roles: &[v1alpha1::NodeRole],
+        node_roles: impl Into<ValidatedNodeRoles>,
     ) -> OpenSearchRoleGroupConfig {
         OpenSearchRoleGroupConfig {
             replicas,
@@ -630,7 +655,7 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(node_roles.to_vec()),
+                node_roles: node_roles.into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),

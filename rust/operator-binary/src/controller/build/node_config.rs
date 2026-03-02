@@ -8,7 +8,10 @@ use tracing::warn;
 
 use super::ValidatedCluster;
 use crate::{
-    controller::{OpenSearchRoleGroupConfig, build::role_group_builder::RoleGroupSecurityMode},
+    controller::{
+        OpenSearchRoleGroupConfig, ValidatedNodeRole,
+        build::role_group_builder::RoleGroupSecurityMode,
+    },
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
@@ -372,15 +375,16 @@ impl NodeConfig {
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
-                self.role_group_config
-                    .config
-                    .node_roles
-                    .iter()
-                    .map(|node_role| format!("{node_role}"))
-                    .collect::<Vec<_>>()
-                    // Node roles cannot contain commas, therefore creating a comma-separated list
-                    // is safe.
-                    .join(","),
+                Self::to_comma_separated_list(
+                    &self
+                        .role_group_config
+                        .config
+                        .node_roles
+                        .iter()
+                        .map(|node_role| format!("{node_role}"))
+                        .collect::<Vec<_>>(),
+                )
+                .expect("Node roles cannot contain commas, therefore creating a comma-separated list is safe."),
             );
 
         if let Some(initial_cluster_manager_nodes) = self.initial_cluster_manager_nodes() {
@@ -476,13 +480,13 @@ impl NodeConfig {
                 .role_group_config
                 .config
                 .node_roles
-                .contains(&v1alpha1::NodeRole::ClusterManager)
+                .contains(&ValidatedNodeRole::ClusterManager)
         {
             None
         } else {
             let cluster_manager_configs = self
                 .cluster
-                .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
+                .role_group_configs_filtered_by_node_role(&ValidatedNodeRole::ClusterManager);
 
             // This setting requires node names as set in NODE_NAME.
             // The node names are set to the pod names with
@@ -501,8 +505,8 @@ impl NodeConfig {
                         .map(|i| format!("{}-{i}", role_group_resource_names.stateful_set_name())),
                 );
             }
-            // Pod names cannot contain commas, therefore creating a comma-separated list is safe.
-            Some(pod_names.join(","))
+
+            Some(Self::to_comma_separated_list(&pod_names).expect("Pod names cannot contain commas, therefore creating a comma-separated list is safe."))
         }
     }
 
@@ -521,6 +525,16 @@ impl NodeConfig {
             .get(&EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"))
+    }
+
+    fn to_comma_separated_list(values: &[String]) -> Option<String> {
+        if values.iter().any(|value| value.contains(",")) {
+            None
+        } else if values.is_empty() {
+            Some("[]".to_owned())
+        } else {
+            Some(values.join(","))
+        }
     }
 }
 
@@ -545,7 +559,7 @@ mod tests {
     use super::*;
     use crate::{
         controller::{ValidatedLogging, ValidatedOpenSearchConfig, ValidatedSecurity},
-        crd::{NodeRoles, v1alpha1},
+        crd::v1alpha1,
         framework::{
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
@@ -592,12 +606,13 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(vec![
-                    v1alpha1::NodeRole::ClusterManager,
-                    v1alpha1::NodeRole::Data,
-                    v1alpha1::NodeRole::Ingest,
-                    v1alpha1::NodeRole::RemoteClusterClient,
-                ]),
+                node_roles: [
+                    ValidatedNodeRole::ClusterManager,
+                    ValidatedNodeRole::Data,
+                    ValidatedNodeRole::Ingest,
+                    ValidatedNodeRole::RemoteClusterClient,
+                ]
+                .into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),
@@ -824,6 +839,32 @@ mod tests {
         assert_eq!(
             Some("my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned()),
             node_config_multiple_nodes.initial_cluster_manager_nodes()
+        );
+    }
+
+    #[test]
+    pub fn test_to_comma_separated_list() {
+        assert_eq!(
+            None,
+            NodeConfig::to_comma_separated_list(&[
+                "one".to_owned(),
+                "two,three".to_owned(),
+                "four".to_owned()
+            ])
+        );
+
+        assert_eq!(
+            Some("[]".to_owned()),
+            NodeConfig::to_comma_separated_list(&[])
+        );
+
+        assert_eq!(
+            Some("one,two,three".to_owned()),
+            NodeConfig::to_comma_separated_list(&[
+                "one".to_owned(),
+                "two".to_owned(),
+                "three".to_owned()
+            ])
         );
     }
 }

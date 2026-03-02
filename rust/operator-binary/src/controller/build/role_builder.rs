@@ -336,12 +336,12 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
             build::role_builder::{
                 discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
             },
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
@@ -385,12 +385,13 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(vec![
-                    v1alpha1::NodeRole::ClusterManager,
-                    v1alpha1::NodeRole::Data,
-                    v1alpha1::NodeRole::Ingest,
-                    v1alpha1::NodeRole::RemoteClusterClient,
-                ]),
+                node_roles: [
+                    ValidatedNodeRole::ClusterManager,
+                    ValidatedNodeRole::Data,
+                    ValidatedNodeRole::Ingest,
+                    ValidatedNodeRole::RemoteClusterClient,
+                ]
+                .into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),

@@ -46,7 +46,7 @@ use crate::{
     constant,
     controller::{
         ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
-        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedSecurity,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
         build::product_logging::config::{
             MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
         },
@@ -494,14 +494,14 @@ impl<'a> RoleGroupBuilder<'a> {
         );
 
         labels.insert(Self::build_node_role_label(
-            &v1alpha1::NodeRole::ClusterManager,
+            &ValidatedNodeRole::ClusterManager,
         ));
 
         labels
     }
 
     /// Builds a label indicating the role of the OpenSearch node
-    fn build_node_role_label(node_role: &v1alpha1::NodeRole) -> Label {
+    fn build_node_role_label(node_role: &ValidatedNodeRole) -> Label {
         // It is not possible to check the infallibility of the following statement at
         // compile-time. Instead, it is tested in `tests::test_build_node_role_label`.
         Label::try_from((
@@ -1045,7 +1045,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .role_group_config
             .config
             .node_roles
-            .contains(&v1alpha1::NodeRole::ClusterManager)
+            .contains(&ValidatedNodeRole::ClusterManager)
         {
             volume_source_builder.with_service_scope(&self.node_config.seed_nodes_service_name);
         }
@@ -1387,14 +1387,14 @@ mod tests {
     use crate::{
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedOpenSearchConfig,
-            ValidatedSecurity,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedNodeRole,
+            ValidatedOpenSearchConfig, ValidatedSecurity,
             build::role_group_builder::{
                 DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
                 TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_CA_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
             },
         },
-        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
+        crd::{OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
@@ -1494,12 +1494,13 @@ mod tests {
                         ),
                     }),
                 },
-                node_roles: NodeRoles(vec![
-                    v1alpha1::NodeRole::ClusterManager,
-                    v1alpha1::NodeRole::Data,
-                    v1alpha1::NodeRole::Ingest,
-                    v1alpha1::NodeRole::RemoteClusterClient,
-                ]),
+                node_roles: [
+                    ValidatedNodeRole::ClusterManager,
+                    ValidatedNodeRole::Data,
+                    ValidatedNodeRole::Ingest,
+                    ValidatedNodeRole::RemoteClusterClient,
+                ]
+                .into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),
@@ -3342,7 +3343,7 @@ mod tests {
     #[test]
     fn test_build_node_role_label() {
         // Test that the function does not panic on all possible inputs
-        for node_role in v1alpha1::NodeRole::iter() {
+        for node_role in ValidatedNodeRole::iter() {
             RoleGroupBuilder::build_node_role_label(&node_role);
         }
     }

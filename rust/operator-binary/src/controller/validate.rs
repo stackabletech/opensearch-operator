@@ -15,9 +15,10 @@ use super::{
 };
 use crate::{
     controller::{
-        DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedSecurity,
+        DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedNodeRole,
+        ValidatedNodeRoles, ValidatedSecurity,
     },
-    crd::v1alpha1::{self},
+    crd::{NodeRoles, v1alpha1},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
@@ -47,6 +48,9 @@ pub enum Error {
         "A TLS server SecretClass must be set if the security configuration is managed by the operator."
     ))]
     CheckSecurityConfigTlsSettings {},
+
+    #[snafu(display("node role \"coordinating_only\" not compatible with other node roles"))]
+    ConflictingNodeRoles {},
 
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {
@@ -210,6 +214,8 @@ fn validate_role_group_config(
             .vector_aggregator_config_map_name,
     )?;
 
+    let node_roles = validate_node_roles(&merged_role_group.config.config.node_roles)?;
+
     let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
     let termination_grace_period_seconds = graceful_shutdown_timeout.as_secs().try_into().context(
         TerminationGracePeriodTooLongSnafu {
@@ -222,7 +228,7 @@ fn validate_role_group_config(
         discovery_service_exposed: merged_role_group.config.config.discovery_service_exposed,
         listener_class: merged_role_group.config.config.listener_class,
         logging,
-        node_roles: merged_role_group.config.config.node_roles,
+        node_roles,
         requested_secret_lifetime: merged_role_group.config.config.requested_secret_lifetime,
         resources: merged_role_group.config.config.resources,
         termination_grace_period_seconds,
@@ -277,6 +283,30 @@ fn validate_logging_configuration(
         opensearch_container,
         vector_container,
     })
+}
+
+fn validate_node_roles(node_roles: &NodeRoles) -> Result<ValidatedNodeRoles> {
+    if node_roles.0.is_empty() || node_roles.0 == vec![v1alpha1::NodeRole::CoordinatingOnly] {
+        Ok(ValidatedNodeRoles::new())
+    } else {
+        let validated_node_roles = node_roles
+            .0
+            .iter()
+            .map(|node_role| match node_role {
+                v1alpha1::NodeRole::ClusterManager => Ok(ValidatedNodeRole::ClusterManager),
+                v1alpha1::NodeRole::CoordinatingOnly => ConflictingNodeRolesSnafu.fail(),
+                v1alpha1::NodeRole::Data => Ok(ValidatedNodeRole::Data),
+                v1alpha1::NodeRole::Ingest => Ok(ValidatedNodeRole::Ingest),
+                v1alpha1::NodeRole::RemoteClusterClient => {
+                    Ok(ValidatedNodeRole::RemoteClusterClient)
+                }
+                v1alpha1::NodeRole::Warm => Ok(ValidatedNodeRole::Warm),
+                v1alpha1::NodeRole::Search => Ok(ValidatedNodeRole::Search),
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(validated_node_roles)
+    }
 }
 
 fn validate_security_config(spec: &v1alpha1::OpenSearchClusterSpec) -> Result<ValidatedSecurity> {
@@ -429,7 +459,7 @@ mod tests {
         built_info,
         controller::{
             ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
-            ValidatedLogging, ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
@@ -564,15 +594,13 @@ mod tests {
                                         ConfigMapName::from_str_unsafe("vector-aggregator"),
                                 }),
                             },
-                            node_roles: NodeRoles(
-                                [
-                                    v1alpha1::NodeRole::ClusterManager,
-                                    v1alpha1::NodeRole::Ingest,
-                                    v1alpha1::NodeRole::Data,
-                                    v1alpha1::NodeRole::RemoteClusterClient
-                                ]
-                                .into()
-                            ),
+                            node_roles: [
+                                ValidatedNodeRole::ClusterManager,
+                                ValidatedNodeRole::Ingest,
+                                ValidatedNodeRole::Data,
+                                ValidatedNodeRole::RemoteClusterClient
+                            ]
+                            .into(),
                             requested_secret_lifetime: Duration::from_str("1d")
                                 .expect("should be a valid duration"),
                             resources: Resources {
@@ -783,6 +811,30 @@ mod tests {
                     .vector_aggregator_config_map_name = None
             },
             ErrorDiscriminants::GetVectorAggregatorConfigMapName,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_conflicting_node_roles() {
+        test_validate_err(
+            |cluster, _| {
+                cluster
+                    .spec
+                    .nodes
+                    .role_groups
+                    .get_mut("default")
+                    .expect("should be defined in the test cluster spec")
+                    .config
+                    .config
+                    .node_roles = Some(NodeRoles(vec![
+                    v1alpha1::NodeRole::ClusterManager,
+                    v1alpha1::NodeRole::CoordinatingOnly,
+                    v1alpha1::NodeRole::Ingest,
+                    v1alpha1::NodeRole::Data,
+                    v1alpha1::NodeRole::RemoteClusterClient,
+                ]));
+            },
+            ErrorDiscriminants::ConflictingNodeRoles,
         );
     }
 

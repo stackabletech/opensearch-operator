@@ -1,4 +1,4 @@
-use std::{array, slice, str::FromStr};
+use std::{array, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -824,16 +824,6 @@ fn discovery_service_listener_class_default() -> ListenerClassName {
 
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct NodeRoles(pub Vec<v1alpha1::NodeRole>);
-
-impl NodeRoles {
-    pub fn contains(&self, node_role: &v1alpha1::NodeRole) -> bool {
-        self.0.contains(node_role)
-    }
-
-    pub fn iter(&self) -> slice::Iter<'_, v1alpha1::NodeRole> {
-        self.0.iter()
-    }
-}
 
 impl Atomic for NodeRoles {}
 
