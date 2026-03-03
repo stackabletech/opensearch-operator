@@ -21,6 +21,8 @@ config:
     opensearch_security:
       cookie:
         secure: true
+# See https://github.com/opensearch-project/helm-charts/blob/main/charts/opensearch-dashboards/templates/deployment.yaml#L122
+opensearchHosts: ""
 extraEnvs:
 - name: OPENSEARCH_HOSTS
   valueFrom:

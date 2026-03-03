@@ -8,6 +8,9 @@ serviceAccount:
   # Use the ServiceAccount of OpenSearch because its permissions are already configured to work on
   # OpenShift.
   name: opensearch-serviceaccount
+# OPENSEARCH_HOSTS cannot be supplied if opensearchHosts is set (so unset explicitly).
+# See https://github.com/opensearch-project/helm-charts/blob/main/charts/opensearch-dashboards/templates/deployment.yaml#L122
+opensearchHosts: ""
 extraEnvs:
   - name: OPENSEARCH_HOSTS
     valueFrom:
