@@ -30,6 +30,9 @@ const STACKABLE_CONFIG_DIR: &str = "/stackable/config";
 // Copy of the private constant `stackable_operator::product_logging::framework::VECTOR_LOG_DIR`
 const VECTOR_CONTROL_DIR: &str = "_vector";
 
+// Copy of the private constant `stackable_operator::product_logging::framework::VECTOR_STATE_DIR`
+const VECTOR_STATE_DIR: &str = "_vector-state";
+
 // Copy of the private constant `stackable_operator::product_logging::framework::SHUTDOWN_FILE`
 const SHUTDOWN_FILE: &str = "shutdown";
 
@@ -142,7 +145,11 @@ pub fn vector_container(
             &EnvVarName::from_str_unsafe("CLUSTER_NAME"),
             &resource_names.cluster_name,
         )
-        .with_value(&EnvVarName::from_str_unsafe("LOG_DIR"), "/stackable/log")
+        .with_value(
+            &EnvVarName::from_str_unsafe("DATA_DIR"),
+            format!("{STACKABLE_LOG_DIR}/{VECTOR_STATE_DIR}"),
+        )
+        .with_value(&EnvVarName::from_str_unsafe("LOG_DIR"), STACKABLE_LOG_DIR)
         .with_field_path(
             &EnvVarName::from_str_unsafe("NAMESPACE"),
             FieldPathEnvVar::Namespace,
@@ -191,7 +198,8 @@ pub fn vector_container(
                 "-c".to_string(),
             ])
             .args(vec![format!(
-                "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n\
+                "mkdir --parents {STACKABLE_LOG_DIR}/{VECTOR_STATE_DIR}\n\
+                # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n\
                 vector & vector_pid=$!\n\
                 if [ ! -f \"{vector_control_directory}/{SHUTDOWN_FILE}\" ]; then\n\
                     mkdir -p {vector_control_directory}\n\
