@@ -182,7 +182,7 @@ Only a lifetime up to the `maxCertificateLifetime` setting in the SecretClass is
 
 [IMPORTANT]
 ====
-The operator sets the configuration `plugins.security.nodes_dn` to `["CN=generated certificate for pod"]` which provides weak authentication between nodes.
+The operator sets the configuration `plugins.security.nodes_dn` to `["CN=generated certificate for pod"]`, which provides weak authentication between nodes.
 For enhanced security, use certificates that uniquely identify the OpenSearch nodes.
 In this case, you must also adapt the `plugins.security.nodes_dn` setting via configOverrides.
 ====
