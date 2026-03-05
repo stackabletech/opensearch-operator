@@ -397,6 +397,7 @@ mod tests {
             {
                 "args": [
                     concat!(
+                        "mkdir --parents /stackable/log/_vector-state\n",
                         "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n",
                         "vector & vector_pid=$!\n",
                         "if [ ! -f \"/stackable/log/_vector/shutdown\" ]; then\n",
@@ -422,6 +423,10 @@ mod tests {
                     {
                         "name": "CUSTOM_ENV",
                         "value": "test",
+                    },
+                    {
+                        "name": "DATA_DIR",
+                        "value": "/stackable/log/_vector-state",
                     },
                     {
                         "name": "LOG_DIR",

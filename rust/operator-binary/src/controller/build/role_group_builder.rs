@@ -2102,6 +2102,7 @@ mod tests {
         let expected_vector_container = json!({
             "args": [
                 concat!(
+                    "mkdir --parents /stackable/log/_vector-state\n",
                     "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n",
                     "vector & vector_pid=$!\n",
                     "if [ ! -f \"/stackable/log/_vector/shutdown\" ]; then\n",
@@ -2123,6 +2124,10 @@ mod tests {
                 {
                     "name": "CLUSTER_NAME",
                     "value":"my-opensearch-cluster",
+                },
+                {
+                    "name": "DATA_DIR",
+                    "value": "/stackable/log/_vector-state",
                 },
                 {
                     "name": "LOG_DIR",
