@@ -38,14 +38,14 @@ use crate::{
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
     #[snafu(display(
-        "The role group that is defined to manage the security configuration, is not specified."
+        "the role group that is defined to manage the security configuration, is not specified."
     ))]
     CheckSecurityConfigManagingRoleGroup {
         security_config_managing_role_group: RoleGroupName,
     },
 
     #[snafu(display(
-        "A TLS server SecretClass must be set if the security configuration is managed by the operator."
+        "a TLS server SecretClass must be set if the security configuration is managed by the operator."
     ))]
     CheckSecurityConfigTlsSettings {},
 
