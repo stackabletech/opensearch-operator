@@ -4,5 +4,5 @@ kind: TestStep
 timeout: 600
 commands:
   - script: >
-      envsubst < opensearch.yaml |
+      envsubst '$NAMESPACE' < 20_opensearch.yaml |
       kubectl apply -n $NAMESPACE -f -

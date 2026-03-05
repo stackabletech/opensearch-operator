@@ -16,7 +16,7 @@ spec:
             - -c
           args:
             - |
-              pip install opensearch-py==3.0.0
+              pip install opensearch-py==3.1.0
               python scripts/test.py
           env:
             # required for pip install
@@ -64,6 +64,7 @@ spec:
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+  backoffLimit: 10
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -79,7 +80,7 @@ data:
     http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
 
     client = OpenSearch(
-      hosts = [{'host': host, 'port': port}],
+      hosts=[{'host': host, 'port': port}],
       http_auth=('integrationtest', 'integrationtest'),
       http_compress=True,
       use_ssl=http_use_tls,

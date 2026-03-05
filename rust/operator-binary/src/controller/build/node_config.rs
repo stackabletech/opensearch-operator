@@ -1,15 +1,17 @@
 //! Configuration of an OpenSearch node
 
-use std::str::FromStr;
-
 use serde_json::{Value, json};
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
 };
+use tracing::warn;
 
 use super::ValidatedCluster;
 use crate::{
-    controller::OpenSearchRoleGroupConfig,
+    controller::{
+        OpenSearchRoleGroupConfig, ValidatedNodeRole,
+        build::role_group_builder::RoleGroupSecurityMode,
+    },
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
@@ -67,10 +69,24 @@ const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
 /// Defines the path for the logs
 /// OpenSearch grants the required access rights, see
-/// https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369
+/// <https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369>
 /// The permissions "write" and "delete" are required for the log file rollover.
 /// Type: string
 const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";
+
+/// If this is set to true, the OpenSearch security plugin will automatically initialize the
+/// configuration index with the files in the config directory if the index does not exist.
+/// Type: boolean
+const CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX: &str =
+    "plugins.security.allow_default_init_securityindex";
+
+/// Defines the DNs of certificates to which admin privileges should be assigned.
+/// Type: (comma-separated) list of strings
+const CONFIG_OPTION_PLUGINS_SECURITY_AUTHCZ_ADMIN_DN: &str = "plugins.security.authcz.admin_dn";
+
+/// Whether to disable the security plugin
+/// Type: boolean
+const CONFIG_OPTION_PLUGINS_SECURITY_DISABLED: &str = "plugins.security.disabled";
 
 /// Specifies a list of distinguished names (DNs) that denote the other nodes in the cluster.
 /// Type: (comma-separated) list of strings
@@ -127,6 +143,7 @@ pub struct NodeConfig {
     cluster: ValidatedCluster,
     role_group_name: RoleGroupName,
     role_group_config: OpenSearchRoleGroupConfig,
+    role_group_security_mode: RoleGroupSecurityMode,
     pub seed_nodes_service_name: ServiceName,
     cluster_domain_name: DomainName,
     headless_service_name: ServiceName,
@@ -139,6 +156,7 @@ impl NodeConfig {
         cluster: ValidatedCluster,
         role_group_name: RoleGroupName,
         role_group_config: OpenSearchRoleGroupConfig,
+        role_group_security_mode: RoleGroupSecurityMode,
         seed_nodes_service_name: ServiceName,
         cluster_domain_name: DomainName,
         headless_service_name: ServiceName,
@@ -147,6 +165,7 @@ impl NodeConfig {
             cluster,
             role_group_name,
             role_group_config,
+            role_group_security_mode,
             seed_nodes_service_name,
             cluster_domain_name,
             headless_service_name,
@@ -170,7 +189,12 @@ impl NodeConfig {
             .into_iter()
             .flatten()
         {
-            config.insert(setting.to_owned(), json!(value));
+            let old_value = config.insert(setting.to_owned(), json!(value));
+            if let Some(old_value) = old_value {
+                warn!(
+                    "configOverrides: Configuration setting {setting:?} changed from {old_value} to {value:?}."
+                );
+            }
         }
 
         // Ensure a deterministic result
@@ -217,33 +241,70 @@ impl NodeConfig {
             )),
         );
 
+        match self.role_group_security_mode {
+            RoleGroupSecurityMode::Initializing { .. } => {
+                config.insert(
+                    CONFIG_OPTION_PLUGINS_SECURITY_ALLOW_DEFAULT_INIT_SECURITYINDEX.to_owned(),
+                    json!(true),
+                );
+            }
+            RoleGroupSecurityMode::Managing { .. }
+            | RoleGroupSecurityMode::Participating { .. } => {
+                config.insert(
+                    CONFIG_OPTION_PLUGINS_SECURITY_AUTHCZ_ADMIN_DN.to_owned(),
+                    json!(self.super_admin_dn()),
+                );
+            }
+            RoleGroupSecurityMode::Disabled => {
+                config.insert(
+                    CONFIG_OPTION_PLUGINS_SECURITY_DISABLED.to_owned(),
+                    json!(true),
+                );
+            }
+        };
+
         config
+    }
+
+    /// Distinguished name (DN) of the super admin certificate
+    pub fn super_admin_dn(&self) -> String {
+        // The common name field is limited to 64 characters, see RFC 5280.
+        format!("CN=update-security-config.{}", self.cluster.uid)
     }
 
     pub fn tls_config(&self) -> serde_json::Map<String, Value> {
         let mut config = serde_json::Map::new();
+
         let opensearch_path_conf = self.opensearch_path_conf();
 
-        // TLS config for TRANSPORT port which is always enabled.
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
-            json!(true),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/internal/tls.crt")),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/internal/tls.key")),
-        );
-        config.insert(
-            CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
-            json!(format!("{opensearch_path_conf}/tls/internal/ca.crt")),
-        );
+        if self
+            .role_group_security_mode
+            .tls_internal_secret_class()
+            .is_some()
+        {
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_ENABLED.to_owned(),
+                json!(true),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMCERT_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/internal/tls.crt")),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMKEY_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/internal/tls.key")),
+            );
+            config.insert(
+                CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH.to_owned(),
+                json!(format!("{opensearch_path_conf}/tls/internal/ca.crt")),
+            );
+        }
 
-        // TLS config for HTTP port (REST API) (optional).
-        if self.cluster.tls_config.server_secret_class.is_some() {
+        if self
+            .role_group_security_mode
+            .tls_server_secret_class()
+            .is_some()
+        {
             config.insert(
                 CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED.to_owned(),
                 json!(true),
@@ -268,25 +329,6 @@ impl NodeConfig {
         }
 
         config
-    }
-
-    /// Returns `true` if TLS is enabled on the HTTP port
-    pub fn tls_on_http_port_enabled(&self) -> bool {
-        self.opensearch_config()
-            .get(CONFIG_OPTION_PLUGINS_SECURITY_SSL_HTTP_ENABLED)
-            .and_then(Self::value_as_bool)
-            == Some(true)
-    }
-
-    /// Converts the given JSON value to [`bool`] if possible
-    pub fn value_as_bool(value: &Value) -> Option<bool> {
-        value.as_bool().or(
-            // OpenSearch parses the strings "true" and "false" as boolean, see
-            // https://github.com/opensearch-project/OpenSearch/blob/3.4.0/libs/common/src/main/java/org/opensearch/common/Booleans.java#L45-L84
-            value
-                .as_str()
-                .and_then(|value| FromStr::from_str(value).ok()),
-        )
     }
 
     /// Creates environment variables for the OpenSearch configurations
@@ -333,15 +375,16 @@ impl NodeConfig {
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
-                self.role_group_config
-                    .config
-                    .node_roles
-                    .iter()
-                    .map(|node_role| format!("{node_role}"))
-                    .collect::<Vec<_>>()
-                    // Node roles cannot contain commas, therefore creating a comma-separated list
-                    // is safe.
-                    .join(","),
+                Self::to_comma_separated_list(
+                    &self
+                        .role_group_config
+                        .config
+                        .node_roles
+                        .iter()
+                        .map(|node_role| format!("{node_role}"))
+                        .collect::<Vec<_>>(),
+                )
+                .expect("Node roles cannot contain commas, therefore creating a comma-separated list is safe."),
             );
 
         if let Some(initial_cluster_manager_nodes) = self.initial_cluster_manager_nodes() {
@@ -437,13 +480,13 @@ impl NodeConfig {
                 .role_group_config
                 .config
                 .node_roles
-                .contains(&v1alpha1::NodeRole::ClusterManager)
+                .contains(&ValidatedNodeRole::ClusterManager)
         {
             None
         } else {
             let cluster_manager_configs = self
                 .cluster
-                .role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::ClusterManager);
+                .role_group_configs_filtered_by_node_role(&ValidatedNodeRole::ClusterManager);
 
             // This setting requires node names as set in NODE_NAME.
             // The node names are set to the pod names with
@@ -462,8 +505,8 @@ impl NodeConfig {
                         .map(|i| format!("{}-{i}", role_group_resource_names.stateful_set_name())),
                 );
             }
-            // Pod names cannot contain commas, therefore creating a comma-separated list is safe.
-            Some(pod_names.join(","))
+
+            Some(Self::to_comma_separated_list(&pod_names).expect("Pod names cannot contain commas, therefore creating a comma-separated list is safe."))
         }
     }
 
@@ -483,11 +526,21 @@ impl NodeConfig {
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"))
     }
+
+    fn to_comma_separated_list(values: &[String]) -> Option<String> {
+        if values.iter().any(|value| value.contains(",")) {
+            None
+        } else if values.is_empty() {
+            Some("[]".to_owned())
+        } else {
+            Some(values.join(","))
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
     use stackable_operator::{
@@ -505,13 +558,15 @@ mod tests {
 
     use super::*;
     use crate::{
-        controller::{ValidatedLogging, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1},
+        controller::{ValidatedLogging, ValidatedOpenSearchConfig, ValidatedSecurity},
+        crd::v1alpha1,
         framework::{
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                kubernetes::{
+                    ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
+                },
                 operator::{ClusterName, ProductVersion, RoleGroupName},
             },
         },
@@ -551,12 +606,13 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(vec![
-                    v1alpha1::NodeRole::ClusterManager,
-                    v1alpha1::NodeRole::Data,
-                    v1alpha1::NodeRole::Ingest,
-                    v1alpha1::NodeRole::RemoteClusterClient,
-                ]),
+                node_roles: [
+                    ValidatedNodeRole::ClusterManager,
+                    ValidatedNodeRole::Data,
+                    ValidatedNodeRole::Ingest,
+                    ValidatedNodeRole::RemoteClusterClient,
+                ]
+                .into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),
@@ -582,6 +638,30 @@ mod tests {
             product_specific_common_config: GenericProductSpecificCommonConfig::default(),
         };
 
+        let security_settings = v1alpha1::SecuritySettings {
+            config: v1alpha1::SecuritySettingsFileType {
+                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                        v1alpha1::ConfigMapKeyRef {
+                            name: ConfigMapName::from_str_unsafe("security-config"),
+                            key: ConfigMapKey::from_str_unsafe("config.yml"),
+                        },
+                    ),
+                ),
+            },
+            ..v1alpha1::SecuritySettings::default()
+        };
+        let tls_server_secret_class = SecretClassName::from_str_unsafe("tls");
+        let tls_internal_secret_class = SecretClassName::from_str_unsafe("tls");
+
+        let validated_security = ValidatedSecurity::ManagedByOperator {
+            managing_role_group: role_group_name.clone(),
+            settings: security_settings.clone(),
+            tls_server_secret_class: tls_server_secret_class.clone(),
+            tls_internal_secret_class: tls_internal_secret_class.clone(),
+        };
+
         let cluster = ValidatedCluster::new(
             ResolvedProductImage {
                 product_version: "3.4.0".to_owned(),
@@ -601,15 +681,22 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
+            validated_security,
             vec![],
             None,
         );
+
+        let role_group_security_config = RoleGroupSecurityMode::Managing {
+            settings: security_settings.clone(),
+            tls_server_secret_class: tls_server_secret_class.clone(),
+            tls_internal_secret_class: tls_internal_secret_class.clone(),
+        };
 
         NodeConfig::new(
             cluster,
             role_group_name,
             role_group_config,
+            role_group_security_config,
             ServiceName::from_str_unsafe("my-opensearch-seed-nodes"),
             DomainName::from_str("cluster.local").expect("should be a valid domain name"),
             ServiceName::from_str_unsafe("my-opensearch-cluster-default-headless"),
@@ -630,6 +717,7 @@ mod tests {
                 "network.host: \"0.0.0.0\"\n",
                 "node.attr.role-group: \"data\"\n",
                 "path.logs: \"/stackable/log/opensearch\"\n",
+                "plugins.security.authcz.admin_dn: \"CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b\"\n",
                 "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
                 "plugins.security.ssl.http.enabled: true\n",
                 "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
@@ -647,59 +735,20 @@ mod tests {
     }
 
     #[test]
-    pub fn test_tls_on_http_port_enabled() {
-        let node_config_tls_undefined = node_config(TestConfig::default());
+    pub fn test_super_admin_dn() {
+        let node_config = node_config(TestConfig::default());
 
-        let node_config_tls_enabled = node_config(TestConfig {
-            config_settings: &[("plugins.security.ssl.http.enabled", "true")],
-            ..TestConfig::default()
-        });
+        let super_admin_dn = node_config.super_admin_dn();
+        let parts: Vec<&str> = super_admin_dn.split("=").collect();
 
-        let node_config_tls_disabled = node_config(TestConfig {
-            config_settings: &[("plugins.security.ssl.http.enabled", "false")],
-            ..TestConfig::default()
-        });
-
-        assert!(node_config_tls_undefined.tls_on_http_port_enabled());
-        assert!(node_config_tls_enabled.tls_on_http_port_enabled());
-        assert!(!node_config_tls_disabled.tls_on_http_port_enabled());
-    }
-
-    #[test]
-    pub fn test_value_as_bool() {
-        // boolean
-        assert_eq!(Some(true), NodeConfig::value_as_bool(&Value::Bool(true)));
-        assert_eq!(Some(false), NodeConfig::value_as_bool(&Value::Bool(false)));
-
-        // valid strings
         assert_eq!(
-            Some(true),
-            NodeConfig::value_as_bool(&Value::String("true".to_owned()))
+            vec![
+                "CN",
+                "update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b"
+            ],
+            parts
         );
-        assert_eq!(
-            Some(false),
-            NodeConfig::value_as_bool(&Value::String("false".to_owned()))
-        );
-
-        // invalid strings
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::String("True".to_owned()))
-        );
-
-        // invalid types
-        assert_eq!(None, NodeConfig::value_as_bool(&Value::Null));
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::Number(
-                serde_json::Number::from_i128(1).expect("should be a valid number")
-            ))
-        );
-        assert_eq!(None, NodeConfig::value_as_bool(&Value::Array(vec![])));
-        assert_eq!(
-            None,
-            NodeConfig::value_as_bool(&Value::Object(serde_json::Map::new()))
-        );
+        assert!(parts[1].len() <= 64);
     }
 
     #[test]
@@ -790,6 +839,32 @@ mod tests {
         assert_eq!(
             Some("my-opensearch-cluster-nodes-default-0,my-opensearch-cluster-nodes-default-1,my-opensearch-cluster-nodes-default-2".to_owned()),
             node_config_multiple_nodes.initial_cluster_manager_nodes()
+        );
+    }
+
+    #[test]
+    pub fn test_to_comma_separated_list() {
+        assert_eq!(
+            None,
+            NodeConfig::to_comma_separated_list(&[
+                "one".to_owned(),
+                "two,three".to_owned(),
+                "four".to_owned()
+            ])
+        );
+
+        assert_eq!(
+            Some("[]".to_owned()),
+            NodeConfig::to_comma_separated_list(&[])
+        );
+
+        assert_eq!(
+            Some("one,two,three".to_owned()),
+            NodeConfig::to_comma_separated_list(&[
+                "one".to_owned(),
+                "two".to_owned(),
+                "three".to_owned()
+            ])
         );
     }
 }

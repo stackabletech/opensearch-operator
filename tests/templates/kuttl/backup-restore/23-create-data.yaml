@@ -16,7 +16,7 @@ spec:
             - -c
           args:
             - |
-              pip install opensearch-py==3.0.0
+              pip install opensearch-py==3.1.0
               python scripts/create-data.py
           env:
             # required for pip install
@@ -54,6 +54,7 @@ spec:
       securityContext:
         fsGroup: 1000
       restartPolicy: OnFailure
+  backoffLimit: 10
 ---
 apiVersion: v1
 kind: ConfigMap

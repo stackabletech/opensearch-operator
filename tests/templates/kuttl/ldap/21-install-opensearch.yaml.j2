@@ -10,8 +10,38 @@ spec:
 {% endif %}
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
-{% if lookup('env', 'VECTOR_AGGREGATOR') %}
   clusterConfig:
+    security:
+      settings:
+        config:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: opensearch-security-config
+                key: config.yml
+        internalUsers:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: opensearch-security-config
+                key: internal_users.yml
+        roles:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: opensearch-security-config
+                key: roles.yml
+        rolesMapping:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: opensearch-security-config
+                key: roles_mapping.yml
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
     vectorAggregatorConfigMapName: vector-aggregator-discovery
 {% endif %}
   nodes:
@@ -47,17 +77,3 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.allow_default_init_securityindex: "true"
-    podOverrides:
-      spec:
-        containers:
-          - name: opensearch
-            volumeMounts:
-              - name: security-config
-                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-                readOnly: true
-        volumes:
-          - name: security-config
-            secret:
-              secretName: opensearch-security-config
-              defaultMode: 0o660

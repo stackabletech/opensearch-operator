@@ -1,0 +1,101 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-opensearch
+spec:
+  template:
+    spec:
+      containers:
+        - name: test-opensearch
+          image: oci.stackable.tech/sdp/testing-tools:0.3.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.1.0
+              python scripts/test.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+          envFrom:
+            - configMapRef:
+                name: opensearch
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: test-opensearch
+        - name: tls
+          configMap:
+            name: truststore-pem
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+  backoffLimit: 10
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-opensearch
+data:
+  test.py: |
+    import os
+    from opensearchpy import OpenSearch
+
+    host = os.environ['OPENSEARCH_HOSTNAME']
+    port = os.environ['OPENSEARCH_PORT']
+    http_use_tls = os.environ['OPENSEARCH_PROTOCOL'] == 'https'
+
+    client = OpenSearch(
+      hosts=[{'host': host, 'port': port}],
+      http_compress=True,
+      use_ssl=http_use_tls,
+      verify_certs=True,
+      ca_certs='/stackable/tls/ca.crt'
+    )
+
+    # Create an index
+    index_name = 'test-index'
+
+    response = client.indices.create(index=index_name)
+
+    print(f'Creating index; {response=}')
+
+    # Add a document to the index
+    response = client.index(
+      index = index_name,
+      body = {
+        'name': 'Stackable'
+      },
+      id = 1,
+    )
+
+    print(f'Adding document; {response=}')
+
+    # Delete the index.
+    response = client.indices.delete(index=index_name)
+
+    print(f'Deleting index; {response=}')

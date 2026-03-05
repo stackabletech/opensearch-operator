@@ -36,14 +36,14 @@ spec:
         config:
           discoveryServiceExposed: true # <5>
           nodeRoles:
-            - cluster_manager
+          - cluster_manager
       data:
         config:
           discoveryServiceExposed: false # <6>
           nodeRoles:
-            - ingest
-            - data
-            - remote_cluster_client
+          - ingest
+          - data
+          - remote_cluster_client
 ----
 <1> The name of the OpenSearch cluster which is also the name of the created discovery ConfigMap.
 <2> The namespace of the cluster and the discovery ConfigMap.

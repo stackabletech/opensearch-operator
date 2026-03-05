@@ -1,0 +1,19 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 600
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch-nodes-default
+status:
+  readyReplicas: 3
+  replicas: 3
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch
+data:
+  OPENSEARCH_PROTOCOL: http

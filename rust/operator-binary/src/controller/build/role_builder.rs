@@ -67,7 +67,7 @@ impl<'a> RoleBuilder<'a> {
             .map(|(role_group_name, role_group_config)| {
                 RoleGroupBuilder::new(
                     self.resource_names.service_account_name(),
-                    self.cluster.clone(),
+                    &self.cluster,
                     role_group_name.clone(),
                     role_group_config.clone(),
                     self.context_names,
@@ -171,7 +171,7 @@ impl<'a> RoleBuilder<'a> {
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
-        let protocol = if self.cluster.tls_config.server_secret_class.is_some() {
+        let protocol = if self.cluster.is_server_tls_enabled() {
             "https"
         } else {
             "http"
@@ -336,12 +336,12 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedOpenSearchConfig,
+            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
             build::role_builder::{
                 discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
             },
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
@@ -349,7 +349,7 @@ mod tests {
                 common::Port,
                 kubernetes::{
                     ConfigMapName, Hostname, ListenerClassName, ListenerName, NamespaceName,
-                    ServiceName,
+                    SecretClassName, ServiceName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -385,12 +385,13 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(vec![
-                    v1alpha1::NodeRole::ClusterManager,
-                    v1alpha1::NodeRole::Data,
-                    v1alpha1::NodeRole::Ingest,
-                    v1alpha1::NodeRole::RemoteClusterClient,
-                ]),
+                node_roles: [
+                    ValidatedNodeRole::ClusterManager,
+                    ValidatedNodeRole::Data,
+                    ValidatedNodeRole::Ingest,
+                    ValidatedNodeRole::RemoteClusterClient,
+                ]
+                .into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: Resources::default(),
@@ -427,7 +428,11 @@ mod tests {
                 role_group_config.clone(),
             )]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
+            ValidatedSecurity::ManagedByApi {
+                settings: v1alpha1::SecuritySettings::default(),
+                tls_server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
+            },
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),

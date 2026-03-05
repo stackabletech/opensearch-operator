@@ -2,7 +2,7 @@
 
 use std::{collections::BTreeMap, str::FromStr};
 
-use snafu::{OptionExt, ResultExt, Snafu};
+use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
     crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
     shared::time::Duration,
@@ -14,8 +14,11 @@ use super::{
     ValidatedLogging, ValidatedOpenSearchConfig,
 };
 use crate::{
-    controller::{DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint},
-    crd::v1alpha1::{self},
+    controller::{
+        DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedNodeRole,
+        ValidatedNodeRoles, ValidatedSecurity,
+    },
+    crd::{NodeRoles, v1alpha1},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
@@ -34,6 +37,21 @@ use crate::{
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]
 pub enum Error {
+    #[snafu(display(
+        "the role group that is defined to manage the security configuration, is not specified."
+    ))]
+    CheckSecurityConfigManagingRoleGroup {
+        security_config_managing_role_group: RoleGroupName,
+    },
+
+    #[snafu(display(
+        "a TLS server SecretClass must be set if the security configuration is managed by the operator."
+    ))]
+    CheckSecurityConfigTlsSettings {},
+
+    #[snafu(display("node role \"coordinating_only\" not compatible with other node roles"))]
+    ConflictingNodeRoles {},
+
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {
         source: crate::framework::controller_utils::Error,
@@ -87,6 +105,12 @@ pub enum Error {
         source: stackable_operator::commons::product_image_selection::Error,
     },
 
+    #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
+    TerminationGracePeriodTooLong {
+        source: std::num::TryFromIntError,
+        duration: Duration,
+    },
+
     #[snafu(display("failed to validate the logging configuration"))]
     ValidateLoggingConfig {
         source: crate::framework::product_logging::framework::Error,
@@ -95,12 +119,6 @@ pub enum Error {
     #[snafu(display("fragment validation failure"))]
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
-    },
-
-    #[snafu(display("termination grace period is too long (got {duration}, maximum allowed is {max})", max = Duration::from_secs(i64::MAX as u64)))]
-    TerminationGracePeriodTooLong {
-        source: std::num::TryFromIntError,
-        duration: Duration,
     },
 }
 
@@ -146,6 +164,8 @@ pub fn validate(
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
 
+    let validated_security = validate_security_config(&cluster.spec)?;
+
     let validated_discovery_endpoint = validate_discovery_endpoint(
         dereferenced_objects
             .maybe_discovery_service_listener
@@ -160,7 +180,7 @@ pub fn validate(
         uid,
         cluster.spec.nodes.role_config.clone(),
         role_group_configs,
-        cluster.spec.cluster_config.tls.clone(),
+        validated_security,
         cluster.spec.cluster_config.keystore.clone(),
         validated_discovery_endpoint,
     ))
@@ -194,6 +214,8 @@ fn validate_role_group_config(
             .vector_aggregator_config_map_name,
     )?;
 
+    let node_roles = validate_node_roles(&merged_role_group.config.config.node_roles)?;
+
     let graceful_shutdown_timeout = merged_role_group.config.config.graceful_shutdown_timeout;
     let termination_grace_period_seconds = graceful_shutdown_timeout.as_secs().try_into().context(
         TerminationGracePeriodTooLongSnafu {
@@ -206,7 +228,7 @@ fn validate_role_group_config(
         discovery_service_exposed: merged_role_group.config.config.discovery_service_exposed,
         listener_class: merged_role_group.config.config.listener_class,
         logging,
-        node_roles: merged_role_group.config.config.node_roles,
+        node_roles,
         requested_secret_lifetime: merged_role_group.config.config.requested_secret_lifetime,
         resources: merged_role_group.config.config.resources,
         termination_grace_period_seconds,
@@ -261,6 +283,77 @@ fn validate_logging_configuration(
         opensearch_container,
         vector_container,
     })
+}
+
+fn validate_node_roles(node_roles: &NodeRoles) -> Result<ValidatedNodeRoles> {
+    if node_roles.0.is_empty() || node_roles.0 == vec![v1alpha1::NodeRole::CoordinatingOnly] {
+        Ok(ValidatedNodeRoles::new())
+    } else {
+        let validated_node_roles = node_roles
+            .0
+            .iter()
+            .map(|node_role| match node_role {
+                v1alpha1::NodeRole::ClusterManager => Ok(ValidatedNodeRole::ClusterManager),
+                v1alpha1::NodeRole::CoordinatingOnly => ConflictingNodeRolesSnafu.fail(),
+                v1alpha1::NodeRole::Data => Ok(ValidatedNodeRole::Data),
+                v1alpha1::NodeRole::Ingest => Ok(ValidatedNodeRole::Ingest),
+                v1alpha1::NodeRole::RemoteClusterClient => {
+                    Ok(ValidatedNodeRole::RemoteClusterClient)
+                }
+                v1alpha1::NodeRole::Warm => Ok(ValidatedNodeRole::Warm),
+                v1alpha1::NodeRole::Search => Ok(ValidatedNodeRole::Search),
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(validated_node_roles)
+    }
+}
+
+fn validate_security_config(spec: &v1alpha1::OpenSearchClusterSpec) -> Result<ValidatedSecurity> {
+    let security = if spec.cluster_config.security.enabled {
+        if spec
+            .cluster_config
+            .security
+            .settings
+            .is_only_managed_by_api()
+        {
+            ValidatedSecurity::ManagedByApi {
+                settings: spec.cluster_config.security.settings.clone(),
+                tls_server_secret_class: spec.cluster_config.tls.server_secret_class.clone(),
+                tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
+            }
+        } else {
+            let managing_role_group = spec.cluster_config.security.managing_role_group.clone();
+
+            ensure!(
+                spec.nodes
+                    .role_groups
+                    .contains_key(&managing_role_group.to_string()),
+                CheckSecurityConfigManagingRoleGroupSnafu {
+                    security_config_managing_role_group: managing_role_group
+                }
+            );
+
+            // The role group requires server TLS to communicate with the cluster.
+            let tls_server_secret_class = spec
+                .cluster_config
+                .tls
+                .server_secret_class
+                .clone()
+                .context(CheckSecurityConfigTlsSettingsSnafu)?;
+
+            ValidatedSecurity::ManagedByOperator {
+                managing_role_group,
+                settings: spec.cluster_config.security.settings.clone(),
+                tls_server_secret_class,
+                tls_internal_secret_class: spec.cluster_config.tls.internal_secret_class.clone(),
+            }
+        }
+    } else {
+        ValidatedSecurity::Disabled
+    };
+
+    Ok(security)
 }
 
 /// Return the validated discovery endpoint if a Listener is given with a status containing the
@@ -366,7 +459,7 @@ mod tests {
         built_info,
         controller::{
             ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
-            ValidatedLogging, ValidatedOpenSearchConfig,
+            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
@@ -378,8 +471,8 @@ mod tests {
             types::{
                 common::Port,
                 kubernetes::{
-                    ConfigMapName, Hostname, ListenerClassName, NamespaceName, SecretClassName,
-                    SecretKey, SecretName,
+                    ConfigMapKey, ConfigMapName, Hostname, ListenerClassName, NamespaceName,
+                    SecretClassName, SecretKey, SecretName,
                 },
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
@@ -501,15 +594,13 @@ mod tests {
                                         ConfigMapName::from_str_unsafe("vector-aggregator"),
                                 }),
                             },
-                            node_roles: NodeRoles(
-                                [
-                                    v1alpha1::NodeRole::ClusterManager,
-                                    v1alpha1::NodeRole::Ingest,
-                                    v1alpha1::NodeRole::Data,
-                                    v1alpha1::NodeRole::RemoteClusterClient
-                                ]
-                                .into()
-                            ),
+                            node_roles: [
+                                ValidatedNodeRole::ClusterManager,
+                                ValidatedNodeRole::Ingest,
+                                ValidatedNodeRole::Data,
+                                ValidatedNodeRole::RemoteClusterClient
+                            ]
+                            .into(),
                             requested_secret_lifetime: Duration::from_str("1d")
                                 .expect("should be a valid duration"),
                             resources: Resources {
@@ -597,9 +688,24 @@ mod tests {
                     }
                 )]
                 .into(),
-                v1alpha1::OpenSearchTls {
-                    server_secret_class: Some(SecretClassName::from_str_unsafe("tls")),
-                    internal_secret_class: SecretClassName::from_str_unsafe("tls")
+                ValidatedSecurity::ManagedByOperator {
+                    managing_role_group: RoleGroupName::from_str_unsafe("default"),
+                    settings: v1alpha1::SecuritySettings {
+                        config: v1alpha1::SecuritySettingsFileType {
+                            managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                            content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                                v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                                    v1alpha1::ConfigMapKeyRef {
+                                        name: ConfigMapName::from_str_unsafe("security-config"),
+                                        key: ConfigMapKey::from_str_unsafe("config.yml")
+                                    }
+                                )
+                            )
+                        },
+                        ..v1alpha1::SecuritySettings::default()
+                    },
+                    tls_server_secret_class: SecretClassName::from_str_unsafe("tls"),
+                    tls_internal_secret_class: SecretClassName::from_str_unsafe("tls")
                 },
                 vec![v1alpha1::OpenSearchKeystore {
                     key: OpenSearchKeystoreKey::from_str_unsafe("Keystore1"),
@@ -709,6 +815,30 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_err_conflicting_node_roles() {
+        test_validate_err(
+            |cluster, _| {
+                cluster
+                    .spec
+                    .nodes
+                    .role_groups
+                    .get_mut("default")
+                    .expect("should be defined in the test cluster spec")
+                    .config
+                    .config
+                    .node_roles = Some(NodeRoles(vec![
+                    v1alpha1::NodeRole::ClusterManager,
+                    v1alpha1::NodeRole::CoordinatingOnly,
+                    v1alpha1::NodeRole::Ingest,
+                    v1alpha1::NodeRole::Data,
+                    v1alpha1::NodeRole::RemoteClusterClient,
+                ]));
+            },
+            ErrorDiscriminants::ConflictingNodeRoles,
+        );
+    }
+
+    #[test]
     fn test_validate_err_termination_grace_period_too_long() {
         test_validate_err(
             |cluster, _| {
@@ -800,6 +930,34 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_validate_err_check_security_config_managing_role_group() {
+        test_validate_err(
+            |cluster, _| {
+                cluster.spec.cluster_config.security.managing_role_group =
+                    RoleGroupName::from_str_unsafe("non-existent");
+            },
+            ErrorDiscriminants::CheckSecurityConfigManagingRoleGroup,
+        );
+    }
+
+    #[test]
+    fn test_validate_err_check_security_config_tls_settings() {
+        test_validate_err(
+            |cluster, _| {
+                cluster
+                    .spec
+                    .cluster_config
+                    .security
+                    .settings
+                    .config
+                    .managed_by = v1alpha1::SecuritySettingsFileTypeManagedBy::Operator;
+                cluster.spec.cluster_config.tls.server_secret_class = None;
+            },
+            ErrorDiscriminants::CheckSecurityConfigTlsSettings,
+        );
+    }
+
     fn test_validate_err(
         change_test_objects: fn(&mut v1alpha1::OpenSearchCluster, &mut DereferencedObjects) -> (),
         expected_err: ErrorDiscriminants,
@@ -843,6 +1001,24 @@ mod tests {
                             key: SecretKey::from_str_unsafe("my-keystore-file"),
                         },
                     }],
+                    security: v1alpha1::Security {
+                        enabled: true,
+                        managing_role_group: RoleGroupName::from_str_unsafe("default"),
+                        settings: v1alpha1::SecuritySettings {
+                            config: v1alpha1::SecuritySettingsFileType {
+                                managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Operator,
+                                content: v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                                    v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                                        v1alpha1::ConfigMapKeyRef {
+                                            name: ConfigMapName::from_str_unsafe("security-config"),
+                                            key: ConfigMapKey::from_str_unsafe("config.yml")
+                                        }
+                                    )
+                                ),
+                            },
+                            ..v1alpha1::SecuritySettings::default()
+                        },
+                    },
                     vector_aggregator_config_map_name: Some(ConfigMapName::from_str_unsafe(
                         "vector-aggregator",
                     )),

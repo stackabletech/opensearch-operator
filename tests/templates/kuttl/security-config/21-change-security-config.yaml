@@ -1,0 +1,16 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  clusterConfig:
+    security:
+      settings:
+        config:
+          content:
+            value:
+              config:
+                dynamic:
+                  http:
+                    anonymous_auth_enabled: false

@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: security-config-file-internal-users
+stringData:
+  internal_users.yml: |
+    ---
+    _meta:
+      type: internalusers
+      config_version: 2
+
+    admin:
+      hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+      reserved: true
+      backend_roles:
+        - admin
+      description: OpenSearch admin user
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-config
+data:
+  roles.yml: |
+    ---
+    _meta:
+      type: roles
+      config_version: 2
+
+    monitoring:
+      reserved: true
+      cluster_permissions:
+        - cluster:monitor/main
+  roles_mapping.yml: |
+    ---
+    _meta:
+      type: rolesmapping
+      config_version: 2
+
+    all_access:
+      reserved: false
+      backend_roles:
+        - admin
+
+    monitoring:
+      backend_roles:
+        - opendistro_security_anonymous_backendrole

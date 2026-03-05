@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+DATA_DIR=/stackable/log/_vector-state \
 LOG_DIR=/stackable/log \
 OPENSEARCH_SERVER_LOG_FILE=opensearch_server.json \
 NAMESPACE=default \

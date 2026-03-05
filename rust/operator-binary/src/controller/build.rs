@@ -82,9 +82,9 @@ mod tests {
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedOpenSearchConfig,
+            ValidatedNodeRole, ValidatedNodeRoles, ValidatedOpenSearchConfig, ValidatedSecurity,
         },
-        crd::{NodeRoles, v1alpha1},
+        crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             role_utils::GenericProductSpecificCommonConfig,
@@ -190,26 +190,26 @@ mod tests {
             [
                 (
                     RoleGroupName::from_str_unsafe("coordinating"),
-                    role_group_config(5, &[v1alpha1::NodeRole::CoordinatingOnly]),
+                    role_group_config(5, []),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("cluster-manager"),
-                    role_group_config(3, &[v1alpha1::NodeRole::ClusterManager]),
+                    role_group_config(3, [ValidatedNodeRole::ClusterManager]),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("data"),
                     role_group_config(
                         8,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
             ]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
+            ValidatedSecurity::Disabled,
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),
@@ -220,7 +220,7 @@ mod tests {
 
     fn role_group_config(
         replicas: u16,
-        node_roles: &[v1alpha1::NodeRole],
+        node_roles: impl Into<ValidatedNodeRoles>,
     ) -> OpenSearchRoleGroupConfig {
         OpenSearchRoleGroupConfig {
             replicas,
@@ -234,7 +234,7 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(node_roles.to_vec()),
+                node_roles: node_roles.into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),

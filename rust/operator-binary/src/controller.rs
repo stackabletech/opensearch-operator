@@ -3,7 +3,12 @@
 //! The cluster specification is validated, Kubernetes resource specifications are created and
 //! applied and the cluster status is updated.
 
-use std::{collections::BTreeMap, marker::PhantomData, str::FromStr, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    marker::PhantomData,
+    str::FromStr,
+    sync::Arc,
+};
 
 use apply::Applier;
 use build::build;
@@ -26,19 +31,20 @@ use stackable_operator::{
     logging::controller::ReconcilerError,
     shared::time::Duration,
 };
-use strum::{EnumDiscriminants, IntoStaticStr};
+use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
 use update_status::update_status;
 use validate::validate;
 
 use crate::{
-    crd::{NodeRoles, v1alpha1},
+    controller::preprocess::preprocess,
+    crd::v1alpha1,
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
         types::{
             common::Port,
-            kubernetes::{Hostname, ListenerClassName, NamespaceName, Uid},
+            kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName, Uid},
             operator::{
                 ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                 RoleGroupName, RoleName,
@@ -50,6 +56,7 @@ use crate::{
 mod apply;
 mod build;
 mod dereference;
+mod preprocess;
 mod update_status;
 mod validate;
 
@@ -157,7 +164,7 @@ pub struct ValidatedOpenSearchConfig {
     pub discovery_service_exposed: bool,
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
-    pub node_roles: NodeRoles,
+    pub node_roles: ValidatedNodeRoles,
     pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
@@ -174,6 +181,45 @@ impl ValidatedLogging {
     pub fn is_vector_agent_enabled(&self) -> bool {
         self.vector_container.is_some()
     }
+}
+
+/// Set of validated node roles
+///
+/// An empty set specifies a coordinating only node.
+type ValidatedNodeRoles = BTreeSet<ValidatedNodeRole>;
+
+/// Validated node role
+#[derive(Clone, Copy, Debug, Display, EnumIter, Eq, PartialEq, PartialOrd, Ord)]
+#[strum(serialize_all = "snake_case")]
+pub enum ValidatedNodeRole {
+    ClusterManager,
+    Data,
+    Ingest,
+    RemoteClusterClient,
+    Search,
+    Warm,
+}
+
+/// Validated security configuration
+#[derive(Clone, Debug, PartialEq)]
+pub enum ValidatedSecurity {
+    /// At least one security setting is managed by the operator
+    ManagedByOperator {
+        managing_role_group: RoleGroupName,
+        settings: v1alpha1::SecuritySettings,
+        tls_server_secret_class: SecretClassName,
+        tls_internal_secret_class: SecretClassName,
+    },
+
+    /// All security settings are managed by the API
+    ManagedByApi {
+        settings: v1alpha1::SecuritySettings,
+        tls_server_secret_class: Option<SecretClassName>,
+        tls_internal_secret_class: SecretClassName,
+    },
+
+    /// The OpenSearch security plugin is disabled.
+    Disabled,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -200,7 +246,7 @@ pub struct ValidatedCluster {
     pub uid: Uid,
     pub role_config: v1alpha1::OpenSearchRoleConfig,
     pub role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-    pub tls_config: v1alpha1::OpenSearchTls,
+    pub security: ValidatedSecurity,
     pub keystores: Vec<v1alpha1::OpenSearchKeystore>,
     pub discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
 }
@@ -215,7 +261,7 @@ impl ValidatedCluster {
         uid: impl Into<Uid>,
         role_config: v1alpha1::OpenSearchRoleConfig,
         role_group_configs: BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig>,
-        tls_config: v1alpha1::OpenSearchTls,
+        security: ValidatedSecurity,
         keystores: Vec<v1alpha1::OpenSearchKeystore>,
         discovery_endpoint: Option<ValidatedDiscoveryEndpoint>,
     ) -> Self {
@@ -234,7 +280,7 @@ impl ValidatedCluster {
             uid,
             role_config,
             role_group_configs,
-            tls_config,
+            security,
             keystores,
             discovery_endpoint,
         }
@@ -261,13 +307,27 @@ impl ValidatedCluster {
     /// Returns all role-group configurations which contain the given node role
     pub fn role_group_configs_filtered_by_node_role(
         &self,
-        node_role: &v1alpha1::NodeRole,
+        node_role: &ValidatedNodeRole,
     ) -> BTreeMap<RoleGroupName, OpenSearchRoleGroupConfig> {
         self.role_group_configs
             .clone()
             .into_iter()
             .filter(|c| c.1.config.node_roles.contains(node_role))
             .collect()
+    }
+
+    /// Whether security is enabled and a server TLS class is defined or not.
+    pub fn is_server_tls_enabled(&self) -> bool {
+        matches!(
+            self.security,
+            ValidatedSecurity::ManagedByApi {
+                tls_server_secret_class: Some(_),
+                ..
+            } | ValidatedSecurity::ManagedByOperator {
+                tls_server_secret_class: _,
+                ..
+            }
+        )
     }
 }
 
@@ -355,10 +415,14 @@ pub fn error_policy(
 /// Reconcile function of the OpenSearchCluster controller
 ///
 /// The reconcile function performs the following steps:
-/// 1. Validate the given cluster specification and return a [`ValidatedCluster`] if successful.
-/// 2. Build Kubernetes resource specifications from the validated cluster.
-/// 3. Apply the Kubernetes resource specifications
-/// 4. Update the cluster status
+/// 1. Dereference objects which are referenced in the OpenSearchCluster.
+/// 2. Preprocess the OpenSearchCluster specification and add configurations that the user is
+///    allowed to leave out.
+/// 3. Validate the preprocessed cluster specification and the dereferenced objects and return a
+///    [`ValidatedCluster`] if successful.
+/// 4. Build Kubernetes resource specifications from the validated cluster.
+/// 5. Apply the Kubernetes resource specifications
+/// 6. Update the cluster status
 pub async fn reconcile(
     object: Arc<DeserializeGuard<v1alpha1::OpenSearchCluster>>,
     context: Arc<Context>,
@@ -369,22 +433,27 @@ pub async fn reconcile(
         .0
         .as_ref()
         .map_err(stackable_operator::kube::core::error_boundary::InvalidObject::clone)
-        .context(DeserializeClusterDefinitionSnafu)?;
+        .context(DeserializeClusterDefinitionSnafu)?
+        .clone();
 
     // dereference (client required)
-    let dereferenced_objects = dereference(&context.client, cluster)
+    let dereferenced_objects = dereference(&context.client, &cluster)
         .await
         .context(DereferenceSnafu)?;
 
+    // preprocess (no client required)
+    let preprocessed_cluster = preprocess(cluster);
+
     // validate (no client required)
-    let validated_cluster =
-        validate(&context.names, cluster, &dereferenced_objects).context(ValidateClusterSnafu)?;
+    let validated_cluster = validate(&context.names, &preprocessed_cluster, &dereferenced_objects)
+        .context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());
 
     // apply (client required)
-    let apply_strategy = ClusterResourceApplyStrategy::from(&cluster.spec.cluster_operation);
+    let apply_strategy =
+        ClusterResourceApplyStrategy::from(&preprocessed_cluster.spec.cluster_operation);
     let applied_resources = Applier::new(
         &context.client,
         &context.names,
@@ -392,7 +461,7 @@ pub async fn reconcile(
         &validated_cluster.namespace,
         &validated_cluster.uid,
         apply_strategy,
-        &cluster.spec.object_overrides,
+        &preprocessed_cluster.spec.object_overrides,
     )
     .apply(prepared_resources)
     .await
@@ -401,9 +470,14 @@ pub async fn reconcile(
     // not necessary in this controller: create discovery ConfigMap based on the applied resources (client required)
 
     // update status (client required)
-    update_status(&context.client, &context.names, cluster, applied_resources)
-        .await
-        .context(UpdateStatusSnafu)?;
+    update_status(
+        &context.client,
+        &context.names,
+        &preprocessed_cluster,
+        applied_resources,
+    )
+    .await
+    .context(UpdateStatusSnafu)?;
 
     Ok(Action::await_change())
 }
@@ -429,14 +503,17 @@ mod tests {
 
     use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
     use crate::{
-        controller::{OpenSearchNodeResources, ValidatedOpenSearchConfig},
-        crd::{NodeRoles, v1alpha1},
+        controller::{
+            OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
+            ValidatedOpenSearchConfig, ValidatedSecurity,
+        },
+        crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
             role_utils::GenericProductSpecificCommonConfig,
             types::{
-                kubernetes::{ListenerClassName, NamespaceName},
+                kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
             },
         },
@@ -481,10 +558,10 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data1"),
                     role_group_config(
                         4,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
@@ -492,15 +569,15 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data2"),
                     role_group_config(
                         6,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
             ]),
-            validated_cluster.role_group_configs_filtered_by_node_role(&v1alpha1::NodeRole::Data)
+            validated_cluster.role_group_configs_filtered_by_node_role(&ValidatedNodeRole::Data)
         );
     }
 
@@ -522,20 +599,20 @@ mod tests {
             [
                 (
                     RoleGroupName::from_str_unsafe("coordinating"),
-                    role_group_config(5, &[v1alpha1::NodeRole::CoordinatingOnly]),
+                    role_group_config(5, []),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("cluster-manager"),
-                    role_group_config(3, &[v1alpha1::NodeRole::ClusterManager]),
+                    role_group_config(3, [ValidatedNodeRole::ClusterManager]),
                 ),
                 (
                     RoleGroupName::from_str_unsafe("data1"),
                     role_group_config(
                         4,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
@@ -543,16 +620,20 @@ mod tests {
                     RoleGroupName::from_str_unsafe("data2"),
                     role_group_config(
                         6,
-                        &[
-                            v1alpha1::NodeRole::Ingest,
-                            v1alpha1::NodeRole::Data,
-                            v1alpha1::NodeRole::RemoteClusterClient,
+                        [
+                            ValidatedNodeRole::Ingest,
+                            ValidatedNodeRole::Data,
+                            ValidatedNodeRole::RemoteClusterClient,
                         ],
                     ),
                 ),
             ]
             .into(),
-            v1alpha1::OpenSearchTls::default(),
+            ValidatedSecurity::ManagedByApi {
+                settings: v1alpha1::SecuritySettings::default(),
+                tls_server_secret_class: None,
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
+            },
             vec![],
             None,
         )
@@ -560,7 +641,7 @@ mod tests {
 
     fn role_group_config(
         replicas: u16,
-        node_roles: &[v1alpha1::NodeRole],
+        node_roles: impl Into<ValidatedNodeRoles>,
     ) -> OpenSearchRoleGroupConfig {
         OpenSearchRoleGroupConfig {
             replicas,
@@ -574,7 +655,7 @@ mod tests {
                     ),
                     vector_container: None,
                 },
-                node_roles: NodeRoles(node_roles.to_vec()),
+                node_roles: node_roles.into(),
                 requested_secret_lifetime: Duration::from_str("1d")
                     .expect("should be a valid duration"),
                 resources: OpenSearchNodeResources::default(),

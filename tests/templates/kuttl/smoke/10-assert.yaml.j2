@@ -182,20 +182,61 @@ spec:
           name: listener
         - mountPath: /stackable/log
           name: log
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
-          name: tls-internal
         - mountPath: /stackable/listeners/discovery-service
           name: discovery-service-listener
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
+          name: tls-internal
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
+          subPath: tls.crt
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+          name: tls-server
+          subPath: tls.key
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
+          name: tls-server
+          subPath: ca.crt
 {% endif %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-          name: security-config
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/action_groups.yml
+          name: security-config-file-actiongroups
           readOnly: true
+          subPath: action_groups.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allowlist.yml
+          name: security-config-file-allowlist
+          readOnly: true
+          subPath: allowlist.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/audit.yml
+          name: security-config-file-audit
+          readOnly: true
+          subPath: audit.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/config.yml
+          name: security-config-file-config
+          readOnly: true
+          subPath: config.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/internal_users.yml
+          name: security-config-file-internalusers
+          readOnly: true
+          subPath: internal_users.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/nodes_dn.yml
+          name: security-config-file-nodesdn
+          readOnly: true
+          subPath: nodes_dn.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles.yml
+          name: security-config-file-roles
+          readOnly: true
+          subPath: roles.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles_mapping.yml
+          name: security-config-file-rolesmapping
+          readOnly: true
+          subPath: roles_mapping.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/tenants.yml
+          name: security-config-file-tenants
+          readOnly: true
+          subPath: tenants.yml
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
         - |-
+          mkdir --parents /stackable/log/_vector-state
           # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
           vector & vector_pid=$!
           if [ ! -f "/stackable/log/_vector/shutdown" ]; then
@@ -213,6 +254,8 @@ spec:
         env:
         - name: CLUSTER_NAME
           value: opensearch
+        - name: DATA_DIR
+          value: /stackable/log/_vector-state
         - name: LOG_DIR
           value: /stackable/log
         - name: NAMESPACE
@@ -280,7 +323,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: service=opensearch-seed-nodes,listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener,service=opensearch-seed-nodes
             spec:
               accessModes:
               - ReadWriteOnce
@@ -298,7 +341,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,listener-volume=discovery-service-listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener,listener-volume=discovery-service-listener
             spec:
               accessModes:
               - ReadWriteOnce
@@ -309,10 +352,78 @@ spec:
               volumeMode: Filesystem
         name: tls-server
 {% endif %}
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: action_groups.yml
+            mode: 432
+            path: action_groups.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-actiongroups
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: allowlist.yml
+            mode: 432
+            path: allowlist.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-allowlist
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: audit.yml
+            mode: 432
+            path: audit.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-audit
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: config.yml
+            mode: 432
+            path: config.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: internal_users.yml
+            mode: 432
+            path: internal_users.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-internalusers
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: nodes_dn.yml
+            mode: 432
+            path: nodes_dn.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-nodesdn
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: roles.yml
+            mode: 432
+            path: roles.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-roles
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: roles_mapping.yml
+            mode: 432
+            path: roles_mapping.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-rolesmapping
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: tenants.yml
+            mode: 432
+            path: tenants.yml
+          name: opensearch-nodes-cluster-manager
+        name: security-config-file-tenants
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -500,7 +611,7 @@ spec:
               apiVersion: v1
               fieldPath: metadata.name
         - name: node.roles
-          value: ingest,data,remote_cluster_client
+          value: data,ingest,remote_cluster_client
         - name: transport.publish_host
           # value: $(_POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
         imagePullPolicy: IfNotPresent
@@ -552,15 +663,56 @@ spec:
         - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal
           name: tls-internal
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
           name: tls-server
+          subPath: tls.crt
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+          name: tls-server
+          subPath: tls.key
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
+          name: tls-server
+          subPath: ca.crt
 {% endif %}
-        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-          name: security-config
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/action_groups.yml
+          name: security-config-file-actiongroups
           readOnly: true
+          subPath: action_groups.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/allowlist.yml
+          name: security-config-file-allowlist
+          readOnly: true
+          subPath: allowlist.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/audit.yml
+          name: security-config-file-audit
+          readOnly: true
+          subPath: audit.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/config.yml
+          name: security-config-file-config
+          readOnly: true
+          subPath: config.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/internal_users.yml
+          name: security-config-file-internalusers
+          readOnly: true
+          subPath: internal_users.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/nodes_dn.yml
+          name: security-config-file-nodesdn
+          readOnly: true
+          subPath: nodes_dn.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles.yml
+          name: security-config-file-roles
+          readOnly: true
+          subPath: roles.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/roles_mapping.yml
+          name: security-config-file-rolesmapping
+          readOnly: true
+          subPath: roles_mapping.yml
+        - mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security/tenants.yml
+          name: security-config-file-tenants
+          readOnly: true
+          subPath: tenants.yml
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
         - |-
+          mkdir --parents /stackable/log/_vector-state
           # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
           vector & vector_pid=$!
           if [ ! -f "/stackable/log/_vector/shutdown" ]; then
@@ -578,6 +730,8 @@ spec:
         env:
         - name: CLUSTER_NAME
           value: opensearch
+        - name: DATA_DIR
+          value: /stackable/log/_vector-state
         - name: LOG_DIR
           value: /stackable/log
         - name: NAMESPACE
@@ -645,7 +799,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
               - ReadWriteOnce
@@ -663,7 +817,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
-                secrets.stackable.tech/scope: listener-volume=listener,pod
+                secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
               - ReadWriteOnce
@@ -674,10 +828,78 @@ spec:
               volumeMode: Filesystem
         name: tls-server
 {% endif %}
-      - name: security-config
-        secret:
-          defaultMode: 0o660
-          secretName: opensearch-security-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: action_groups.yml
+            mode: 432
+            path: action_groups.yml
+          name: opensearch-nodes-data
+        name: security-config-file-actiongroups
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: allowlist.yml
+            mode: 432
+            path: allowlist.yml
+          name: opensearch-nodes-data
+        name: security-config-file-allowlist
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: audit.yml
+            mode: 432
+            path: audit.yml
+          name: opensearch-nodes-data
+        name: security-config-file-audit
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: config.yml
+            mode: 432
+            path: config.yml
+          name: opensearch-nodes-data
+        name: security-config-file-config
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: internal_users.yml
+            mode: 432
+            path: internal_users.yml
+          name: opensearch-nodes-data
+        name: security-config-file-internalusers
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: nodes_dn.yml
+            mode: 432
+            path: nodes_dn.yml
+          name: opensearch-nodes-data
+        name: security-config-file-nodesdn
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: roles.yml
+            mode: 432
+            path: roles.yml
+          name: opensearch-nodes-data
+        name: security-config-file-roles
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: roles_mapping.yml
+            mode: 432
+            path: roles_mapping.yml
+          name: opensearch-nodes-data
+        name: security-config-file-rolesmapping
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: tenants.yml
+            mode: 432
+            path: tenants.yml
+          name: opensearch-nodes-data
+        name: security-config-file-tenants
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -734,6 +956,12 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
+  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
+  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
+  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
+  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
+  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
+  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
   opensearch.yml: |-
     cluster.name: "opensearch"
     cluster.routing.allocation.disk.threshold_enabled: "false"
@@ -742,7 +970,7 @@ data:
     node.attr.role-group: "cluster-manager"
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
-    plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.allow_default_init_securityindex: true
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
@@ -756,6 +984,9 @@ data:
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
+  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
+  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
+  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -775,6 +1006,12 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
+  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
+  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
+  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
+  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
+  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
+  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
   opensearch.yml: |-
     cluster.name: "opensearch"
     cluster.routing.allocation.disk.threshold_enabled: "false"
@@ -783,7 +1020,7 @@ data:
     node.attr.role-group: "data"
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
-    plugins.security.allow_default_init_securityindex: "true"
+    plugins.security.allow_default_init_securityindex: true
     plugins.security.nodes_dn: ["CN=generated certificate for pod"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
@@ -797,6 +1034,9 @@ data:
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
+  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
+  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
+  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
 ---
 apiVersion: v1
 kind: Service

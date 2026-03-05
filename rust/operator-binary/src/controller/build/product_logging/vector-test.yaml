@@ -298,6 +298,37 @@ tests:
               }
 
               assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with DEPRECATION level
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "DEPRECATION", "component": "o.o.d.t.TransportInfo", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "transport.publish_address was printed as [ip:port] instead of [hostname/ip:port]. This format is deprecated and will change to [hostname/ip:port] in a future version. Use -Dopensearch.transport.cname_in_publish_address=true to enforce non-deprecated formatting.", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331Z
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "file": "opensearch_server.json",
+                "level": "WARN",
+                "logger": "o.o.d.t.TransportInfo",
+                "message": "transport.publish_address was printed as [ip:port] instead of [hostname/ip:port]. This format is deprecated and will change to [hostname/ip:port] in a future version. Use -Dopensearch.transport.cname_in_publish_address=true to enforce non-deprecated formatting.",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T10:47:28.582Z'
+              }
+
+              assert_eq!(expected_log_event, .)
   - name: Test opensearch_server log entry with unknown level
     inputs:
       - type: log

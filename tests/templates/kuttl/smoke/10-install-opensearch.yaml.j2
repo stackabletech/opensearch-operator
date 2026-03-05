@@ -11,6 +11,56 @@ spec:
     productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
     pullPolicy: IfNotPresent
   clusterConfig:
+    security:
+      settings:
+        config:
+          managedBy: API
+          content:
+            value:
+              _meta:
+                type: config
+                config_version: 2
+
+              config:
+                dynamic:
+                  authc:
+                    basic_internal_auth_domain:
+                      description: Authenticate via HTTP Basic against internal users database
+                      http_enabled: true
+                      transport_enabled: true
+                      order: 1
+                      http_authenticator:
+                        type: basic
+                        challenge: true
+                      authentication_backend:
+                        type: intern
+                  authz: {}
+        internalUsers:
+          managedBy: API
+          content:
+            value:
+              _meta:
+                type: internalusers
+                config_version: 2
+
+              admin:
+                hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+                reserved: true
+                backend_roles:
+                  - admin
+                description: OpenSearch admin user
+        rolesMapping:
+          managedBy: API
+          content:
+            value:
+              _meta:
+                type: rolesmapping
+                config_version: 2
+
+              all_access:
+                reserved: false
+                backend_roles:
+                  - admin
 {% if test_scenario['values']['server-use-tls'] == 'false' %}
     tls:
       serverSecretClass: null
@@ -63,17 +113,3 @@ spec:
         # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
         # not be created even if enough disk space would be available.
         cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.allow_default_init_securityindex: "true"
-    podOverrides:
-      spec:
-        containers:
-          - name: opensearch
-            volumeMounts:
-              - name: security-config
-                mountPath: {{ test_scenario['values']['opensearch_home'] }}/config/opensearch-security
-                readOnly: true
-        volumes:
-          - name: security-config
-            secret:
-              secretName: opensearch-security-config
-              defaultMode: 0o660

@@ -1,6 +1,7 @@
-use std::{slice, str::FromStr};
+use std::{array, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use stackable_operator::{
     commons::{
         affinity::{StackableAffinity, StackableAffinityFragment, affinity_between_role_pods},
@@ -23,6 +24,7 @@ use stackable_operator::{
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
+    utils::crds::raw_object_schema,
     versioned::versioned,
 };
 use strum::{Display, EnumIter};
@@ -34,10 +36,10 @@ use crate::{
         role_utils::GenericProductSpecificCommonConfig,
         types::{
             kubernetes::{
-                ConfigMapName, ContainerName, ListenerClassName, SecretClassName, SecretKey,
-                SecretName,
+                ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName, SecretClassName,
+                SecretKey, SecretName,
             },
-            operator::{ClusterName, ProductName, RoleName},
+            operator::{ClusterName, ProductName, RoleGroupName, RoleName},
         },
     },
 };
@@ -57,6 +59,7 @@ constant!(TLS_DEFAULT_SECRET_CLASS: SecretClassName = "tls");
     )
 )]
 pub mod versioned {
+
     /// An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for
     /// OpenSearch. Find more information on how to use it and the resources that the operator
     /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
@@ -101,7 +104,13 @@ pub mod versioned {
         #[serde(default)]
         pub keystore: Vec<OpenSearchKeystore>,
 
+        /// Configuration of the OpenSearch security plugin
+        #[serde(default)]
+        pub security: Security,
+
         /// TLS configuration options for the server (REST API) and internal communication (transport).
+        ///
+        /// This configuration is only effective if the OpenSearch security plugin is not disabled.
         #[serde(default)]
         pub tls: OpenSearchTls,
 
@@ -123,10 +132,172 @@ pub mod versioned {
         pub secret_key_ref: SecretKeyRef,
     }
 
+    /// Configuration of the OpenSearch security plugin
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct Security {
+        /// Whether to enable the OpenSearch security plugin
+        ///
+        /// Disabling the security plugin also disables TLS and exposes the security index if it
+        /// exists.
+        #[serde(default = "security_config_enabled_default")]
+        pub enabled: bool,
+
+        /// The role group that updates the security index if any setting is managed by the operator.
+        #[serde(default = "security_config_managing_role_group_default")]
+        pub managing_role_group: RoleGroupName,
+
+        /// Settings for the OpenSearch security plugin
+        #[serde(default)]
+        pub settings: SecuritySettings,
+    }
+
+    /// Configuration files of the OpenSearch security plugin
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SecuritySettings {
+        /// User-defined action groups
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml>
+        #[serde(default = "security_settings_file_type_default_actiongroups")]
+        pub action_groups: SecuritySettingsFileType,
+
+        /// List of allowed HTTP endpoints
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml>
+        #[serde(default = "security_settings_file_type_default_allowlist")]
+        pub allow_list: SecuritySettingsFileType,
+
+        /// Settings for audit logging
+        ///
+        /// see
+        /// <https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml>
+        #[serde(default = "security_settings_file_type_default_audit")]
+        pub audit: SecuritySettingsFileType,
+
+        /// Configuration of the security backend
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/configuration/>
+        #[serde(default = "security_settings_file_type_default_config")]
+        pub config: SecuritySettingsFileType,
+
+        /// The internal user database
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml>
+        #[serde(default = "security_settings_file_type_default_internalusers")]
+        pub internal_users: SecuritySettingsFileType,
+
+        /// Distinguished names (DNs) of nodes to allow communication between nodes and clusters
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml>
+        #[serde(default = "security_settings_file_type_default_nodesdn")]
+        pub nodes_dn: SecuritySettingsFileType,
+
+        /// Definition of roles in the security plugin
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml>
+        #[serde(default = "security_settings_file_type_default_roles")]
+        pub roles: SecuritySettingsFileType,
+
+        /// Role mappings to users or backend roles
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml>
+        #[serde(default = "security_settings_file_type_default_rolesmapping")]
+        pub roles_mapping: SecuritySettingsFileType,
+
+        /// OpenSearch Dashboards tenants
+        ///
+        /// see <https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml>
+        #[serde(default = "security_settings_file_type_default_tenants")]
+        pub tenants: SecuritySettingsFileType,
+    }
+
+    /// Specific configuration file of the OpenSearch security plugin
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SecuritySettingsFileType {
+        /// Whether this configuration should only be applied initially and afterwards be managed
+        /// via the "API", or managed all the time by the "operator".
+        ///
+        /// If this configuration is changed later from "API" to "operator", then the changes made
+        /// via the API are overridden.
+        // There is no default, so that the user is aware of this choice.
+        pub managed_by: SecuritySettingsFileTypeManagedBy,
+
+        /// The content of the security configuration file
+        pub content: SecuritySettingsFileTypeContent,
+    }
+
+    /// Responsibility for initializing and updating the security configuration
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Display,
+        EnumIter,
+        Eq,
+        JsonSchema,
+        Ord,
+        PartialEq,
+        PartialOrd,
+        Serialize,
+    )]
+    pub enum SecuritySettingsFileTypeManagedBy {
+        /// Only initially applied by the operator, but afterwards managed via the API.
+        #[serde(rename = "API")]
+        Api,
+
+        /// Managed by the operator; Changes made via the API will be eventually overridden.
+        #[serde(rename = "operator")]
+        Operator,
+    }
+
+    /// Content of the security configuration file
+    #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum SecuritySettingsFileTypeContent {
+        /// Security configuration file content defined inline
+        Value(SecuritySettingsFileTypeContentValue),
+
+        /// Security configuration file content ingested from a ConfigMap or Secret
+        ValueFrom(SecuritySettingsFileTypeContentValueFrom),
+    }
+
+    /// Security configuration file content defined inline
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    pub struct SecuritySettingsFileTypeContentValue {
+        #[serde(flatten)]
+        #[schemars(schema_with = "raw_object_schema")]
+        value: serde_json::Value,
+    }
+
+    /// Security configuration file content ingested from a ConfigMap or Secret
+    #[derive(Clone, Debug, Deserialize, Display, Eq, JsonSchema, PartialEq, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum SecuritySettingsFileTypeContentValueFrom {
+        /// Reference to a key in a ConfigMap
+        ConfigMapKeyRef(ConfigMapKeyRef),
+
+        /// Reference to a key in a Secret
+        SecretKeyRef(SecretKeyRef),
+    }
+
+    /// Reference to a key in a ConfigMap
+    #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
+    pub struct ConfigMapKeyRef {
+        /// Name of the ConfigMap
+        pub name: ConfigMapName,
+
+        /// Key in the ConfigMap that contains the value
+        pub key: ConfigMapKey,
+    }
+
+    /// Reference to a key in a Secret
     #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
     pub struct SecretKeyRef {
         /// Name of the Secret
         pub name: SecretName,
+
         /// Key in the Secret that contains the value
         pub key: SecretKey,
     }
@@ -266,6 +437,12 @@ pub mod versioned {
         #[serde(rename = "vector")]
         Vector,
 
+        #[serde(rename = "create-admin-certificate")]
+        CreateAdminCertificate,
+
+        #[serde(rename = "update-security-config")]
+        UpdateSecurityConfig,
+
         #[serde(rename = "init-keystore")]
         InitKeystore,
     }
@@ -391,6 +568,230 @@ impl v1alpha1::OpenSearchConfig {
     }
 }
 
+impl Default for v1alpha1::Security {
+    fn default() -> Self {
+        Self {
+            enabled: security_config_enabled_default(),
+            managing_role_group: security_config_managing_role_group_default(),
+            settings: v1alpha1::SecuritySettings::default(),
+        }
+    }
+}
+
+impl v1alpha1::SecuritySettings {
+    pub fn is_only_managed_by_api(&self) -> bool {
+        self.into_iter()
+            .all(|config| *config.managed_by == v1alpha1::SecuritySettingsFileTypeManagedBy::Api)
+    }
+}
+
+impl Default for v1alpha1::SecuritySettings {
+    fn default() -> Self {
+        Self {
+            action_groups: security_settings_file_type_default_actiongroups(),
+            allow_list: security_settings_file_type_default_allowlist(),
+            audit: security_settings_file_type_default_audit(),
+            config: security_settings_file_type_default_config(),
+            internal_users: security_settings_file_type_default_internalusers(),
+            nodes_dn: security_settings_file_type_default_nodesdn(),
+            roles_mapping: security_settings_file_type_default_rolesmapping(),
+            roles: security_settings_file_type_default_roles(),
+            tenants: security_settings_file_type_default_tenants(),
+        }
+    }
+}
+
+/// [`v1alpha1::SecuritySettingsFileType`] extended with ID and filename
+pub struct ExtendedSecuritySettingsFileType<'a> {
+    /// The ID of the file type as set in the `_meta.type` field; can be used to construct
+    /// volume names
+    pub id: &'static str,
+
+    /// The file name as expected by the OpenSearch security plugin
+    pub filename: &'static str,
+
+    pub managed_by: &'a v1alpha1::SecuritySettingsFileTypeManagedBy,
+
+    pub content: &'a v1alpha1::SecuritySettingsFileTypeContent,
+}
+
+impl<'a> IntoIterator for &'a v1alpha1::SecuritySettings {
+    type IntoIter = array::IntoIter<Self::Item, 9>;
+    type Item = ExtendedSecuritySettingsFileType<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIterator::into_iter([
+            ExtendedSecuritySettingsFileType {
+                id: "actiongroups",
+                filename: "action_groups.yml",
+                managed_by: &self.action_groups.managed_by,
+                content: &self.action_groups.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "allowlist",
+                filename: "allowlist.yml",
+                managed_by: &self.allow_list.managed_by,
+                content: &self.allow_list.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "audit",
+                filename: "audit.yml",
+                managed_by: &self.audit.managed_by,
+                content: &self.audit.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "config",
+                filename: "config.yml",
+                managed_by: &self.config.managed_by,
+                content: &self.config.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "internalusers",
+                filename: "internal_users.yml",
+                managed_by: &self.internal_users.managed_by,
+                content: &self.internal_users.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "nodesdn",
+                filename: "nodes_dn.yml",
+                managed_by: &self.nodes_dn.managed_by,
+                content: &self.nodes_dn.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "roles",
+                filename: "roles.yml",
+                managed_by: &self.roles.managed_by,
+                content: &self.roles.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "rolesmapping",
+                filename: "roles_mapping.yml",
+                managed_by: &self.roles_mapping.managed_by,
+                content: &self.roles_mapping.content,
+            },
+            ExtendedSecuritySettingsFileType {
+                id: "tenants",
+                filename: "tenants.yml",
+                managed_by: &self.tenants.managed_by,
+                content: &self.tenants.content,
+            },
+        ])
+    }
+}
+
+fn security_config_enabled_default() -> bool {
+    true
+}
+
+fn security_config_managing_role_group_default() -> RoleGroupName {
+    RoleGroupName::from_str("security-config").expect("should be a valid role group name")
+}
+
+fn security_settings_file_type_default_actiongroups() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "actiongroups",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default_allowlist() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "allowlist",
+        "config_version": 2
+      },
+      "config": {
+        "enabled": false
+      }
+    }))
+}
+
+fn security_settings_file_type_default_audit() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "audit",
+        "config_version": 2
+      },
+      "config": {
+        "enabled": false
+      }
+    }))
+}
+
+fn security_settings_file_type_default_config() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "config",
+        "config_version": 2
+      },
+      "config": {
+        "dynamic": {
+          "http": {},
+          "authc": {},
+          "authz": {}
+        }
+      }
+    }))
+}
+
+fn security_settings_file_type_default_internalusers() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "internalusers",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default_nodesdn() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "nodesdn",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default_roles() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "roles",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default_rolesmapping() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "rolesmapping",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default_tenants() -> v1alpha1::SecuritySettingsFileType {
+    security_settings_file_type_default(json!({
+      "_meta": {
+        "type": "tenants",
+        "config_version": 2
+      }
+    }))
+}
+
+fn security_settings_file_type_default(
+    value: serde_json::Value,
+) -> v1alpha1::SecuritySettingsFileType {
+    v1alpha1::SecuritySettingsFileType {
+        managed_by: v1alpha1::SecuritySettingsFileTypeManagedBy::Api,
+        content: v1alpha1::SecuritySettingsFileTypeContent::Value(
+            v1alpha1::SecuritySettingsFileTypeContentValue { value },
+        ),
+    }
+}
+
 impl Default for v1alpha1::OpenSearchTls {
     fn default() -> Self {
         v1alpha1::OpenSearchTls {
@@ -424,16 +825,6 @@ fn discovery_service_listener_class_default() -> ListenerClassName {
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct NodeRoles(pub Vec<v1alpha1::NodeRole>);
 
-impl NodeRoles {
-    pub fn contains(&self, node_role: &v1alpha1::NodeRole) -> bool {
-        self.0.contains(node_role)
-    }
-
-    pub fn iter(&self) -> slice::Iter<'_, v1alpha1::NodeRole> {
-        self.0.iter()
-    }
-}
-
 impl Atomic for NodeRoles {}
 
 impl v1alpha1::Container {
@@ -445,6 +836,8 @@ impl v1alpha1::Container {
         ContainerName::from_str(match self {
             v1alpha1::Container::OpenSearch => "opensearch",
             v1alpha1::Container::Vector => "vector",
+            v1alpha1::Container::CreateAdminCertificate => "create-admin-certificate",
+            v1alpha1::Container::UpdateSecurityConfig => "update-security-config",
             v1alpha1::Container::InitKeystore => "init-keystore",
         })
         .expect("should be a valid container name")
@@ -464,7 +857,7 @@ attributed_string_type! {
 mod tests {
     use strum::IntoEnumIterator;
 
-    use crate::crd::v1alpha1;
+    use crate::crd::{security_config_managing_role_group_default, v1alpha1};
 
     #[test]
     fn test_node_role() {
@@ -493,5 +886,11 @@ mod tests {
             // Test that the function does not panic
             container.to_container_name();
         }
+    }
+
+    #[test]
+    fn test_security_config_managing_role_group_default() {
+        // Test that the function does not panic
+        security_config_managing_role_group_default();
     }
 }

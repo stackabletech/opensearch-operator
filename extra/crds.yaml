@@ -29,6 +29,82 @@ spec:
               clusterConfig:
                 default:
                   keystore: []
+                  security:
+                    enabled: true
+                    managingRoleGroup: security-config
+                    settings:
+                      actionGroups:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: actiongroups
+                        managedBy: API
+                      allowList:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: allowlist
+                            config:
+                              enabled: false
+                        managedBy: API
+                      audit:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: audit
+                            config:
+                              enabled: false
+                        managedBy: API
+                      config:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: config
+                            config:
+                              dynamic:
+                                authc: {}
+                                authz: {}
+                                http: {}
+                        managedBy: API
+                      internalUsers:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: internalusers
+                        managedBy: API
+                      nodesDn:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: nodesdn
+                        managedBy: API
+                      roles:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: roles
+                        managedBy: API
+                      rolesMapping:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: rolesmapping
+                        managedBy: API
+                      tenants:
+                        content:
+                          value:
+                            _meta:
+                              config_version: 2
+                              type: tenants
+                        managedBy: API
                   tls:
                     internalSecretClass: tls
                     serverSecretClass: tls
@@ -68,11 +144,987 @@ spec:
                       - secretKeyRef
                       type: object
                     type: array
+                  security:
+                    default:
+                      enabled: true
+                      managingRoleGroup: security-config
+                      settings:
+                        actionGroups:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: actiongroups
+                          managedBy: API
+                        allowList:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: allowlist
+                              config:
+                                enabled: false
+                          managedBy: API
+                        audit:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: audit
+                              config:
+                                enabled: false
+                          managedBy: API
+                        config:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: config
+                              config:
+                                dynamic:
+                                  authc: {}
+                                  authz: {}
+                                  http: {}
+                          managedBy: API
+                        internalUsers:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: internalusers
+                          managedBy: API
+                        nodesDn:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: nodesdn
+                          managedBy: API
+                        roles:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: roles
+                          managedBy: API
+                        rolesMapping:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: rolesmapping
+                          managedBy: API
+                        tenants:
+                          content:
+                            value:
+                              _meta:
+                                config_version: 2
+                                type: tenants
+                          managedBy: API
+                    description: Configuration of the OpenSearch security plugin
+                    properties:
+                      enabled:
+                        default: true
+                        description: |-
+                          Whether to enable the OpenSearch security plugin
+
+                          Disabling the security plugin also disables TLS and exposes the security index if it
+                          exists.
+                        type: boolean
+                      managingRoleGroup:
+                        default: security-config
+                        description: The role group that updates the security index if any setting is managed by the operator.
+                        maxLength: 16
+                        minLength: 1
+                        type: string
+                      settings:
+                        default:
+                          actionGroups:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: actiongroups
+                            managedBy: API
+                          allowList:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: allowlist
+                                config:
+                                  enabled: false
+                            managedBy: API
+                          audit:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: audit
+                                config:
+                                  enabled: false
+                            managedBy: API
+                          config:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: config
+                                config:
+                                  dynamic:
+                                    authc: {}
+                                    authz: {}
+                                    http: {}
+                            managedBy: API
+                          internalUsers:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: internalusers
+                            managedBy: API
+                          nodesDn:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: nodesdn
+                            managedBy: API
+                          roles:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: roles
+                            managedBy: API
+                          rolesMapping:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: rolesmapping
+                            managedBy: API
+                          tenants:
+                            content:
+                              value:
+                                _meta:
+                                  config_version: 2
+                                  type: tenants
+                            managedBy: API
+                        description: Settings for the OpenSearch security plugin
+                        properties:
+                          actionGroups:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: actiongroups
+                              managedBy: API
+                            description: |-
+                              User-defined action groups
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#action_groupsyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          allowList:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: allowlist
+                                  config:
+                                    enabled: false
+                              managedBy: API
+                            description: |-
+                              List of allowed HTTP endpoints
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#allowlistyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          audit:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: audit
+                                  config:
+                                    enabled: false
+                              managedBy: API
+                            description: |-
+                              Settings for audit logging
+
+                              see
+                              <https://docs.opensearch.org/latest/security/audit-logs/index/#settings-in-audityml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          config:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: config
+                                  config:
+                                    dynamic:
+                                      authc: {}
+                                      authz: {}
+                                      http: {}
+                              managedBy: API
+                            description: |-
+                              Configuration of the security backend
+
+                              see <https://docs.opensearch.org/latest/security/configuration/configuration/>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          internalUsers:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: internalusers
+                              managedBy: API
+                            description: |-
+                              The internal user database
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#internal_usersyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          nodesDn:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: nodesdn
+                              managedBy: API
+                            description: |-
+                              Distinguished names (DNs) of nodes to allow communication between nodes and clusters
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#nodes_dnyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          roles:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: roles
+                              managedBy: API
+                            description: |-
+                              Definition of roles in the security plugin
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#rolesyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          rolesMapping:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: rolesmapping
+                              managedBy: API
+                            description: |-
+                              Role mappings to users or backend roles
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#roles_mappingyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                          tenants:
+                            default:
+                              content:
+                                value:
+                                  _meta:
+                                    config_version: 2
+                                    type: tenants
+                              managedBy: API
+                            description: |-
+                              OpenSearch Dashboards tenants
+
+                              see <https://docs.opensearch.org/latest/security/configuration/yaml/#tenantsyml>
+                            properties:
+                              content:
+                                description: The content of the security configuration file
+                                oneOf:
+                                - required:
+                                  - value
+                                - required:
+                                  - valueFrom
+                                properties:
+                                  value:
+                                    description: Security configuration file content defined inline
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                  valueFrom:
+                                    description: Security configuration file content ingested from a ConfigMap or Secret
+                                    oneOf:
+                                    - required:
+                                      - configMapKeyRef
+                                    - required:
+                                      - secretKeyRef
+                                    properties:
+                                      configMapKeyRef:
+                                        description: Reference to a key in a ConfigMap
+                                        properties:
+                                          key:
+                                            description: Key in the ConfigMap that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the ConfigMap
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                      secretKeyRef:
+                                        description: Reference to a key in a Secret
+                                        properties:
+                                          key:
+                                            description: Key in the Secret that contains the value
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[-._a-zA-Z0-9]+$
+                                            type: string
+                                          name:
+                                            description: Name of the Secret
+                                            maxLength: 253
+                                            minLength: 1
+                                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                            type: string
+                                        required:
+                                        - key
+                                        - name
+                                        type: object
+                                    type: object
+                                type: object
+                              managedBy:
+                                description: |-
+                                  Whether this configuration should only be applied initially and afterwards be managed
+                                  via the "API", or managed all the time by the "operator".
+
+                                  If this configuration is changed later from "API" to "operator", then the changes made
+                                  via the API are overridden.
+                                enum:
+                                - API
+                                - operator
+                                type: string
+                            required:
+                            - content
+                            - managedBy
+                            type: object
+                        type: object
+                    type: object
                   tls:
                     default:
                       internalSecretClass: tls
                       serverSecretClass: tls
-                    description: TLS configuration options for the server (REST API) and internal communication (transport).
+                    description: |-
+                      TLS configuration options for the server (REST API) and internal communication (transport).
+
+                      This configuration is only effective if the OpenSearch security plugin is not disabled.
                     properties:
                       internalSecretClass:
                         default: tls
@@ -273,6 +1325,86 @@ spec:
                           containers:
                             description: Log configuration per container.
                             properties:
+                              create-admin-certificate:
+                                anyOf:
+                                - required:
+                                  - custom
+                                - {}
+                                - {}
+                                description: Log configuration of the container
+                                properties:
+                                  console:
+                                    description: Configuration for the console appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  custom:
+                                    description: Custom log configuration provided in a ConfigMap
+                                    properties:
+                                      configMap:
+                                        description: ConfigMap containing the log configuration files
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  file:
+                                    description: Configuration for the file appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  loggers:
+                                    additionalProperties:
+                                      description: Configuration of a logger
+                                      properties:
+                                        level:
+                                          description: |-
+                                            The log level threshold.
+                                            Log events with a lower log level are discarded.
+                                          enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                          - null
+                                          nullable: true
+                                          type: string
+                                      type: object
+                                    default: {}
+                                    description: Configuration per logger
+                                    type: object
+                                type: object
                               init-keystore:
                                 anyOf:
                                 - required:
@@ -354,6 +1486,86 @@ spec:
                                     type: object
                                 type: object
                               opensearch:
+                                anyOf:
+                                - required:
+                                  - custom
+                                - {}
+                                - {}
+                                description: Log configuration of the container
+                                properties:
+                                  console:
+                                    description: Configuration for the console appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  custom:
+                                    description: Custom log configuration provided in a ConfigMap
+                                    properties:
+                                      configMap:
+                                        description: ConfigMap containing the log configuration files
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  file:
+                                    description: Configuration for the file appender
+                                    nullable: true
+                                    properties:
+                                      level:
+                                        description: |-
+                                          The log level threshold.
+                                          Log events with a lower log level are discarded.
+                                        enum:
+                                        - TRACE
+                                        - DEBUG
+                                        - INFO
+                                        - WARN
+                                        - ERROR
+                                        - FATAL
+                                        - NONE
+                                        - null
+                                        nullable: true
+                                        type: string
+                                    type: object
+                                  loggers:
+                                    additionalProperties:
+                                      description: Configuration of a logger
+                                      properties:
+                                        level:
+                                          description: |-
+                                            The log level threshold.
+                                            Log events with a lower log level are discarded.
+                                          enum:
+                                          - TRACE
+                                          - DEBUG
+                                          - INFO
+                                          - WARN
+                                          - ERROR
+                                          - FATAL
+                                          - NONE
+                                          - null
+                                          nullable: true
+                                          type: string
+                                      type: object
+                                    default: {}
+                                    description: Configuration per logger
+                                    type: object
+                                type: object
+                              update-security-config:
                                 anyOf:
                                 - required:
                                   - custom
@@ -804,6 +2016,86 @@ spec:
                                 containers:
                                   description: Log configuration per container.
                                   properties:
+                                    create-admin-certificate:
+                                      anyOf:
+                                      - required:
+                                        - custom
+                                      - {}
+                                      - {}
+                                      description: Log configuration of the container
+                                      properties:
+                                        console:
+                                          description: Configuration for the console appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        custom:
+                                          description: Custom log configuration provided in a ConfigMap
+                                          properties:
+                                            configMap:
+                                              description: ConfigMap containing the log configuration files
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        file:
+                                          description: Configuration for the file appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        loggers:
+                                          additionalProperties:
+                                            description: Configuration of a logger
+                                            properties:
+                                              level:
+                                                description: |-
+                                                  The log level threshold.
+                                                  Log events with a lower log level are discarded.
+                                                enum:
+                                                - TRACE
+                                                - DEBUG
+                                                - INFO
+                                                - WARN
+                                                - ERROR
+                                                - FATAL
+                                                - NONE
+                                                - null
+                                                nullable: true
+                                                type: string
+                                            type: object
+                                          default: {}
+                                          description: Configuration per logger
+                                          type: object
+                                      type: object
                                     init-keystore:
                                       anyOf:
                                       - required:
@@ -885,6 +2177,86 @@ spec:
                                           type: object
                                       type: object
                                     opensearch:
+                                      anyOf:
+                                      - required:
+                                        - custom
+                                      - {}
+                                      - {}
+                                      description: Log configuration of the container
+                                      properties:
+                                        console:
+                                          description: Configuration for the console appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        custom:
+                                          description: Custom log configuration provided in a ConfigMap
+                                          properties:
+                                            configMap:
+                                              description: ConfigMap containing the log configuration files
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        file:
+                                          description: Configuration for the file appender
+                                          nullable: true
+                                          properties:
+                                            level:
+                                              description: |-
+                                                The log level threshold.
+                                                Log events with a lower log level are discarded.
+                                              enum:
+                                              - TRACE
+                                              - DEBUG
+                                              - INFO
+                                              - WARN
+                                              - ERROR
+                                              - FATAL
+                                              - NONE
+                                              - null
+                                              nullable: true
+                                              type: string
+                                          type: object
+                                        loggers:
+                                          additionalProperties:
+                                            description: Configuration of a logger
+                                            properties:
+                                              level:
+                                                description: |-
+                                                  The log level threshold.
+                                                  Log events with a lower log level are discarded.
+                                                enum:
+                                                - TRACE
+                                                - DEBUG
+                                                - INFO
+                                                - WARN
+                                                - ERROR
+                                                - FATAL
+                                                - NONE
+                                                - null
+                                                nullable: true
+                                                type: string
+                                            type: object
+                                          default: {}
+                                          description: Configuration per logger
+                                          type: object
+                                      type: object
+                                    update-security-config:
                                       anyOf:
                                       - required:
                                         - custom
