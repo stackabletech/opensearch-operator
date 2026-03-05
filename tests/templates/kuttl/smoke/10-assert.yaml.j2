@@ -236,6 +236,7 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
         - |-
+          mkdir --parents /stackable/log/_vector-state
           # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
           vector & vector_pid=$!
           if [ ! -f "/stackable/log/_vector/shutdown" ]; then
@@ -253,6 +254,8 @@ spec:
         env:
         - name: CLUSTER_NAME
           value: opensearch
+        - name: DATA_DIR
+          value: /stackable/log/_vector-state
         - name: LOG_DIR
           value: /stackable/log
         - name: NAMESPACE
@@ -709,6 +712,7 @@ spec:
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
       - args:
         - |-
+          mkdir --parents /stackable/log/_vector-state
           # Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file
           vector & vector_pid=$!
           if [ ! -f "/stackable/log/_vector/shutdown" ]; then
@@ -726,6 +730,8 @@ spec:
         env:
         - name: CLUSTER_NAME
           value: opensearch
+        - name: DATA_DIR
+          value: /stackable/log/_vector-state
         - name: LOG_DIR
           value: /stackable/log
         - name: NAMESPACE
