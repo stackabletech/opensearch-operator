@@ -31,7 +31,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.106.2, strum to 0.28, and snafu to 0.9 ([#120]).
+- Bump stackable-operator to 0.108.0, strum to 0.28, and snafu to 0.9 ([#120], [#122]).
 - Gracefully shutdown all concurrent tasks by forwarding the SIGTERM signal ([#110]).
 - Bump testing-tools to `0.3.0-stackable0.0.0-dev` ([#91]).
 
@@ -53,6 +53,7 @@ All notable changes to this project will be documented in this file.
 [#114]: https://github.com/stackabletech/opensearch-operator/pull/114
 [#117]: https://github.com/stackabletech/opensearch-operator/pull/117
 [#120]: https://github.com/stackabletech/opensearch-operator/pull/120
+[#122]: https://github.com/stackabletech/opensearch-operator/pull/122
 
 ## [25.11.0] - 2025-11-07
 
