@@ -38,6 +38,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Log file rollover fixed ([#107]).
+- Fix "404 page not found" error for the initial object list ([#122]).
 
 [#55]: https://github.com/stackabletech/opensearch-operator/pull/55
 [#63]: https://github.com/stackabletech/opensearch-operator/pull/63
