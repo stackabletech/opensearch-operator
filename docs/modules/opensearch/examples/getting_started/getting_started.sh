@@ -146,7 +146,7 @@ helm install opensearch-dashboards opensearch-dashboards \
     --wait
 # end::opensearch-dashboards[]
 
-echo "Starting port-forwarding of port 5601"
+echo "Starting port-forwarding of port 5601 (press Ctrl+C to exit early)"
 # tag::opensearch-dashboards-port-forwarding[]
 kubectl port-forward services/opensearch-dashboards 5601 > /dev/null 2>&1 &
 # end::opensearch-dashboards-port-forwarding[]
