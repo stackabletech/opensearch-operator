@@ -2812,6 +2812,8 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1d4bced6a69f90b2056c03dcff2c4737f98d6fb9e0853493996e1d253ca29c6"
 dependencies = [
+ "futures-core",
+ "pin-project",
  "snafu-derive 0.9.0",
 ]
 

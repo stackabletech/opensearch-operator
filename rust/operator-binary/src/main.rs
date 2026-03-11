@@ -7,7 +7,7 @@ use clap::Parser as _;
 use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
 use framework::types::operator::OperatorName;
 use futures::{FutureExt, StreamExt};
-use snafu::{ResultExt as _, Snafu};
+use snafu::{ResultExt as _, Snafu, futures::TryFutureExt};
 use stackable_operator::{
     YamlSchema as _,
     cli::{Command, RunArguments},
@@ -20,6 +20,7 @@ use stackable_operator::{
         rbac::v1::RoleBinding,
     },
     kube::{
+        CustomResourceExt as _,
         core::DeserializeGuard,
         runtime::{
             Controller,
@@ -30,7 +31,7 @@ use stackable_operator::{
     logging::controller::report_controller_reconciled,
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
-    utils::signal::SignalWatcher,
+    utils::signal::{self, SignalWatcher},
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -82,13 +83,15 @@ pub enum Error {
     #[snafu(display("failed to create webhook server"))]
     CreateWebhook { source: webhooks::conversion::Error },
 
-    // No context selector is being generated here so that we can run the webhook
-    // as is, without the need to map the error to this variant. The ? operator
-    // used after the futures::try_join function automatically converts the
-    // underlying error to this variant.
-    #[snafu(display("failed to run webhook server"), context(false))]
+    #[snafu(display("failed to run webhook server"))]
     RunWebhook {
         source: stackable_operator::webhook::WebhookServerError,
+    },
+
+    #[snafu(display("failed to establish if CRD {crd_name:?} is available"))]
+    EstablishCrd {
+        crd_name: String,
+        source: stackable_operator::utils::signal::CrdEstablishedError,
     },
 }
 
@@ -159,7 +162,9 @@ async fn main() -> Result<()> {
             .await
             .context(CreateWebhookSnafu)?;
 
-            let webhook_server = webhook_server.run(sigterm_watcher.handle());
+            let webhook_server = webhook_server
+                .run(sigterm_watcher.handle())
+                .context(RunWebhookSnafu);
 
             let controller_context = controller::Context::new(client.clone(), operator_name);
             let full_controller_name = controller_context.full_controller_name();
@@ -229,7 +234,15 @@ async fn main() -> Result<()> {
             )
             .map(Ok);
 
-            futures::try_join!(controller, eos_checker, webhook_server)?;
+            let delayed_controller = async {
+                let crd_name = v1alpha1::OpenSearchCluster::crd_name();
+                signal::crd_established(&client, crd_name, None)
+                    .await
+                    .context(EstablishCrdSnafu { crd_name })?;
+                controller.await
+            };
+
+            futures::try_join!(delayed_controller, eos_checker, webhook_server)?;
         }
     }
 
