@@ -17,6 +17,9 @@ then
   exit 1
 fi
 
+echo "Waiting for node(s) to be ready..."
+kubectl wait node --all --for=condition=Ready --timeout=120s
+
 cd "$(dirname "$0")"
 
 case "$1" in
@@ -44,6 +47,9 @@ echo "Need to give 'helm' or 'stackablectl' as an argument for which installatio
 exit 1
 ;;
 esac
+
+# TODO: Remove once https://github.com/stackabletech/issues/issues/828 has been implemented (see that issue for details).
+until kubectl get crd opensearchclusters.opensearch.stackable.tech >/dev/null 2>&1; do echo "Waiting for CRDs to be installed" && sleep 1; done
 
 echo "Creating OpenSearch security plugin configuration"
 # tag::apply-security-config[]
@@ -140,7 +146,7 @@ helm install opensearch-dashboards opensearch-dashboards \
     --wait
 # end::opensearch-dashboards[]
 
-echo "Starting port-forwarding of port 5601"
+echo "Starting port-forwarding of port 5601 (press Ctrl+C to exit early)"
 # tag::opensearch-dashboards-port-forwarding[]
 kubectl port-forward services/opensearch-dashboards 5601 > /dev/null 2>&1 &
 # end::opensearch-dashboards-port-forwarding[]

@@ -46,7 +46,7 @@ spec:
                 key: roles_mapping.yml
   nodes:
     roleConfig:
-      discoveryServiceListenerClass: external-stable
+      discoveryServiceListenerClass: external-unstable
     roleGroups:
       default:
         replicas: 3
