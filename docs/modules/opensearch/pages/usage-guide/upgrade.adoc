@@ -1,0 +1,164 @@
+= SDP upgrade notes
+:description: Instructions for upgrading the SDP versions.
+
+== Upgrade from SDP 25.11 to 26.3
+
+When upgrading the OpenSearch operator from SDP 25.11 to 26.3, you may encounter several warnings and errors in the operator logs.
+These issues are not due to breaking changes in the Custom Resource Definition, but rather arise from incompatibilities in your `configOverrides` and `podOverrides` related to the current version.
+You might have configured the OpenSearch security plugin, TLS and other features with overrides which are now handled directly by the operator.
+
+If `configOverrides` replace values that are already set by the operator, a corresponding warning will be issued:
+
+[source]
+----
+WARN reconciling object{...}: stackable_opensearch_operator::controller::build::node_config:
+configOverrides: Configuration setting "plugins.security.ssl.http.pemcert_filepath" changed
+from "/stackable/opensearch/config/tls/server/tls.crt" to
+"/stackable/opensearch/config/tls/tls.crt".
+----
+
+=== TLS
+
+The operator now offers the option to configure TLS using SecretClasses:
+
+[source,yaml]
+----
+spec:
+  clusterConfig:
+    tls:
+      internalSecretClass: tls
+      serverSecretClass: tls
+----
+
+This means that the following `configOverrides` are now obsolete and must be removed:
+
+[source,yaml]
+----
+configOverrides:
+  opensearch.yml:
+    plugins.security.ssl.http.enabled: ...
+    plugins.security.ssl.http.pemcert_filepath: ...
+    plugins.security.ssl.http.pemkey_filepath: ...
+    plugins.security.ssl.http.pemtrustedcas_filepath: ...
+    plugins.security.ssl.transport.enabled: ...
+    plugins.security.ssl.transport.pemcert_filepath: ...
+    plugins.security.ssl.transport.pemkey_filepath: ...
+    plugins.security.ssl.transport.pemtrustedcas_filepath: ...
+----
+
+Additionally, the following `podOverrides` for the TLS `volumes` and `volumeMounts` must be removed:
+
+[source,yaml]
+----
+podOverrides:
+  spec:
+    containers:
+    - name: opensearch
+      volumeMounts:
+      - mountPath: /stackable/opensearch/config/tls
+        name: tls
+    volumes:
+    - name: tls
+      ephemeral:
+        volumeClaimTemplate:
+          metadata:
+            annotations:
+              secrets.stackable.tech/class: tls
+              secrets.stackable.tech/scope: ...
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: "1"
+            storageClassName: secrets.stackable.tech
+----
+
+Refer to the xref:usage-guide/security.adoc#_tls[TLS documentation] for further details.
+
+=== Security plugin configuration
+
+The configuration of the OpenSearch security plugin is now managed by the operator.
+
+You may have defined the configuration files in a Secret or ConfigMap.
+These files were previously used to initialize the security index when you set `plugins.security.allow_default_init_securityindex` to `true`.
+Since these files are not utilized after the security index creation, you can safely remove the corresponding `configOverrides` and `podOverrides`, particularly to prevent mount path conflicts:
+
+[source,yaml]
+----
+configOverrides:
+  opensearch.yml:
+    plugins.security.allow_default_init_securityindex: "true"
+podOverrides:
+  spec:
+    containers:
+    - name: opensearch
+      volumeMounts:
+      - mountPath: /stackable/opensearch/config/opensearch-security
+        name: security-config
+        readOnly: true
+    volumes:
+    - name: security-config
+      secret:
+        defaultMode: 432
+        secretName: opensearch-security-config
+----
+
+Please have a look at the xref:usage-guide/security.adoc#_settings[documentation on security settings], if you want the operator to manage certain security configurations.
+
+=== StatefulSet updates
+
+The OpenSearch operator deploys a StatefulSet, in which Kubernetes restricts changes to certain fields.
+As a result, the following error may occur:
+
+[source]
+----
+ERROR stackable_operator::logging::controller: Failed to reconcile object ...
+unable to patch resource "opensearch-nodes-default",
+ApiError: StatefulSet.apps "opensearch-nodes-default" is invalid:
+spec: Forbidden: updates to statefulset spec for fields other than 'replicas', ...
+----
+
+To resolve this error, you need to delete the StatefulSets.
+You can do this using the following command:
+
+[source,shell]
+----
+kubectl delete statefulsets.apps --cascade=orphan opensearch-nodes-default
+----
+
+The operator will automatically recreate the StatefulSet.
+
+=== Service discovery
+
+The OpenSearch operator now deploys a discovery ConfigMap that is named after the OpenSearch cluster:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch
+data:
+  OPENSEARCH_HOSTNAME: opensearch.default.svc.cluster.local
+  OPENSEARCH_HOSTS: https://opensearch.default.svc.cluster.local:9200
+  OPENSEARCH_PORT: "9200"
+  OPENSEARCH_PROTOCOL: https
+----
+
+Consider using this ConfigMap in your OpenSearch clients instead of hard-coding a Service or IP address.
+
+For example, the Helm values for OpenSearch Dashboards can reference the discovery ConfigMap:
+
+[source,yaml]
+----
+opensearchHosts: null # Use the discovery ConfigMap instead
+extraEnvs:
+- name: OPENSEARCH_HOSTS
+  valueFrom:
+    configMapKeyRef:
+      name: opensearch
+      key: OPENSEARCH_HOSTS
+----
+
+Please consult the xref:reference/discovery.adoc[Discovery documentation] for instructions on how to select the role groups exposed by the discovery ConfigMap.
