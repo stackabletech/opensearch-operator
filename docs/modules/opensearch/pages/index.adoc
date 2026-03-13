@@ -17,6 +17,11 @@ The Stackable operator for {opensearch}[OpenSearch{external-link-icon}^] deploys
 OpenSearch is a powerful search and analytics engine built on Apache Lucene.
 This operator helps you manage your OpenSearch instances on Kubernetes efficiently.
 
+[IMPORTANT]
+====
+If you intend to upgrade an existing OpenSearchCluster from a previous SDP version, please refer to the xref:usage-guide/upgrade.adoc[SDP upgrade notes] for detailed guidance.
+====
+
 == Getting started
 
 Get started using OpenSearch with the Stackable operator by following the xref:getting_started/index.adoc[].

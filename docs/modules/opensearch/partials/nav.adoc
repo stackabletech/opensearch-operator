@@ -12,6 +12,7 @@
 ** xref:opensearch:usage-guide/scaling.adoc[]
 ** xref:opensearch:usage-guide/keystore.adoc[]
 ** xref:opensearch:usage-guide/security.adoc[]
+** xref:opensearch:usage-guide/upgrade.adoc[]
 ** xref:opensearch:usage-guide/operations/index.adoc[]
 *** xref:opensearch:usage-guide/operations/cluster-operations.adoc[]
 *** xref:opensearch:usage-guide/operations/pod-placement.adoc[]
