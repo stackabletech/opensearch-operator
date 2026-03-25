@@ -5,6 +5,8 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # For automatic cluster domain detection: nodes are listed/watched to find a node to
+  # proxy through, and nodes/proxy is used to read kubelet info that contains the cluster domain.
   - apiGroups:
       - ""
     resources:
@@ -12,19 +14,25 @@ rules:
     verbs:
       - list
       - watch
-  # For automatic cluster domain detection
   - apiGroups:
       - ""
     resources:
       - nodes/proxy
     verbs:
       - get
+  # Manage core workload resources created per OpenSearchCluster.
+  # All resources are applied via Server-Side Apply (create + patch) and tracked for
+  # orphan cleanup (list + delete). The controller watches all of these via .owns() (watch).
+  # get is required by the ReconciliationPaused strategy, which calls client.get() instead
+  # of apply_patch() when reconciliation is paused.
+  # update is NOT needed: SSA uses patch (HTTP PATCH), not update (HTTP PUT).
+  # - configmaps: per-rolegroup configuration files mounted into pods
+  # - serviceaccounts: per-rolegroup ServiceAccounts for workload pods
+  # - services: per-rolegroup and discovery Services
   - apiGroups:
       - ""
     resources:
       - configmaps
-      - endpoints
-      - pods
       - serviceaccounts
       - services
     verbs:
@@ -33,8 +41,10 @@ rules:
       - get
       - list
       - patch
-      - update
       - watch
+  # RoleBindings bind the product ClusterRole to each per-rolegroup ServiceAccount so that
+  # workload pods have the permissions they need at runtime.
+  # Applied via SSA, tracked for orphan cleanup, and watched via .owns().
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -45,8 +55,9 @@ rules:
       - get
       - list
       - patch
-      - update
       - watch
+  # StatefulSets drive the OpenSearch node pods.
+  # Applied via SSA, tracked for orphan cleanup, and watched via .owns().
   - apiGroups:
       - apps
     resources:
@@ -57,8 +68,9 @@ rules:
       - get
       - list
       - patch
-      - update
       - watch
+  # PodDisruptionBudgets limit voluntary disruptions during rolling upgrades and maintenance.
+  # Applied via SSA, tracked for orphan cleanup, and watched via .owns().
   - apiGroups:
       - policy
     resources:
@@ -69,7 +81,6 @@ rules:
       - get
       - list
       - patch
-      - update
       - watch
   - apiGroups:
       - apiextensions.k8s.io
@@ -86,17 +97,22 @@ rules:
       - list
       - watch
       {{- end }}
+  # Listeners (stackable-listener-operator CRD) expose OpenSearch endpoints via a
+  # cluster-level abstraction. Applied via SSA, tracked for orphan cleanup, watched via .owns().
+  # get is also used directly in dereference.rs to fetch the discovery service Listener.
   - apiGroups:
       - listeners.stackable.tech
     resources:
       - listeners
     verbs:
-      - get
-      - list
-      - watch
-      - patch
       - create
       - delete
+      - get
+      - list
+      - patch
+      - watch
+  # Events are emitted by the controller to report reconciliation results (e.g. errors,
+  # status changes) visible via kubectl describe / kubectl get events.
   - apiGroups:
       - events.k8s.io
     resources:
@@ -104,6 +120,9 @@ rules:
     verbs:
       - create
       - patch
+  # The primary CRD: the controller watches OpenSearchCluster objects to trigger reconciliation
+  # and reads them during reconcile. patch is NOT needed here — the operator only writes
+  # to the /status subresource (see rule below).
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
@@ -111,14 +130,17 @@ rules:
     verbs:
       - get
       - list
-      - patch
       - watch
+  # Status subresource: the controller calls apply_patch_status() after each reconcile to
+  # update conditions (Available, Degraded, etc.) on the OpenSearchCluster object.
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
       - {{ include "operator.name" . }}clusters/status
     verbs:
       - patch
+  # The operator creates per-rolegroup RoleBindings that bind the product ClusterRole to
+  # workload ServiceAccounts. bind permission on the product ClusterRole is required for that.
   - apiGroups:
       - rbac.authorization.k8s.io
     resources:
@@ -135,6 +157,10 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
+  # OpenSearch pods need read access to their own namespace resources at runtime:
+  # - configmaps: read configuration (e.g. opensearch.yml, log4j2.properties)
+  # - secrets: read TLS certificates and credentials mounted into the pod
+  # - serviceaccounts: read own ServiceAccount metadata (e.g. for token projection)
   - apiGroups:
       - ""
     resources:
@@ -143,6 +169,7 @@ rules:
       - serviceaccounts
     verbs:
       - get
+  # OpenSearch pods emit Kubernetes Events (e.g. via the Stackable logging framework).
   - apiGroups:
       - events.k8s.io
     resources:
@@ -150,6 +177,9 @@ rules:
     verbs:
       - create
       - patch
+  # Required on OpenShift: allows OpenSearch pods to run with the nonroot-v2
+  # SecurityContextConstraint, which permits running as a non-root UID without a specific
+  # seccomp profile.
   - apiGroups:
       - security.openshift.io
     resources:
