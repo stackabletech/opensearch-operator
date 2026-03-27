@@ -1,6 +1,6 @@
 //! Builder for role resources
 
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
@@ -13,7 +13,6 @@ use stackable_operator::{
             rbac::v1::{ClusterRole, RoleBinding, RoleRef, Subject},
         },
     },
-    kube::api::ObjectMeta,
     kvp::{
         Label, Labels,
         consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
@@ -23,12 +22,14 @@ use stackable_operator::{
 use crate::{
     controller::{
         ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        ValidatedCluster, build::role_group_builder::RoleGroupBuilder,
+        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
     },
+    crd::v1alpha1,
     framework::{
         NameIsValidLabelValue,
         builder::{
-            meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
+            meta::{annotation_ignore_restarter, ownerreference_from_resource},
+            pdb::pod_disruption_budget_builder_with_role,
         },
         role_utils::ResourceNames,
         types::{
@@ -80,7 +81,9 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a ServiceAccount used by all role-groups
     pub fn build_service_account(&self) -> ServiceAccount {
-        let metadata = self.common_metadata(self.resource_names.service_account_name());
+        let metadata = self
+            .common_metadata(self.resource_names.service_account_name())
+            .build();
 
         ServiceAccount {
             metadata,
@@ -90,7 +93,9 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a RoleBinding used by all role-groups
     pub fn build_role_binding(&self) -> RoleBinding {
-        let metadata = self.common_metadata(self.resource_names.role_binding_name());
+        let metadata = self
+            .common_metadata(self.resource_names.role_binding_name())
+            .build();
 
         RoleBinding {
             metadata,
@@ -116,7 +121,9 @@ impl<'a> RoleBuilder<'a> {
             ..ServicePort::default()
         }];
 
-        let metadata = self.common_metadata(seed_nodes_service_name(&self.cluster.name));
+        let metadata = self
+            .common_metadata(seed_nodes_service_name(&self.cluster.name))
+            .build();
 
         let service_selector =
             RoleGroupBuilder::cluster_manager_labels(&self.cluster, self.context_names);
@@ -140,7 +147,9 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a Listener whose status is used to populate the discovery ConfigMap.
     pub fn build_discovery_service_listener(&self) -> listener::v1alpha1::Listener {
-        let metadata = self.common_metadata(discovery_service_listener_name(&self.cluster.name));
+        let metadata = self
+            .common_metadata(discovery_service_listener_name(&self.cluster.name))
+            .build();
 
         let listener_class = &self.cluster.role_config.discovery_service_listener_class;
 
@@ -166,10 +175,12 @@ impl<'a> RoleBuilder<'a> {
     /// The discovery endpoint is derived from the status of the discovery service Listener. If the
     /// status is not set yet, the reconciliation process will occur again once the Listener status
     /// is updated, leading to the eventual creation of the discovery ConfigMap.
-    pub fn build_discovery_config_map(&self) -> Option<ConfigMap> {
+    pub fn build_maybe_discovery_config_map(&self) -> Option<ConfigMap> {
         let discovery_endpoint = self.cluster.discovery_endpoint.as_ref()?;
 
-        let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
+        let metadata = self
+            .common_metadata(discovery_config_map_name(&self.cluster.name))
+            .build();
 
         let protocol = if self.cluster.is_server_tls_enabled() {
             "https"
@@ -204,6 +215,43 @@ impl<'a> RoleBuilder<'a> {
         })
     }
 
+    /// Builds the [`ConfigMap`] containing the security configuration files that were defined by
+    /// value.
+    ///
+    /// Returns `None` if the security plugin is disabled or all configuration files are
+    /// references.
+    pub fn build_maybe_security_config_map(&self) -> Option<ConfigMap> {
+        let metadata = self
+            .common_metadata(security_config_map_name(&self.cluster.name))
+            .with_annotation(annotation_ignore_restarter())
+            .build();
+
+        let mut data = BTreeMap::new();
+
+        if let ValidatedSecurity::ManagedByApi { settings, .. }
+        | ValidatedSecurity::ManagedByOperator { settings, .. } = &self.cluster.security
+        {
+            for file_type in settings {
+                if let v1alpha1::SecuritySettingsFileTypeContent::Value(
+                    v1alpha1::SecuritySettingsFileTypeContentValue { value },
+                ) = &file_type.content
+                {
+                    data.insert(file_type.filename.to_owned(), value.to_string());
+                }
+            }
+        }
+
+        if data.is_empty() {
+            None
+        } else {
+            Some(ConfigMap {
+                metadata,
+                data: Some(data),
+                ..ConfigMap::default()
+            })
+        }
+    }
+
     /// Builds a [`PodDisruptionBudget`] used by all role-groups
     pub fn build_pdb(&self) -> Option<PodDisruptionBudget> {
         let pdb_config = &self.cluster.role_config.common.pod_disruption_budget;
@@ -229,8 +277,10 @@ impl<'a> RoleBuilder<'a> {
     }
 
     /// Common metadata for role resources
-    fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMeta {
-        ObjectMetaBuilder::new()
+    fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
+        let mut builder = ObjectMetaBuilder::new();
+
+        builder
             .name(resource_name)
             .namespace(&self.cluster.namespace)
             .ownerreference(ownerreference_from_resource(
@@ -238,8 +288,9 @@ impl<'a> RoleBuilder<'a> {
                 None,
                 Some(true),
             ))
-            .with_labels(self.labels())
-            .build()
+            .with_labels(self.labels());
+
+        builder
     }
 
     /// Common labels for role resources
@@ -295,6 +346,20 @@ fn discovery_config_map_name(cluster_name: &ClusterName) -> ConfigMapName {
     let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
 
     ConfigMapName::from_str(cluster_name.as_ref()).expect("should be a valid ConfigMap name")
+}
+
+pub fn security_config_map_name(cluster_name: &ClusterName) -> ConfigMapName {
+    const SUFFIX: &str = "-security-config";
+
+    // compile-time checks
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH + SUFFIX.len() <= ConfigMapName::MAX_LENGTH,
+        "The string `<cluster_name>-security-config` must not exceed the limit of ConfigMap names."
+    );
+    let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+    ConfigMapName::from_str(&format!("{}{SUFFIX}", cluster_name.as_ref()))
+        .expect("should be a valid ConfigMap name")
 }
 
 pub fn discovery_service_listener_name(cluster_name: &ClusterName) -> ListenerName {
@@ -640,12 +705,13 @@ mod tests {
     }
 
     #[test]
-    fn test_build_discovery_config_map() {
+    fn test_build_maybe_discovery_config_map() {
         let context_names = context_names();
         let role_builder = role_builder(&context_names);
 
-        let discovery_config_map = serde_json::to_value(role_builder.build_discovery_config_map())
-            .expect("should be serializable");
+        let discovery_config_map =
+            serde_json::to_value(role_builder.build_maybe_discovery_config_map())
+                .expect("should be serializable");
 
         assert_eq!(
             json!({
@@ -680,6 +746,59 @@ mod tests {
                 },
             }),
             discovery_config_map
+        );
+    }
+
+    #[test]
+    fn test_build_maybe_security_config_map() {
+        let context_names = context_names();
+        let role_builder = role_builder(&context_names);
+
+        let security_config_map =
+            serde_json::to_value(role_builder.build_maybe_security_config_map())
+                .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "annotations": {
+                        "restarter.stackable.tech/ignore": "true"
+                    },
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/version": "3.4.0",
+                        "stackable.tech/vendor": "Stackable",
+                    },
+                    "name": "my-opensearch-cluster-security-config",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b",
+                        },
+                    ],
+                },
+                "data": {
+                    "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
+                    "allowlist.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
+                    "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
+                    "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
+                    "internal_users.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"internalusers\"}}",
+                    "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
+                    "roles.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"roles\"}}",
+                    "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
+                    "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
+                },
+            }),
+            security_config_map
         );
     }
 
