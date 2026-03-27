@@ -1,6 +1,7 @@
 use stackable_operator::{
     builder::meta::OwnerReferenceBuilder,
     k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference, kube::Resource,
+    kvp::Annotation,
 };
 
 use crate::framework::{HasName, HasUid};
@@ -28,6 +29,15 @@ pub fn ownerreference_from_resource(
         )
 }
 
+/// Annotation which signals the restarter to ignore this resource.
+pub fn annotation_ignore_restarter() -> Annotation {
+    Annotation::try_from((
+        "restarter.stackable.tech/ignore".to_owned(),
+        "true".to_owned(),
+    ))
+    .expect("should be a valid annotation")
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -37,7 +47,10 @@ mod tests {
         kube::Resource,
     };
 
-    use crate::framework::{HasName, HasUid, Uid, builder::meta::ownerreference_from_resource};
+    use crate::framework::{
+        HasName, HasUid, Uid,
+        builder::meta::{annotation_ignore_restarter, ownerreference_from_resource},
+    };
 
     struct Cluster {
         object_meta: ObjectMeta,
@@ -120,5 +133,11 @@ mod tests {
         };
 
         assert_eq!(expected_owner_reference, actual_owner_reference);
+    }
+
+    #[test]
+    fn test_annotation_ignore_restarter() {
+        // Test that the functions do not panic
+        annotation_ignore_restarter();
     }
 }

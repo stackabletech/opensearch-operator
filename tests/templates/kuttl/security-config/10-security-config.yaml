@@ -3,6 +3,8 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: security-config-file-internal-users
+  annotations:
+    restarter.stackable.tech/ignore: "true"
 stringData:
   internal_users.yml: |
     ---
@@ -21,6 +23,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: security-config
+  annotations:
+    restarter.stackable.tech/ignore: "true"
 data:
   roles.yml: |
     ---

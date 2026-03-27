@@ -33,8 +33,11 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
         listeners.push(role_group_builder.build_listener());
     }
 
-    if let Some(discovery_config_map) = role_builder.build_discovery_config_map() {
+    if let Some(discovery_config_map) = role_builder.build_maybe_discovery_config_map() {
         config_maps.push(discovery_config_map);
+    }
+    if let Some(security_config_map) = role_builder.build_maybe_security_config_map() {
+        config_maps.push(security_config_map);
     }
     services.push(role_builder.build_seed_nodes_service());
     listeners.push(role_builder.build_discovery_service_listener());
