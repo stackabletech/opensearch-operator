@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support hot-reloading of security configuration files ([#130]).
+
+[#130]: https://github.com/stackabletech/opensearch-operator/pull/130
+
 ## [26.3.0] - 2026-03-16
 
 ## [26.3.0-rc1] - 2026-03-16
