@@ -358,7 +358,7 @@ spec:
           - key: action_groups.yml
             mode: 432
             path: action_groups.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-actiongroups
       - configMap:
           defaultMode: 420
@@ -366,7 +366,7 @@ spec:
           - key: allowlist.yml
             mode: 432
             path: allowlist.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-allowlist
       - configMap:
           defaultMode: 420
@@ -374,7 +374,7 @@ spec:
           - key: audit.yml
             mode: 432
             path: audit.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-audit
       - configMap:
           defaultMode: 420
@@ -382,7 +382,7 @@ spec:
           - key: config.yml
             mode: 432
             path: config.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-config
       - configMap:
           defaultMode: 420
@@ -390,7 +390,7 @@ spec:
           - key: internal_users.yml
             mode: 432
             path: internal_users.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-internalusers
       - configMap:
           defaultMode: 420
@@ -398,7 +398,7 @@ spec:
           - key: nodes_dn.yml
             mode: 432
             path: nodes_dn.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-nodesdn
       - configMap:
           defaultMode: 420
@@ -406,7 +406,7 @@ spec:
           - key: roles.yml
             mode: 432
             path: roles.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-roles
       - configMap:
           defaultMode: 420
@@ -414,7 +414,7 @@ spec:
           - key: roles_mapping.yml
             mode: 432
             path: roles_mapping.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-rolesmapping
       - configMap:
           defaultMode: 420
@@ -422,7 +422,7 @@ spec:
           - key: tenants.yml
             mode: 432
             path: tenants.yml
-          name: opensearch-nodes-cluster-manager
+          name: opensearch-security-config
         name: security-config-file-tenants
   volumeClaimTemplates:
   - apiVersion: v1
@@ -834,7 +834,7 @@ spec:
           - key: action_groups.yml
             mode: 432
             path: action_groups.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-actiongroups
       - configMap:
           defaultMode: 420
@@ -842,7 +842,7 @@ spec:
           - key: allowlist.yml
             mode: 432
             path: allowlist.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-allowlist
       - configMap:
           defaultMode: 420
@@ -850,7 +850,7 @@ spec:
           - key: audit.yml
             mode: 432
             path: audit.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-audit
       - configMap:
           defaultMode: 420
@@ -858,7 +858,7 @@ spec:
           - key: config.yml
             mode: 432
             path: config.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-config
       - configMap:
           defaultMode: 420
@@ -866,7 +866,7 @@ spec:
           - key: internal_users.yml
             mode: 432
             path: internal_users.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-internalusers
       - configMap:
           defaultMode: 420
@@ -874,7 +874,7 @@ spec:
           - key: nodes_dn.yml
             mode: 432
             path: nodes_dn.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-nodesdn
       - configMap:
           defaultMode: 420
@@ -882,7 +882,7 @@ spec:
           - key: roles.yml
             mode: 432
             path: roles.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-roles
       - configMap:
           defaultMode: 420
@@ -890,7 +890,7 @@ spec:
           - key: roles_mapping.yml
             mode: 432
             path: roles_mapping.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-rolesmapping
       - configMap:
           defaultMode: 420
@@ -898,7 +898,7 @@ spec:
           - key: tenants.yml
             mode: 432
             path: tenants.yml
-          name: opensearch-nodes-data
+          name: opensearch-security-config
         name: security-config-file-tenants
   volumeClaimTemplates:
   - apiVersion: v1
@@ -941,6 +941,35 @@ status:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  annotations:
+    restarter.stackable.tech/ignore: "true"
+  labels:
+    app.kubernetes.io/component: nodes
+    app.kubernetes.io/instance: opensearch
+    app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
+    app.kubernetes.io/name: opensearch
+    app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
+    stackable.tech/vendor: Stackable
+  name: opensearch-security-config
+  ownerReferences:
+  - apiVersion: opensearch.stackable.tech/v1alpha1
+    controller: true
+    kind: OpenSearchCluster
+    name: opensearch
+data:
+  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
+  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
+  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
+  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
+  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
+  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
+  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
+  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
+  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -956,12 +985,6 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
-  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
-  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
-  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
-  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
   opensearch.yml: |-
     cluster.name: "opensearch"
     cluster.routing.allocation.disk.threshold_enabled: "false"
@@ -984,9 +1007,6 @@ data:
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
-  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
-  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
-  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -1006,12 +1026,6 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
-  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
-  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
-  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
-  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
   opensearch.yml: |-
     cluster.name: "opensearch"
     cluster.routing.allocation.disk.threshold_enabled: "false"
@@ -1034,9 +1048,6 @@ data:
     plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
     plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
     plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
-  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
-  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
-  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
 ---
 apiVersion: v1
 kind: Service
