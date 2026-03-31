@@ -144,6 +144,31 @@ spec:
 
 If this role group is not defined, it will be created by the operator.
 
+[IMPORTANT]
+====
+Settings managed by the operator are hot-reloaded when changed, i.e. without pod restarts.
+However, if those settings are provided via ConfigMap or Secret, updates will normally trigger a restart.
+To prevent that restart, add the following annotation:
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: security-config
+  annotations:
+    restarter.stackable.tech/ignore: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-config
+  annotations:
+    restarter.stackable.tech/ignore: "true"
+----
+====
+
 == TLS
 
 TLS is also managed by the OpenSearch security plugin, therefore TLS is only available if the security plugin was not disabled.

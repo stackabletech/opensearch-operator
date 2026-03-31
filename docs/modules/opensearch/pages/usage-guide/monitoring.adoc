@@ -29,10 +29,12 @@ To make the metrics accessible for all users, especially Prometheus, anonymous a
 ----
 ---
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
-  name: opensearch-security-config
-stringData:
+  name: custom-opensearch-security-config
+  annotations:
+    restarter.stackable.tech/ignore: "true"
+data:
   config.yml: |
     ---
     _meta:
