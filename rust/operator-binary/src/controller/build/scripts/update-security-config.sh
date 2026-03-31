@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Expected environment variables:
+# Required environment variables:
 # - OPENSEARCH_PATH_CONF
 # - POD_NAME
 # - MANAGE_ACTIONGROUPS
@@ -12,8 +12,6 @@
 # - MANAGE_ROLES
 # - MANAGE_ROLESMAPPING
 # - MANAGE_TENANTS
-
-# TODO config_files vs. configuration_files
 
 set -u -o pipefail
 
@@ -80,6 +78,7 @@ function config_file () {
     echo "$SECURITY_CONFIG_DIR/${CONFIG_FILENAME[$filetype]}"
 }
 
+# Create link for every configuration file in SECURITY_CONFIG_DIR
 function symlink_config_files () {
     for filetype in "${CONFIG_FILETYPES[@]}"
     do
@@ -89,14 +88,13 @@ function symlink_config_files () {
     done
 }
 
-function initialize_managed_configuration_filetypes () {
+function initialize_managed_config_filetypes () {
     for filetype in "${CONFIG_FILETYPES[@]}"
     do
         envvar="MANAGE_${filetype^^}"
         if test "${!envvar}" = "true"
         then
             info "Watch managed configuration type \"$filetype\"."
-
             managed_filetypes+=("$filetype")
         else
             info "Skip unmanaged configuration type \"$filetype\"."
@@ -250,7 +248,7 @@ mkdir --parents "$VECTOR_CONTROL_DIR"
 
 check_pod
 symlink_config_files
-initialize_managed_configuration_filetypes
+initialize_managed_config_filetypes
 
 while true
 do

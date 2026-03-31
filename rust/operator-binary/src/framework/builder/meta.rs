@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_annotation_ignore_restarter() {
-        // Test that the functions do not panic
+        // Test that the function does not panic
         annotation_ignore_restarter();
     }
 }

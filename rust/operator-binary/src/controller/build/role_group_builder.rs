@@ -715,6 +715,9 @@ impl<'a> RoleGroupBuilder<'a> {
         };
 
         if let RoleGroupSecurityMode::Initializing { settings, .. } = &self.security_mode {
+            // Mount the security configuration files using `subPath`, because the configuration
+            // files are only used for initializing the security index and hot-reloading is not
+            // required.
             volume_mounts.extend(self.security_config_volume_mounts(settings, true));
         };
 
@@ -778,6 +781,13 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the security settings volume mounts for the [`v1alpha1::Container::OpenSearch`]
     /// container or the [`v1alpha1::Container::UpdateSecurityConfig`] container
+    ///
+    /// If `use_sub_path` is set to `true`, then the configuration files are directly mounted via
+    /// `subPath` into the opensearch-security configuration directory. If it is set to `false`,
+    /// then they are mounted into sub directories of the opensearch-security configuration
+    /// directory without using `subPath`. Files mounted via `subPath` are not updated on changes
+    /// in the ConfigMap or Secret volume. Therefore, hot-reloading works only without `subPath`,
+    /// but links from the configuration directory into the sub directories are required.
     fn security_config_volume_mounts(
         &self,
         settings: &v1alpha1::SecuritySettings,
@@ -882,6 +892,9 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..VolumeMount::default()
             },
         ];
+
+        // Mount the security configuration files without using `subPath`, so that hot-reloading
+        // works.
         volume_mounts.extend(self.security_config_volume_mounts(settings, false));
 
         let mut env_vars = EnvVarSet::new()

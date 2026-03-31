@@ -93,7 +93,7 @@ mod tests {
             role_utils::GenericProductSpecificCommonConfig,
             types::{
                 common::Port,
-                kubernetes::{Hostname, ListenerClassName, NamespaceName},
+                kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName},
                 operator::{
                     ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
                     RoleGroupName,
@@ -137,7 +137,8 @@ mod tests {
                 "my-opensearch",
                 "my-opensearch-nodes-cluster-manager",
                 "my-opensearch-nodes-coordinating",
-                "my-opensearch-nodes-data"
+                "my-opensearch-nodes-data",
+                "my-opensearch-security-config"
             ],
             extract_resource_names(&resources.config_maps)
         );
@@ -212,7 +213,11 @@ mod tests {
                 ),
             ]
             .into(),
-            ValidatedSecurity::Disabled,
+            ValidatedSecurity::ManagedByApi {
+                settings: v1alpha1::SecuritySettings::default(),
+                tls_server_secret_class: None,
+                tls_internal_secret_class: SecretClassName::from_str_unsafe("tls"),
+            },
             vec![],
             Some(ValidatedDiscoveryEndpoint {
                 hostname: Hostname::from_str_unsafe("1.2.3.4"),
