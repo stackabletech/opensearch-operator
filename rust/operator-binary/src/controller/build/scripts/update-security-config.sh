@@ -72,13 +72,14 @@ function warn () {
     log WARN "$message"
 }
 
+# Return the configuration file in SECURITY_CONFIG_DIR for the given file type
 function config_file () {
     filetype="$1"
 
     echo "$SECURITY_CONFIG_DIR/${CONFIG_FILENAME[$filetype]}"
 }
 
-# Create link for every configuration file in SECURITY_CONFIG_DIR
+# Create a link for every configuration file in SECURITY_CONFIG_DIR
 function symlink_config_files () {
     for filetype in "${CONFIG_FILETYPES[@]}"
     do
@@ -88,6 +89,7 @@ function symlink_config_files () {
     done
 }
 
+# Initialize the variable managed_filetypes
 function initialize_managed_config_filetypes () {
     for filetype in "${CONFIG_FILETYPES[@]}"
     do
@@ -102,6 +104,7 @@ function initialize_managed_config_filetypes () {
     done
 }
 
+# Calculate the hashes of the managed configuration files
 function calculate_config_hashes () {
     for filetype in "${managed_filetypes[@]}"
     do
@@ -124,9 +127,8 @@ function wait_seconds_or_shutdown () {
             "$VECTOR_CONTROL_DIR"
     fi
 
-    # Only the file named "shutdown" should be created in
-    # VECTOR_CONTROL_DIR. If another file is created instead, this
-    # function will return early; this is acceptable and has no adverse
+    # Only the file named "shutdown" should be created in VECTOR_CONTROL_DIR. If another file is
+    # created instead, this function will return early; this is acceptable and has no adverse
     # effects.
     if test -e "$VECTOR_CONTROL_DIR/shutdown"
     then
@@ -159,6 +161,7 @@ function wait_for_shutdown () {
     exit 0
 }
 
+# Return if this pod is responsible for managing the security configuration or wait for shutdown
 function check_pod () {
     POD_INDEX="${POD_NAME##*-}"
 
@@ -176,6 +179,7 @@ function check_pod () {
     fi
 }
 
+# Initialize the security index with all (managed and unmanaged) configuration files
 function initialize_security_index() {
     info "Initialize the security index."
 
@@ -193,7 +197,8 @@ function initialize_security_index() {
     done
 }
 
-function update_config () {
+# Update the security index with the managed configuration files
+function update_security_index () {
     last_applied_config_hashes=$(calculate_config_hashes)
 
     for filetype in "${managed_filetypes[@]}"
@@ -216,7 +221,8 @@ function update_config () {
     done
 }
 
-function update_security_index() {
+# Initialize or update the security index
+function apply_configuration_files() {
     info "Check the status of the security index."
 
     STATUS_CODE=$(curl \
@@ -230,8 +236,7 @@ function update_security_index() {
     if test "$STATUS_CODE" = "200"
     then
         info "The security index is already initialized."
-
-        update_config
+        update_security_index
     elif test "$STATUS_CODE" = "404"
     then
         initialize_security_index
@@ -242,8 +247,7 @@ function update_security_index() {
     fi
 }
 
-# Ensure that VECTOR_CONTROL_DIR exists, so that calls to inotifywait do not
-# fail.
+# Ensure that VECTOR_CONTROL_DIR exists, so that calls to inotifywait do not fail
 mkdir --parents "$VECTOR_CONTROL_DIR"
 
 check_pod
@@ -252,6 +256,6 @@ initialize_managed_config_filetypes
 
 while true
 do
-    update_security_index
+    apply_configuration_files
     wait_for_configuration_changes_or_shutdown
 done
