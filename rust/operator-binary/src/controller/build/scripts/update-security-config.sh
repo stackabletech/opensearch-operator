@@ -85,7 +85,7 @@ function symlink_config_files () {
     do
         ln --force --symbolic \
             "$SECURITY_CONFIG_DIR/$filetype/${CONFIG_FILENAME[$filetype]}" \
-            "$(config_file $filetype)"
+            "$(config_file "$filetype")"
     done
 }
 
