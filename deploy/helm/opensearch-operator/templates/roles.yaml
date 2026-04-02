@@ -5,15 +5,7 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # For automatic cluster domain detection: nodes are listed/watched to find a node to
-  # proxy through, and nodes/proxy is used to read kubelet info that contains the cluster domain.
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - list
-      - watch
+  # For automatic cluster domain detection.
   - apiGroups:
       - ""
     resources:
