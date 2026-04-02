@@ -113,7 +113,7 @@ rules:
     verbs:
       - create
       - patch
-  # Primary CRD: watched by Controller::new() and read during reconciliation.
+  # Primary CRD: watched by the controller and read during reconciliation.
   - apiGroups:
       - {{ include "operator.name" . }}.stackable.tech
     resources:
