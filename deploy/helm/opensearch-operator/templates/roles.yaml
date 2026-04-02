@@ -150,18 +150,6 @@ metadata:
   labels:
   {{- include "operator.labels" . | nindent 4 }}
 rules:
-  # OpenSearch pods need read access to their own namespace resources at runtime:
-  # - configmaps: read configuration (e.g. opensearch.yml, log4j2.properties)
-  # - secrets: read TLS certificates and credentials mounted into the pod
-  # - serviceaccounts: read own ServiceAccount metadata (e.g. for token projection)
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - secrets
-      - serviceaccounts
-    verbs:
-      - get
   # OpenSearch pods emit Kubernetes Events (e.g. via the Stackable logging framework).
   - apiGroups:
       - events.k8s.io
