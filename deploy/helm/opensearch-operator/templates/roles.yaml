@@ -86,10 +86,10 @@ rules:
       {{- if .Values.maintenance.customResourceDefinitions.maintain }}
       - create
       - patch
+      {{- end }}
       # Required for startup condition
       - list
       - watch
-      {{- end }}
   # Listeners (stackable-listener-operator CRD) expose OpenSearch endpoints via a
   # cluster-level abstraction. Applied via SSA, tracked for orphan cleanup, watched via .owns().
   # get is also used directly in dereference.rs to fetch the discovery service Listener.
