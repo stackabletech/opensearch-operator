@@ -158,6 +158,7 @@ rules:
     verbs:
       - create
       - patch
+{{ if .Capabilities.APIVersions.Has "security.openshift.io/v1" }}
   # Required on OpenShift: allows OpenSearch pods to run with the nonroot-v2
   # SecurityContextConstraint, which permits running as a non-root UID without a specific
   # seccomp profile.
@@ -169,3 +170,4 @@ rules:
       - nonroot-v2
     verbs:
       - use
+{{ end }}
