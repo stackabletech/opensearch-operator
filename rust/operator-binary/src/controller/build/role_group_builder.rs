@@ -1,6 +1,9 @@
 //! Builder for role group resources
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    str::FromStr,
+};
 
 use stackable_operator::{
     builder::{
@@ -70,8 +73,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
-                ServiceName, VolumeName,
+                ConfigMapName, ListenerName, PersistentVolumeClaimName, SecretClassName,
+                SecretName, ServiceAccountName, ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -309,6 +312,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
             .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+            .with_annotations(self.restarter_ignore_annotations())
             .build();
 
         let template = self.build_pod_template();
@@ -371,6 +375,42 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(spec),
             status: None,
         }
+    }
+
+    fn restarter_ignore_annotations(&self) -> Annotations {
+        let (security_settings_config_maps, security_settings_secrets) =
+            self.security_settings_resource_names();
+
+        let restarter_ignore_config_maps_annotations = security_settings_config_maps
+            .iter()
+            .enumerate()
+            .map(|(i, config_map_name)| {
+                (
+                    format!("restarter.stackable.tech/ignore-config-map.{i}"),
+                    config_map_name.to_string(),
+                )
+            });
+        let restarter_ignore_secrets_annotations = security_settings_secrets
+            .iter()
+            .enumerate()
+            .map(|(i, secret_name)| {
+                (
+                    format!("restarter.stackable.tech/ignore-secret.{i}"),
+                    secret_name.to_string(),
+                )
+            });
+
+        // The expectation is tested in the unit tests.
+        Annotations::try_from(
+            restarter_ignore_config_maps_annotations
+                .chain(restarter_ignore_secrets_annotations)
+                .collect::<BTreeMap<_, _>>(),
+        )
+        .expect(
+            "should contain only valid annotations because the annotation keys are statically \
+            defined apart from the index number and the names of ConfigMaps and Secrets are valid \
+            annotation values.",
+        )
     }
 
     /// Builds the [`PodTemplateSpec`] for the [`StatefulSet`] of the role group
@@ -1123,6 +1163,39 @@ impl<'a> RoleGroupBuilder<'a> {
         }]
     }
 
+    fn security_settings_resource_names(&self) -> (BTreeSet<ConfigMapName>, BTreeSet<SecretName>) {
+        let mut config_map_names = BTreeSet::new();
+        let mut secret_names = BTreeSet::new();
+
+        if let RoleGroupSecurityMode::Initializing { settings, .. }
+        | RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode
+        {
+            for file_type in settings {
+                match &file_type.content {
+                    v1alpha1::SecuritySettingsFileTypeContent::Value(_) => {
+                        config_map_names.insert(security_config_map_name(&self.cluster.name));
+                    }
+                    v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                        v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                            v1alpha1::ConfigMapKeyRef { name, .. },
+                        ),
+                    ) => {
+                        config_map_names.insert(name.clone());
+                    }
+                    v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                        v1alpha1::SecuritySettingsFileTypeContentValueFrom::SecretKeyRef(
+                            v1alpha1::SecretKeyRef { name, .. },
+                        ),
+                    ) => {
+                        secret_names.insert(name.clone());
+                    }
+                };
+            }
+        }
+
+        (config_map_names, secret_names)
+    }
+
     /// Builds the security settings volumes for the [`PodTemplateSpec`]
     /// It is not checked if these volumes are required in this role group.
     fn build_security_settings_volumes(
@@ -1711,6 +1784,15 @@ mod tests {
 
         let stateful_set = serde_json::to_value(role_group_builder.build_stateful_set())
             .expect("should be serializable");
+
+        let expected_annotations = match security_mode {
+            TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
+                "restarter.stackable.tech/ignore-config-map.0": "my-opensearch-cluster-security-config",
+                "restarter.stackable.tech/ignore-config-map.1": "opensearch-security-config",
+                "restarter.stackable.tech/ignore-secret.0": "opensearch-security-config",
+            }),
+            TestSecurityMode::Disabled | TestSecurityMode::Participating => json!({}),
+        };
 
         let expected_opensearch_container_volume_mounts = match security_mode {
             TestSecurityMode::Initializing => json!([
@@ -3026,6 +3108,7 @@ mod tests {
                 "apiVersion": "apps/v1",
                 "kind": "StatefulSet",
                 "metadata": {
+                    "annotations": expected_annotations,
                     "labels": {
                         "app.kubernetes.io/component": "nodes",
                         "app.kubernetes.io/instance": "my-opensearch-cluster",

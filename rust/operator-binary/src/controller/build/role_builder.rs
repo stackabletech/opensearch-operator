@@ -13,6 +13,7 @@ use stackable_operator::{
             rbac::v1::{ClusterRole, RoleBinding, RoleRef, Subject},
         },
     },
+    kube::api::ObjectMeta,
     kvp::{
         Label, Labels,
         consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
@@ -28,8 +29,7 @@ use crate::{
     framework::{
         NameIsValidLabelValue,
         builder::{
-            meta::{annotation_ignore_restarter, ownerreference_from_resource},
-            pdb::pod_disruption_budget_builder_with_role,
+            meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
         role_utils::ResourceNames,
         types::{
@@ -81,9 +81,7 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a ServiceAccount used by all role-groups
     pub fn build_service_account(&self) -> ServiceAccount {
-        let metadata = self
-            .common_metadata(self.resource_names.service_account_name())
-            .build();
+        let metadata = self.common_metadata(self.resource_names.service_account_name());
 
         ServiceAccount {
             metadata,
@@ -93,9 +91,7 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a RoleBinding used by all role-groups
     pub fn build_role_binding(&self) -> RoleBinding {
-        let metadata = self
-            .common_metadata(self.resource_names.role_binding_name())
-            .build();
+        let metadata = self.common_metadata(self.resource_names.role_binding_name());
 
         RoleBinding {
             metadata,
@@ -121,9 +117,7 @@ impl<'a> RoleBuilder<'a> {
             ..ServicePort::default()
         }];
 
-        let metadata = self
-            .common_metadata(seed_nodes_service_name(&self.cluster.name))
-            .build();
+        let metadata = self.common_metadata(seed_nodes_service_name(&self.cluster.name));
 
         let service_selector =
             RoleGroupBuilder::cluster_manager_labels(&self.cluster, self.context_names);
@@ -147,9 +141,7 @@ impl<'a> RoleBuilder<'a> {
 
     /// Builds a Listener whose status is used to populate the discovery ConfigMap.
     pub fn build_discovery_service_listener(&self) -> listener::v1alpha1::Listener {
-        let metadata = self
-            .common_metadata(discovery_service_listener_name(&self.cluster.name))
-            .build();
+        let metadata = self.common_metadata(discovery_service_listener_name(&self.cluster.name));
 
         let listener_class = &self.cluster.role_config.discovery_service_listener_class;
 
@@ -178,9 +170,7 @@ impl<'a> RoleBuilder<'a> {
     pub fn build_maybe_discovery_config_map(&self) -> Option<ConfigMap> {
         let discovery_endpoint = self.cluster.discovery_endpoint.as_ref()?;
 
-        let metadata = self
-            .common_metadata(discovery_config_map_name(&self.cluster.name))
-            .build();
+        let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
 
         let protocol = if self.cluster.is_server_tls_enabled() {
             "https"
@@ -221,10 +211,7 @@ impl<'a> RoleBuilder<'a> {
     /// Returns `None` if the security plugin is disabled or all configuration files are
     /// references.
     pub fn build_maybe_security_config_map(&self) -> Option<ConfigMap> {
-        let metadata = self
-            .common_metadata(security_config_map_name(&self.cluster.name))
-            .with_annotation(annotation_ignore_restarter())
-            .build();
+        let metadata = self.common_metadata(security_config_map_name(&self.cluster.name));
 
         let mut data = BTreeMap::new();
 
@@ -277,10 +264,8 @@ impl<'a> RoleBuilder<'a> {
     }
 
     /// Common metadata for role resources
-    fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMetaBuilder {
-        let mut builder = ObjectMetaBuilder::new();
-
-        builder
+    fn common_metadata(&self, resource_name: impl Into<String>) -> ObjectMeta {
+        ObjectMetaBuilder::new()
             .name(resource_name)
             .namespace(&self.cluster.namespace)
             .ownerreference(ownerreference_from_resource(
@@ -288,9 +273,8 @@ impl<'a> RoleBuilder<'a> {
                 None,
                 Some(true),
             ))
-            .with_labels(self.labels());
-
-        builder
+            .with_labels(self.labels())
+            .build()
     }
 
     /// Common labels for role resources
@@ -763,9 +747,6 @@ mod tests {
                 "apiVersion": "v1",
                 "kind": "ConfigMap",
                 "metadata": {
-                    "annotations": {
-                        "restarter.stackable.tech/ignore": "true"
-                    },
                     "labels": {
                         "app.kubernetes.io/component": "nodes",
                         "app.kubernetes.io/instance": "my-opensearch-cluster",
