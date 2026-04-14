@@ -24,7 +24,19 @@ kind: StatefulSet
 metadata:
   name: opensearch-nodes-security-config
   annotations:
-    restarter.stackable.tech/ignore-config-map.0: "opensearch-security-config"
+    restarter.stackable.tech/ignore-configmap.0: opensearch-security-config
+    restarter.stackable.tech/ignore-configmap.1: security-config
+    restarter.stackable.tech/ignore-secret.0: security-config-file-internal-users
+  labels:
+    restarter.stackable.tech/enabled: "true"
+spec:
+  template:
+    metadata:
+      annotations:
+        # configmap.restarter.stackable.tech/opensearch-nodes-security-config: <uid>/<resourceVersion>
+        configmap.restarter.stackable.tech/opensearch-security-config: changes-ignored
+        configmap.restarter.stackable.tech/security-config: changes-ignored
+        secret.restarter.stackable.tech/security-config-file-internal-users: changes-ignored
 status:
   readyReplicas: 1
   replicas: 1

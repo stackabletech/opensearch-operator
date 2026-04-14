@@ -386,7 +386,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .enumerate()
             .map(|(i, config_map_name)| {
                 (
-                    format!("restarter.stackable.tech/ignore-config-map.{i}"),
+                    format!("restarter.stackable.tech/ignore-configmap.{i}"),
                     config_map_name.to_string(),
                 )
             });
@@ -1787,8 +1787,8 @@ mod tests {
 
         let expected_annotations = match security_mode {
             TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
-                "restarter.stackable.tech/ignore-config-map.0": "my-opensearch-cluster-security-config",
-                "restarter.stackable.tech/ignore-config-map.1": "opensearch-security-config",
+                "restarter.stackable.tech/ignore-configmap.0": "my-opensearch-cluster-security-config",
+                "restarter.stackable.tech/ignore-configmap.1": "opensearch-security-config",
                 "restarter.stackable.tech/ignore-secret.0": "opensearch-security-config",
             }),
             TestSecurityMode::Disabled | TestSecurityMode::Participating => json!({}),

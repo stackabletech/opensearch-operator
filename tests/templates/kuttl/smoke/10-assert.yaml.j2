@@ -11,7 +11,7 @@ kind: StatefulSet
 metadata:
   name: opensearch-nodes-cluster-manager
   annotations:
-    restarter.stackable.tech/ignore-config-map.0: opensearch-security-config
+    restarter.stackable.tech/ignore-configmap.0: opensearch-security-config
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -40,8 +40,8 @@ spec:
   template:
     metadata:
       annotations:
-        # configmap.restarter.stackable.tech/opensearch-nodes-cluster-manager: <UID>
-        # configmap.restarter.stackable.tech/opensearch-security-config: <UID>
+        # configmap.restarter.stackable.tech/opensearch-nodes-cluster-manager: <uid>/<resourceVersion>
+        configmap.restarter.stackable.tech/opensearch-security-config: changes-ignored
         kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
@@ -493,7 +493,7 @@ kind: StatefulSet
 metadata:
   name: opensearch-nodes-data
   annotations:
-    restarter.stackable.tech/ignore-config-map.0: opensearch-security-config
+    restarter.stackable.tech/ignore-configmap.0: opensearch-security-config
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -522,8 +522,8 @@ spec:
   template:
     metadata:
       annotations:
-        # configmap.restarter.stackable.tech/opensearch-nodes-data: <UID>
-        # configmap.restarter.stackable.tech/opensearch-security-config: <UID>
+        # configmap.restarter.stackable.tech/opensearch-nodes-data: <uid>/<resourceVersion>
+        configmap.restarter.stackable.tech/opensearch-security-config: changes-ignored
         kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
