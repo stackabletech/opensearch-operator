@@ -32,8 +32,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: custom-opensearch-security-config
-  annotations:
-    restarter.stackable.tech/ignore: "true"
 data:
   config.yml: |
     ---
