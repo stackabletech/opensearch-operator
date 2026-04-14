@@ -10,6 +10,8 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: opensearch-nodes-cluster-manager
+  annotations:
+    restarter.stackable.tech/ignore-config-map.0: opensearch-security-config
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -17,8 +19,8 @@ metadata:
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: cluster-manager
     app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
-    stackable.tech/vendor: Stackable
     restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
   generation: 1 # There should be no unneeded Pod restarts
   ownerReferences:
   - apiVersion: opensearch.stackable.tech/v1alpha1
@@ -38,6 +40,8 @@ spec:
   template:
     metadata:
       annotations:
+        # configmap.restarter.stackable.tech/opensearch-nodes-cluster-manager: <UID>
+        # configmap.restarter.stackable.tech/opensearch-security-config: <UID>
         kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
@@ -488,6 +492,8 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: opensearch-nodes-data
+  annotations:
+    restarter.stackable.tech/ignore-config-map.0: opensearch-security-config
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
@@ -495,8 +501,8 @@ metadata:
     app.kubernetes.io/name: opensearch
     app.kubernetes.io/role-group: data
     app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
-    stackable.tech/vendor: Stackable
     restarter.stackable.tech/enabled: "true"
+    stackable.tech/vendor: Stackable
   generation: 1 # There should be no unneeded Pod restarts
   ownerReferences:
   - apiVersion: opensearch.stackable.tech/v1alpha1
@@ -516,6 +522,8 @@ spec:
   template:
     metadata:
       annotations:
+        # configmap.restarter.stackable.tech/opensearch-nodes-data: <UID>
+        # configmap.restarter.stackable.tech/opensearch-security-config: <UID>
         kubectl.kubernetes.io/default-container: opensearch
       labels:
         app.kubernetes.io/component: nodes
@@ -941,8 +949,6 @@ status:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  annotations:
-    restarter.stackable.tech/ignore: "true"
   labels:
     app.kubernetes.io/component: nodes
     app.kubernetes.io/instance: opensearch
