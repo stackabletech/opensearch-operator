@@ -149,7 +149,7 @@ function wait_for_configuration_changes_or_shutdown () {
 }
 
 function wait_for_shutdown () {
-    until test ! -e "$VECTOR_CONTROL_DIR/shutdown"
+    until test -e "$VECTOR_CONTROL_DIR/shutdown"
     do
         inotifywait \
             --quiet --quiet \
