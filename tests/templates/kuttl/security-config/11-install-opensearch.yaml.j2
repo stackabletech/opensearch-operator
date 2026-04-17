@@ -85,6 +85,8 @@ spec:
             storage:
               data:
                 capacity: 100Mi
+        # Test two replicas: The first pod will update the security index and the second pod will
+        # step aside.
         replicas: 2
     configOverrides:
       opensearch.yml:
