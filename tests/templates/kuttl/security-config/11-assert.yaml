@@ -6,7 +6,7 @@ timeout: 600
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: opensearch-nodes-cluster-manager
+  name: opensearch-nodes-default
 status:
   readyReplicas: 3
   replicas: 3
@@ -14,15 +14,7 @@ status:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: opensearch-nodes-data
-status:
-  readyReplicas: 2
-  replicas: 2
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: opensearch-nodes-security-config
+  name: opensearch-nodes-security-coord
   annotations:
     restarter.stackable.tech/ignore-configmap.0: opensearch-security-config
     restarter.stackable.tech/ignore-configmap.1: security-config
@@ -33,13 +25,13 @@ spec:
   template:
     metadata:
       annotations:
-        # configmap.restarter.stackable.tech/opensearch-nodes-security-config: <uid>/<resourceVersion>
+        # configmap.restarter.stackable.tech/opensearch-nodes-security-coord: <uid>/<resourceVersion>
         configmap.restarter.stackable.tech/opensearch-security-config: changes-ignored
         configmap.restarter.stackable.tech/security-config: changes-ignored
         secret.restarter.stackable.tech/security-config-file-internal-users: changes-ignored
 status:
-  readyReplicas: 1
-  replicas: 1
+  readyReplicas: 2
+  replicas: 2
 ---
 apiVersion: v1
 kind: ConfigMap

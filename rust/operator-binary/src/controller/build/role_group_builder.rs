@@ -65,6 +65,9 @@ use crate::{
                 container::{EnvVarName, EnvVarSet, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
+            statefulset::{
+                restarter_ignore_configmap_annotations, restarter_ignore_secret_annotations,
+            },
         },
         kvp::label::{recommended_labels, role_group_selector, role_selector},
         product_logging::framework::{
@@ -381,36 +384,11 @@ impl<'a> RoleGroupBuilder<'a> {
         let (security_settings_config_maps, security_settings_secrets) =
             self.security_settings_resource_names();
 
-        let restarter_ignore_config_maps_annotations = security_settings_config_maps
-            .iter()
-            .enumerate()
-            .map(|(i, config_map_name)| {
-                (
-                    format!("restarter.stackable.tech/ignore-configmap.{i}"),
-                    config_map_name.to_string(),
-                )
-            });
-        let restarter_ignore_secrets_annotations = security_settings_secrets
-            .iter()
-            .enumerate()
-            .map(|(i, secret_name)| {
-                (
-                    format!("restarter.stackable.tech/ignore-secret.{i}"),
-                    secret_name.to_string(),
-                )
-            });
-
-        // The expectation is tested in the unit tests.
-        Annotations::try_from(
-            restarter_ignore_config_maps_annotations
-                .chain(restarter_ignore_secrets_annotations)
-                .collect::<BTreeMap<_, _>>(),
-        )
-        .expect(
-            "should contain only valid annotations because the annotation keys are statically \
-            defined apart from the index number and the names of ConfigMaps and Secrets are valid \
-            annotation values.",
-        )
+        let mut annotations = restarter_ignore_configmap_annotations(security_settings_config_maps);
+        annotations.extend(restarter_ignore_secret_annotations(
+            security_settings_secrets,
+        ));
+        annotations
     }
 
     /// Builds the [`PodTemplateSpec`] for the [`StatefulSet`] of the role group
