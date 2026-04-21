@@ -1,6 +1,14 @@
 = SDP upgrade notes
 :description: Instructions for upgrading the SDP versions.
 
+== Upgrade from SDP 26.3 to 26.7
+
+=== Dedicated ConfigMap for security settings
+
+The security settings defined in the cluster specification are now stored in a separate ConfigMap named `<cluster-name>-security-config`.
+If you used this name for your custom security configuration, then you must rename it.
+Otherwise the operator will override it.
+
 == Upgrade from SDP 25.11 to 26.3
 
 When upgrading the OpenSearch operator from SDP 25.11 to 26.3, you may encounter several warnings and errors in the operator logs.

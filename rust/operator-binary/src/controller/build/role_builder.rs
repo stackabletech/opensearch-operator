@@ -1,6 +1,6 @@
 //! Builder for role resources
 
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
     builder::meta::ObjectMetaBuilder,
@@ -23,8 +23,9 @@ use stackable_operator::{
 use crate::{
     controller::{
         ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        ValidatedCluster, build::role_group_builder::RoleGroupBuilder,
+        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
     },
+    crd::v1alpha1,
     framework::{
         NameIsValidLabelValue,
         builder::{
@@ -166,7 +167,7 @@ impl<'a> RoleBuilder<'a> {
     /// The discovery endpoint is derived from the status of the discovery service Listener. If the
     /// status is not set yet, the reconciliation process will occur again once the Listener status
     /// is updated, leading to the eventual creation of the discovery ConfigMap.
-    pub fn build_discovery_config_map(&self) -> Option<ConfigMap> {
+    pub fn build_maybe_discovery_config_map(&self) -> Option<ConfigMap> {
         let discovery_endpoint = self.cluster.discovery_endpoint.as_ref()?;
 
         let metadata = self.common_metadata(discovery_config_map_name(&self.cluster.name));
@@ -202,6 +203,40 @@ impl<'a> RoleBuilder<'a> {
             data: Some(data.into()),
             ..ConfigMap::default()
         })
+    }
+
+    /// Builds the [`ConfigMap`] containing the security configuration files that were defined by
+    /// value.
+    ///
+    /// Returns `None` if the security plugin is disabled or all configuration files are
+    /// references.
+    pub fn build_maybe_security_config_map(&self) -> Option<ConfigMap> {
+        let metadata = self.common_metadata(security_config_map_name(&self.cluster.name));
+
+        let mut data = BTreeMap::new();
+
+        if let ValidatedSecurity::ManagedByApi { settings, .. }
+        | ValidatedSecurity::ManagedByOperator { settings, .. } = &self.cluster.security
+        {
+            for file_type in settings {
+                if let v1alpha1::SecuritySettingsFileTypeContent::Value(
+                    v1alpha1::SecuritySettingsFileTypeContentValue { value },
+                ) = &file_type.content
+                {
+                    data.insert(file_type.filename.to_owned(), value.to_string());
+                }
+            }
+        }
+
+        if data.is_empty() {
+            None
+        } else {
+            Some(ConfigMap {
+                metadata,
+                data: Some(data),
+                ..ConfigMap::default()
+            })
+        }
     }
 
     /// Builds a [`PodDisruptionBudget`] used by all role-groups
@@ -295,6 +330,20 @@ fn discovery_config_map_name(cluster_name: &ClusterName) -> ConfigMapName {
     let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
 
     ConfigMapName::from_str(cluster_name.as_ref()).expect("should be a valid ConfigMap name")
+}
+
+pub fn security_config_map_name(cluster_name: &ClusterName) -> ConfigMapName {
+    const SUFFIX: &str = "-security-config";
+
+    // compile-time checks
+    const _: () = assert!(
+        ClusterName::MAX_LENGTH + SUFFIX.len() <= ConfigMapName::MAX_LENGTH,
+        "The string `<cluster_name>-security-config` must not exceed the limit of ConfigMap names."
+    );
+    let _ = ClusterName::IS_RFC_1123_SUBDOMAIN_NAME;
+
+    ConfigMapName::from_str(&format!("{}{SUFFIX}", cluster_name.as_ref()))
+        .expect("should be a valid ConfigMap name")
 }
 
 pub fn discovery_service_listener_name(cluster_name: &ClusterName) -> ListenerName {
@@ -640,12 +689,13 @@ mod tests {
     }
 
     #[test]
-    fn test_build_discovery_config_map() {
+    fn test_build_maybe_discovery_config_map() {
         let context_names = context_names();
         let role_builder = role_builder(&context_names);
 
-        let discovery_config_map = serde_json::to_value(role_builder.build_discovery_config_map())
-            .expect("should be serializable");
+        let discovery_config_map =
+            serde_json::to_value(role_builder.build_maybe_discovery_config_map())
+                .expect("should be serializable");
 
         assert_eq!(
             json!({
@@ -680,6 +730,56 @@ mod tests {
                 },
             }),
             discovery_config_map
+        );
+    }
+
+    #[test]
+    fn test_build_maybe_security_config_map() {
+        let context_names = context_names();
+        let role_builder = role_builder(&context_names);
+
+        let security_config_map =
+            serde_json::to_value(role_builder.build_maybe_security_config_map())
+                .expect("should be serializable");
+
+        assert_eq!(
+            json!({
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "labels": {
+                        "app.kubernetes.io/component": "nodes",
+                        "app.kubernetes.io/instance": "my-opensearch-cluster",
+                        "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
+                        "app.kubernetes.io/name": "opensearch",
+                        "app.kubernetes.io/version": "3.4.0",
+                        "stackable.tech/vendor": "Stackable",
+                    },
+                    "name": "my-opensearch-cluster-security-config",
+                    "namespace": "default",
+                    "ownerReferences": [
+                        {
+                            "apiVersion": "opensearch.stackable.tech/v1alpha1",
+                            "controller": true,
+                            "kind": "OpenSearchCluster",
+                            "name": "my-opensearch-cluster",
+                            "uid": "0b1e30e6-326e-4c1a-868d-ad6598b49e8b",
+                        },
+                    ],
+                },
+                "data": {
+                    "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
+                    "allowlist.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
+                    "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
+                    "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
+                    "internal_users.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"internalusers\"}}",
+                    "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
+                    "roles.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"roles\"}}",
+                    "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
+                    "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
+                },
+            }),
+            security_config_map
         );
     }
 

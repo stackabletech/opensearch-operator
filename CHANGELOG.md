@@ -4,11 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support hot-reloading of security configuration files ([#130]).
+
 ### Changed
 
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#129]).
 
 [#129]: https://github.com/stackabletech/opensearch-operator/pull/129
+[#130]: https://github.com/stackabletech/opensearch-operator/pull/130
 
 ## [26.3.0] - 2026-03-16
 

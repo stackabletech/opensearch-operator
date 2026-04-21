@@ -144,6 +144,8 @@ spec:
 
 If this role group is not defined, it will be created by the operator.
 
+Settings managed by the operator are hot-reloaded when changed, i.e. without pod restarts.
+
 == TLS
 
 TLS is also managed by the OpenSearch security plugin, therefore TLS is only available if the security plugin was not disabled.

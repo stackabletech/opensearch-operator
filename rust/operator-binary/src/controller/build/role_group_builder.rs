@@ -1,6 +1,9 @@
 //! Builder for role group resources
 
-use std::{collections::BTreeMap, str::FromStr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    str::FromStr,
+};
 
 use stackable_operator::{
     builder::{
@@ -47,8 +50,11 @@ use crate::{
     controller::{
         ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
         TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
-        build::product_logging::config::{
-            MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
+        build::{
+            product_logging::config::{
+                MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
+            },
+            role_builder::security_config_map_name,
         },
     },
     crd::{ExtendedSecuritySettingsFileType, v1alpha1},
@@ -59,6 +65,9 @@ use crate::{
                 container::{EnvVarName, EnvVarSet, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
+            statefulset::{
+                restarter_ignore_configmap_annotations, restarter_ignore_secret_annotations,
+            },
         },
         kvp::label::{recommended_labels, role_group_selector, role_selector},
         product_logging::framework::{
@@ -67,8 +76,8 @@ use crate::{
         role_group_utils::ResourceNames,
         types::{
             kubernetes::{
-                ListenerName, PersistentVolumeClaimName, SecretClassName, ServiceAccountName,
-                ServiceName, VolumeName,
+                ConfigMapName, ListenerName, PersistentVolumeClaimName, SecretClassName,
+                SecretName, ServiceAccountName, ServiceName, VolumeName,
             },
             operator::RoleGroupName,
         },
@@ -294,19 +303,6 @@ impl<'a> RoleGroupBuilder<'a> {
             data.insert(VECTOR_CONFIG_FILE.to_owned(), vector_config_file_content());
         }
 
-        if let RoleGroupSecurityMode::Initializing { settings, .. }
-        | RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode
-        {
-            for file_type in settings {
-                if let v1alpha1::SecuritySettingsFileTypeContent::Value(
-                    v1alpha1::SecuritySettingsFileTypeContentValue { value },
-                ) = &file_type.content
-                {
-                    data.insert(file_type.filename.to_owned(), value.to_string());
-                }
-            }
-        }
-
         ConfigMap {
             metadata,
             data: Some(data),
@@ -319,6 +315,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let metadata = self
             .common_metadata(self.resource_names.stateful_set_name())
             .with_label(RESTART_CONTROLLER_ENABLED_LABEL.to_owned())
+            .with_annotations(self.restarter_ignore_annotations())
             .build();
 
         let template = self.build_pod_template();
@@ -381,6 +378,17 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(spec),
             status: None,
         }
+    }
+
+    fn restarter_ignore_annotations(&self) -> Annotations {
+        let (security_settings_config_maps, security_settings_secrets) =
+            self.security_settings_resource_names();
+
+        let mut annotations = restarter_ignore_configmap_annotations(security_settings_config_maps);
+        annotations.extend(restarter_ignore_secret_annotations(
+            security_settings_secrets,
+        ));
+        annotations
     }
 
     /// Builds the [`PodTemplateSpec`] for the [`StatefulSet`] of the role group
@@ -725,7 +733,10 @@ impl<'a> RoleGroupBuilder<'a> {
         };
 
         if let RoleGroupSecurityMode::Initializing { settings, .. } = &self.security_mode {
-            volume_mounts.extend(self.security_config_volume_mounts(settings));
+            // Mount the security configuration files using `subPath`, because the configuration
+            // files are only used for initializing the security index and hot-reloading is not
+            // required.
+            volume_mounts.extend(self.security_config_volume_mounts(settings, true));
         };
 
         if !self.cluster.keystores.is_empty() {
@@ -788,23 +799,45 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Builds the security settings volume mounts for the [`v1alpha1::Container::OpenSearch`]
     /// container or the [`v1alpha1::Container::UpdateSecurityConfig`] container
+    ///
+    /// If `use_sub_path` is set to `true`, then the configuration files are directly mounted via
+    /// `subPath` into the opensearch-security configuration directory. If it is set to `false`,
+    /// then they are mounted into sub directories of the opensearch-security configuration
+    /// directory without using `subPath`. Files mounted via `subPath` are not updated on changes
+    /// in the ConfigMap or Secret volume. Therefore, hot-reloading works only without `subPath`,
+    /// but links from the configuration directory into the sub directories are required.
     fn security_config_volume_mounts(
         &self,
         settings: &v1alpha1::SecuritySettings,
+        use_sub_path: bool,
     ) -> Vec<VolumeMount> {
         let mut volume_mounts = vec![];
 
         let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
         for file_type in settings {
-            volume_mounts.push(VolumeMount {
-                mount_path: format!(
+            let mount_path;
+            let sub_path;
+
+            if use_sub_path {
+                mount_path = format!(
                     "{opensearch_path_conf}/opensearch-security/{filename}",
                     filename = file_type.filename.to_owned()
-                ),
+                );
+                sub_path = Some(file_type.filename.to_owned());
+            } else {
+                mount_path = format!(
+                    "{opensearch_path_conf}/opensearch-security/{file_type}",
+                    file_type = file_type.id
+                );
+                sub_path = None;
+            }
+
+            volume_mounts.push(VolumeMount {
+                mount_path,
                 name: Self::security_settings_file_type_volume_name(&file_type).to_string(),
                 read_only: Some(true),
-                sub_path: Some(file_type.filename.to_owned()),
+                sub_path,
                 ..VolumeMount::default()
             });
         }
@@ -877,7 +910,10 @@ impl<'a> RoleGroupBuilder<'a> {
                 ..VolumeMount::default()
             },
         ];
-        volume_mounts.extend(self.security_config_volume_mounts(settings));
+
+        // Mount the security configuration files without using `subPath`, so that hot-reloading
+        // works.
+        volume_mounts.extend(self.security_config_volume_mounts(settings, false));
 
         let mut env_vars = EnvVarSet::new()
             .with_value(
@@ -1105,6 +1141,39 @@ impl<'a> RoleGroupBuilder<'a> {
         }]
     }
 
+    fn security_settings_resource_names(&self) -> (BTreeSet<ConfigMapName>, BTreeSet<SecretName>) {
+        let mut config_map_names = BTreeSet::new();
+        let mut secret_names = BTreeSet::new();
+
+        if let RoleGroupSecurityMode::Initializing { settings, .. }
+        | RoleGroupSecurityMode::Managing { settings, .. } = &self.security_mode
+        {
+            for file_type in settings {
+                match &file_type.content {
+                    v1alpha1::SecuritySettingsFileTypeContent::Value(_) => {
+                        config_map_names.insert(security_config_map_name(&self.cluster.name));
+                    }
+                    v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                        v1alpha1::SecuritySettingsFileTypeContentValueFrom::ConfigMapKeyRef(
+                            v1alpha1::ConfigMapKeyRef { name, .. },
+                        ),
+                    ) => {
+                        config_map_names.insert(name.clone());
+                    }
+                    v1alpha1::SecuritySettingsFileTypeContent::ValueFrom(
+                        v1alpha1::SecuritySettingsFileTypeContentValueFrom::SecretKeyRef(
+                            v1alpha1::SecretKeyRef { name, .. },
+                        ),
+                    ) => {
+                        secret_names.insert(name.clone());
+                    }
+                };
+            }
+        }
+
+        (config_map_names, secret_names)
+    }
+
     /// Builds the security settings volumes for the [`PodTemplateSpec`]
     /// It is not checked if these volumes are required in this role group.
     fn build_security_settings_volumes(
@@ -1125,7 +1194,7 @@ impl<'a> RoleGroupBuilder<'a> {
                             mode: Some(0o660),
                             path: file_type.filename.to_owned(),
                         }]),
-                        name: self.resource_names.role_group_config_map().to_string(),
+                        name: security_config_map_name(&self.cluster.name).to_string(),
                         ..Default::default()
                     }),
                     ..Volume::default()
@@ -1628,12 +1697,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case::security_mode_initializing(TestSecurityMode::Initializing)]
-    #[case::security_mode_managing(TestSecurityMode::Managing)]
-    #[case::security_mode_participating(TestSecurityMode::Participating)]
-    #[case::security_mode_disabled(TestSecurityMode::Disabled)]
-    fn test_build_config_map(#[case] security_mode: TestSecurityMode) {
-        let cluster = validated_cluster(security_mode);
+    fn test_build_config_map() {
+        let cluster = validated_cluster(TestSecurityMode::Disabled);
         let context_names = context_names();
         let role_group_builder = role_group_builder(&cluster, &context_names);
 
@@ -1648,26 +1713,6 @@ mod tests {
         config_map["data"]["opensearch.yml"].take();
         // vector.yaml is a static file and does not have to be repeated here.
         config_map["data"]["vector.yaml"].take();
-
-        let expected_data = match security_mode {
-            TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
-               "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
-               "allowlist.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
-               "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
-               "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
-               "log4j2.properties": null,
-               "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
-               "opensearch.yml": null,
-               "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
-               "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
-               "vector.yaml": null
-            }),
-            TestSecurityMode::Participating | TestSecurityMode::Disabled => json!({
-               "log4j2.properties": null,
-               "opensearch.yml": null,
-               "vector.yaml": null
-            }),
-        };
 
         assert_eq!(
             json!({
@@ -1695,7 +1740,11 @@ mod tests {
                         }
                     ]
                 },
-                "data": expected_data
+                "data": {
+                    "log4j2.properties": null,
+                    "opensearch.yml": null,
+                    "vector.yaml": null
+                }
             }),
             config_map
         );
@@ -1713,6 +1762,15 @@ mod tests {
 
         let stateful_set = serde_json::to_value(role_group_builder.build_stateful_set())
             .expect("should be serializable");
+
+        let expected_annotations = match security_mode {
+            TestSecurityMode::Initializing | TestSecurityMode::Managing => json!({
+                "restarter.stackable.tech/ignore-configmap.0": "my-opensearch-cluster-security-config",
+                "restarter.stackable.tech/ignore-configmap.1": "opensearch-security-config",
+                "restarter.stackable.tech/ignore-secret.0": "opensearch-security-config",
+            }),
+            TestSecurityMode::Disabled | TestSecurityMode::Participating => json!({}),
+        };
 
         let expected_opensearch_container_volume_mounts = match security_mode {
             TestSecurityMode::Initializing => json!([
@@ -2297,58 +2355,49 @@ mod tests {
                     "name": "log",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/action_groups.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/actiongroups",
                     "name": "security-config-file-actiongroups",
                     "readOnly": true,
-                    "subPath": "action_groups.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/allowlist.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/allowlist",
                     "name": "security-config-file-allowlist",
                     "readOnly": true,
-                    "subPath": "allowlist.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/audit.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/audit",
                     "name": "security-config-file-audit",
                     "readOnly": true,
-                    "subPath": "audit.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/config.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/config",
                     "name": "security-config-file-config",
                     "readOnly": true,
-                    "subPath": "config.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/internal_users.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/internalusers",
                     "name": "security-config-file-internalusers",
                     "readOnly": true,
-                    "subPath": "internal_users.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/nodes_dn.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/nodesdn",
                     "name": "security-config-file-nodesdn",
                     "readOnly": true,
-                    "subPath": "nodes_dn.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles",
                     "name": "security-config-file-roles",
                     "readOnly": true,
-                    "subPath": "roles.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/roles_mapping.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/rolesmapping",
                     "name": "security-config-file-rolesmapping",
                     "readOnly": true,
-                    "subPath": "roles_mapping.yml",
                 },
                 {
-                    "mountPath": "/stackable/opensearch/config/opensearch-security/tenants.yml",
+                    "mountPath": "/stackable/opensearch/config/opensearch-security/tenants",
                     "name": "security-config-file-tenants",
                     "readOnly": true,
-                    "subPath": "tenants.yml",
                 },
             ],
         });
@@ -2546,7 +2595,7 @@ mod tests {
                                 "path": "action_groups.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-actiongroups"
                 },
@@ -2559,7 +2608,7 @@ mod tests {
                                 "path": "allowlist.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-allowlist"
                 },
@@ -2572,7 +2621,7 @@ mod tests {
                                 "path": "audit.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-audit"
                 },
@@ -2585,7 +2634,7 @@ mod tests {
                                 "path": "config.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-config"
                 },
@@ -2611,7 +2660,7 @@ mod tests {
                                 "path": "nodes_dn.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-nodesdn"
                 },
@@ -2637,7 +2686,7 @@ mod tests {
                                 "path": "roles_mapping.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-rolesmapping"
                 },
@@ -2650,7 +2699,7 @@ mod tests {
                                 "path": "tenants.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-tenants"
                 },
@@ -2756,7 +2805,7 @@ mod tests {
                                 "path": "action_groups.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-actiongroups"
                 },
@@ -2769,7 +2818,7 @@ mod tests {
                                 "path": "allowlist.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-allowlist"
                 },
@@ -2782,7 +2831,7 @@ mod tests {
                                 "path": "audit.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-audit"
                 },
@@ -2795,7 +2844,7 @@ mod tests {
                                 "path": "config.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-config"
                 },
@@ -2821,7 +2870,7 @@ mod tests {
                                 "path": "nodes_dn.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-nodesdn"
                 },
@@ -2847,7 +2896,7 @@ mod tests {
                                 "path": "roles_mapping.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-rolesmapping"
                 },
@@ -2860,7 +2909,7 @@ mod tests {
                                 "path": "tenants.yml"
                             }
                         ],
-                        "name": "my-opensearch-cluster-nodes-default"
+                        "name": "my-opensearch-cluster-security-config"
                     },
                     "name": "security-config-file-tenants"
                 },
@@ -3037,6 +3086,7 @@ mod tests {
                 "apiVersion": "apps/v1",
                 "kind": "StatefulSet",
                 "metadata": {
+                    "annotations": expected_annotations,
                     "labels": {
                         "app.kubernetes.io/component": "nodes",
                         "app.kubernetes.io/instance": "my-opensearch-cluster",

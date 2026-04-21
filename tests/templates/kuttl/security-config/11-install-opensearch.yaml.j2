@@ -12,6 +12,7 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     security:
+      managingRoleGroup: security-coord
       settings:
         config:
           managedBy: operator
@@ -67,27 +68,25 @@ spec:
     roleConfig:
       discoveryServiceListenerClass: external-unstable
     roleGroups:
-      cluster-manager:
+      default:
         config:
           discoveryServiceExposed: true
-          nodeRoles:
-            - cluster_manager
           resources:
             storage:
               data:
                 capacity: 100Mi
         replicas: 3
-      data:
+      security-coord:
         config:
           discoveryServiceExposed: false
           nodeRoles:
-            - ingest
-            - data
-            - remote_cluster_client
+            - coordinating_only
           resources:
             storage:
               data:
-                capacity: 2Gi
+                capacity: 100Mi
+        # Test two replicas: The first pod will update the security index and the second pod will
+        # step aside.
         replicas: 2
     configOverrides:
       opensearch.yml:
