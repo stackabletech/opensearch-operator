@@ -1000,7 +1000,7 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn: ["CN=generated certificate for pod"]
+    plugins.security.nodes_dn: ["DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*","DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
@@ -1041,7 +1041,7 @@ data:
     node.store.allow_mmap: "false"
     path.logs: "/stackable/log/opensearch"
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn: ["CN=generated certificate for pod"]
+    plugins.security.nodes_dn: ["DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*","DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*"]
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
