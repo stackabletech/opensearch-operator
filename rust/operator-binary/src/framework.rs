@@ -24,6 +24,7 @@ use types::kubernetes::Uid;
 
 pub mod builder;
 pub mod cluster_resources;
+pub mod config_overrides;
 pub mod controller_utils;
 pub mod kvp;
 pub mod macros;

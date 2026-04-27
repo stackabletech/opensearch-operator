@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use stackable_operator::{
     config::{
         fragment::{self, FromFragment},
-        merge::{Merge, merge},
+        merge::{self, Merge, merge},
     },
     k8s_openapi::{DeepMerge, api::core::v1::PodTemplateSpec},
     role_utils::{CommonConfiguration, Role, RoleGroup},
@@ -38,10 +38,10 @@ impl Merge for GenericProductSpecificCommonConfig {
 /// * `config` is flattened.
 /// * The [`HashMap`] in `env_overrides` is replaced with an [`EnvVarSet`].
 #[derive(Clone, Debug, PartialEq)]
-pub struct RoleGroupConfig<ProductSpecificCommonConfig, T> {
+pub struct RoleGroupConfig<ProductSpecificCommonConfig, Config, ConfigOverrides> {
     pub replicas: u16,
-    pub config: T,
-    pub config_overrides: HashMap<String, HashMap<String, String>>,
+    pub config: Config,
+    pub config_overrides: ConfigOverrides,
     pub env_overrides: EnvVarSet,
     pub cli_overrides: BTreeMap<String, String>,
     pub pod_overrides: PodTemplateSpec,
@@ -50,7 +50,9 @@ pub struct RoleGroupConfig<ProductSpecificCommonConfig, T> {
     pub product_specific_common_config: ProductSpecificCommonConfig,
 }
 
-impl<ProductSpecificCommonConfig, T> RoleGroupConfig<ProductSpecificCommonConfig, T> {
+impl<ProductSpecificCommonConfig, Config, ConfigOverrides>
+    RoleGroupConfig<ProductSpecificCommonConfig, Config, ConfigOverrides>
+{
     pub fn cli_overrides_to_vec(&self) -> Vec<String> {
         self.cli_overrides
             .clone()
@@ -60,45 +62,25 @@ impl<ProductSpecificCommonConfig, T> RoleGroupConfig<ProductSpecificCommonConfig
     }
 }
 
-/// Variant of [`stackable_operator::role_utils::RoleGroup::validate_config`] with fixed types
-///
-/// The `role` parameter takes the `ProductSpecificCommonConfig` into account.
-pub fn validate_config<C, ProductSpecificCommonConfig, T, U>(
-    role_group: &RoleGroup<T, ProductSpecificCommonConfig>,
-    role: &Role<T, U, ProductSpecificCommonConfig>,
-    default_config: &T,
-) -> Result<C, fragment::ValidationError>
-where
-    C: FromFragment<Fragment = T>,
-    ProductSpecificCommonConfig: Default + JsonSchema + Serialize,
-    T: Merge + Clone,
-    U: Default + JsonSchema + Serialize,
-{
-    let mut role_config = role.config.config.clone();
-    role_config.merge(default_config);
-    let mut rolegroup_config = role_group.config.config.clone();
-    rolegroup_config.merge(&role_config);
-    fragment::validate(rolegroup_config)
-}
-
 /// Merges and validates the [`RoleGroup`] with the given `role` and `default_config`
-pub fn with_validated_config<C, ProductSpecificCommonConfig, T, U>(
-    role_group: &RoleGroup<T, ProductSpecificCommonConfig>,
-    role: &Role<T, U, ProductSpecificCommonConfig>,
-    default_config: &T,
-) -> Result<RoleGroup<C, ProductSpecificCommonConfig>, fragment::ValidationError>
+pub fn with_validated_config<C, CommonConfig, Config, RoleConfig, ConfigOverrides>(
+    role_group: &RoleGroup<Config, CommonConfig, ConfigOverrides>,
+    role: &Role<Config, ConfigOverrides, RoleConfig, CommonConfig>,
+    default_config: &Config,
+) -> Result<RoleGroup<C, CommonConfig, ConfigOverrides>, fragment::ValidationError>
 where
-    C: FromFragment<Fragment = T>,
-    ProductSpecificCommonConfig: Clone + Default + JsonSchema + Merge + Serialize,
-    T: Clone + Merge,
-    U: Default + JsonSchema + Serialize,
+    C: FromFragment<Fragment = Config>,
+    CommonConfig: Clone + Default + JsonSchema + Merge + Serialize,
+    Config: Clone + Merge,
+    RoleConfig: Default + JsonSchema + Serialize,
+    ConfigOverrides: Clone + Default + JsonSchema + Merge + Serialize,
 {
-    let validated_config = validate_config(role_group, role, default_config)?;
+    let validated_config = role_group.validate_config(role, default_config)?;
     Ok(RoleGroup {
         config: CommonConfiguration {
             config: validated_config,
             config_overrides: merged_config_overrides(
-                role.config.config_overrides.clone(),
+                &role.config.config_overrides,
                 role_group.config.config_overrides.clone(),
             ),
             env_overrides: merged_env_overrides(
@@ -122,20 +104,14 @@ where
     })
 }
 
-fn merged_config_overrides(
-    role_config_overrides: HashMap<String, HashMap<String, String>>,
-    role_group_config_overrides: HashMap<String, HashMap<String, String>>,
-) -> HashMap<String, HashMap<String, String>> {
-    let mut merged_config_overrides = role_config_overrides;
-
-    for (filename, role_group_config_file_overrides) in role_group_config_overrides {
-        merged_config_overrides
-            .entry(filename)
-            .or_default()
-            .extend(role_group_config_file_overrides);
-    }
-
-    merged_config_overrides
+fn merged_config_overrides<ConfigOverrides>(
+    role_config_overrides: &ConfigOverrides,
+    role_group_config_overrides: ConfigOverrides,
+) -> ConfigOverrides
+where
+    ConfigOverrides: Merge,
+{
+    merge::merge(role_group_config_overrides, role_config_overrides)
 }
 
 fn merged_env_overrides(
@@ -268,27 +244,30 @@ mod tests {
     }
 
     #[derive(Clone, Debug, Default, JsonSchema, Merge, PartialEq, Serialize)]
-    struct ProductCommonConfig {
+    struct CommonConfig {
         property: Option<String>,
     }
 
-    fn new_common_config<T>(
-        config: T,
+    #[derive(Clone, Debug, Default, JsonSchema, Merge, PartialEq, Serialize)]
+    struct ConfigOverrides(HashMap<String, Option<String>>);
+
+    fn new_common_config<Config>(
+        config: Config,
         override_value: Option<&str>,
-    ) -> CommonConfiguration<T, ProductCommonConfig> {
+    ) -> CommonConfiguration<Config, CommonConfig, ConfigOverrides> {
         let mut config_file_overrides = HashMap::new();
         let mut env_overrides = HashMap::new();
         let mut cli_overrides = BTreeMap::new();
 
         if let Some(value) = override_value {
-            config_file_overrides.insert("property".to_owned(), value.to_owned());
+            config_file_overrides.insert("property".to_owned(), Some(value.to_owned()));
             env_overrides.insert("PROPERTY".to_owned(), value.to_owned());
             cli_overrides.insert("--property".to_owned(), value.to_owned());
         }
 
         CommonConfiguration {
             config,
-            config_overrides: [("config.file".to_owned(), config_file_overrides)].into(),
+            config_overrides: ConfigOverrides(config_file_overrides),
             env_overrides,
             cli_overrides,
             pod_overrides: PodTemplateSpec {
@@ -298,7 +277,7 @@ mod tests {
                 }),
                 ..PodTemplateSpec::default()
             },
-            product_specific_common_config: ProductCommonConfig {
+            product_specific_common_config: CommonConfig {
                 property: override_value.map(str::to_owned),
             },
         }
@@ -341,7 +320,7 @@ mod tests {
             config: new_common_config(ConfigFragment::new(role_group_value), role_group_value),
             replicas: Some(3),
         };
-        let role = Role::<_, GenericRoleConfig, _> {
+        let role = Role::<_, _, GenericRoleConfig, _> {
             config: new_common_config(ConfigFragment::new(role_value), role_value),
             ..Role::default()
         };
@@ -367,13 +346,13 @@ mod tests {
             config: new_common_config(ConfigFragment::new(None), None),
             replicas: None,
         };
-        let role = Role::<_, GenericRoleConfig, _> {
+        let role = Role::<_, _, GenericRoleConfig, _> {
             config: new_common_config(ConfigFragment::new(None), None),
             ..Role::default()
         };
         let default_config = ConfigFragment::new(None);
 
-        let result: Result<RoleGroup<Config, _>, _> =
+        let result: Result<RoleGroup<Config, _, _>, _> =
             with_validated_config(&role_group, &role, &default_config);
 
         assert!(result.is_err())

@@ -146,8 +146,11 @@ impl ReconcilerError for Error {
     }
 }
 
-type OpenSearchRoleGroupConfig =
-    RoleGroupConfig<GenericProductSpecificCommonConfig, ValidatedOpenSearchConfig>;
+type OpenSearchRoleGroupConfig = RoleGroupConfig<
+    GenericProductSpecificCommonConfig,
+    ValidatedOpenSearchConfig,
+    v1alpha1::OpenSearchConfigOverrides,
+>;
 
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
@@ -484,10 +487,7 @@ pub async fn reconcile(
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use stackable_operator::{
         commons::{
@@ -661,7 +661,7 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),

@@ -359,10 +359,7 @@ pub fn discovery_service_listener_name(cluster_name: &ClusterName) -> ListenerNa
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -446,7 +443,7 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),

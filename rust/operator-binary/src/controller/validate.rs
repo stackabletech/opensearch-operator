@@ -18,14 +18,14 @@ use crate::{
         DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedNodeRole,
         ValidatedNodeRoles, ValidatedSecurity,
     },
-    crd::{NodeRoles, v1alpha1},
+    crd::{NodeRoles, OpenSearchRoleGroup, v1alpha1},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
-        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
+        role_utils::{RoleGroupConfig, with_validated_config},
         types::{
             common::Port,
             kubernetes::{ConfigMapName, Hostname},
@@ -190,12 +190,9 @@ fn validate_role_group_config(
     context_names: &ContextNames,
     cluster_name: &ClusterName,
     cluster: &v1alpha1::OpenSearchCluster,
-    role_group_config: &RoleGroup<
-        v1alpha1::OpenSearchConfigFragment,
-        GenericProductSpecificCommonConfig,
-    >,
+    role_group_config: &OpenSearchRoleGroup,
 ) -> Result<OpenSearchRoleGroupConfig> {
-    let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _> = with_validated_config(
+    let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _, _> = with_validated_config(
         role_group_config,
         &cluster.spec.nodes,
         &v1alpha1::OpenSearchConfig::default_config(
@@ -464,6 +461,7 @@ mod tests {
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
+            config_overrides::KeyValueConfigOverrides,
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
@@ -621,22 +619,25 @@ mod tests {
                             },
                             termination_grace_period_seconds: 300,
                         },
-                        config_overrides: [(
-                            "opensearch.yml".to_owned(),
-                            [
-                                ("setting1".to_owned(), "value from role level".to_owned()),
-                                (
-                                    "setting2".to_owned(),
-                                    "value from role-group level".to_owned()
-                                ),
-                                (
-                                    "setting3".to_owned(),
-                                    "value from role-group level".to_owned()
-                                ),
-                            ]
-                            .into()
-                        )]
-                        .into(),
+                        config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                            opensearch_yml: KeyValueConfigOverrides {
+                                overrides: [
+                                    (
+                                        "setting1".to_owned(),
+                                        Some("value from role level".to_owned())
+                                    ),
+                                    (
+                                        "setting2".to_owned(),
+                                        Some("value from role-group level".to_owned())
+                                    ),
+                                    (
+                                        "setting3".to_owned(),
+                                        Some("value from role-group level".to_owned())
+                                    ),
+                                ]
+                                .into()
+                            }
+                        },
                         env_overrides: EnvVarSet::new().with_values([
                             (
                                 EnvVarName::from_str_unsafe("ENV1"),
@@ -1038,15 +1039,15 @@ mod tests {
                             },
                             ..v1alpha1::OpenSearchConfigFragment::default()
                         },
-                        config_overrides: [(
-                            "opensearch.yml".to_owned(),
-                            [
-                                ("setting1".to_owned(), "value from role level".to_owned()),
-                                ("setting2".to_owned(), "value from role level".to_owned()),
-                            ]
-                            .into(),
-                        )]
-                        .into(),
+                        config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                            opensearch_yml: KeyValueConfigOverrides {
+                                overrides: [
+                                    ("setting1".to_owned(), Some("value from role level".to_owned())),
+                                    ("setting2".to_owned(), Some("value from role level".to_owned())),
+                                ]
+                                .into()
+                            }
+                        },
                         env_overrides: [
                             ("ENV1".to_owned(), "value from role level".to_owned()),
                             ("ENV2".to_owned(), "value from role level".to_owned()),
@@ -1084,21 +1085,21 @@ mod tests {
                                     )),
                                     ..v1alpha1::OpenSearchConfigFragment::default()
                                 },
-                                config_overrides: [(
-                                    "opensearch.yml".to_owned(),
-                                    [
-                                        (
-                                            "setting2".to_owned(),
-                                            "value from role-group level".to_owned(),
-                                        ),
-                                        (
-                                            "setting3".to_owned(),
-                                            "value from role-group level".to_owned(),
-                                        ),
-                                    ]
-                                    .into(),
-                                )]
-                                .into(),
+                                config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                                    opensearch_yml: KeyValueConfigOverrides {
+                                        overrides: [
+                                            (
+                                                "setting2".to_owned(),
+                                                Some("value from role-group level".to_owned()),
+                                            ),
+                                            (
+                                                "setting3".to_owned(),
+                                                Some("value from role-group level".to_owned()),
+                                            ),
+                                        ]
+                                        .into()
+                                    }
+                                },
                                 env_overrides: [
                                     ("ENV2".to_owned(), "value from role-group level".to_owned()),
                                     ("ENV3".to_owned(), "value from role-group level".to_owned()),
