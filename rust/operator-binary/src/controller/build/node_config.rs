@@ -562,7 +562,7 @@ mod tests {
         framework::{
             config_overrides::KeyValueConfigOverrides,
             product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{
                     ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
@@ -635,7 +635,7 @@ mod tests {
             ),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         };
 
         let security_settings = v1alpha1::SecuritySettings {

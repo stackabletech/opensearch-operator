@@ -87,7 +87,7 @@ mod tests {
         crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 common::Port,
                 kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName},
@@ -249,7 +249,7 @@ mod tests {
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         }
     }
 }

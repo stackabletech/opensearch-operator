@@ -465,7 +465,7 @@ mod tests {
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
-            role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+            role_utils::{GenericCommonConfig, RoleGroupConfig},
             types::{
                 common::Port,
                 kubernetes::{
@@ -684,8 +684,7 @@ mod tests {
                             }),
                             ..PodTemplateSpec::default()
                         },
-                        product_specific_common_config: GenericProductSpecificCommonConfig::default(
-                        )
+                        product_specific_common_config: GenericCommonConfig::default()
                     }
                 )]
                 .into(),
@@ -1071,7 +1070,7 @@ mod tests {
                             }),
                             ..PodTemplateSpec::default()
                         },
-                        product_specific_common_config: GenericProductSpecificCommonConfig::default(
+                        product_specific_common_config: GenericCommonConfig::default(
                         ),
                     },
                     role_config: v1alpha1::OpenSearchRoleConfig::default(),
@@ -1136,7 +1135,7 @@ mod tests {
                                     ..PodTemplateSpec::default()
                                 },
                                 product_specific_common_config:
-                                    GenericProductSpecificCommonConfig::default(),
+                                    GenericCommonConfig::default(),
                             },
                             replicas: Some(3),
                         },

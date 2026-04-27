@@ -34,7 +34,7 @@ use crate::{
     framework::{
         NameIsValidLabelValue,
         config_overrides::KeyValueConfigOverrides,
-        role_utils::GenericProductSpecificCommonConfig,
+        role_utils::GenericCommonConfig,
         types::{
             kubernetes::{
                 ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName, SecretClassName,
@@ -53,12 +53,12 @@ type OpenSearchRole = Role<
     v1alpha1::OpenSearchConfigFragment,
     v1alpha1::OpenSearchConfigOverrides,
     v1alpha1::OpenSearchRoleConfig,
-    GenericProductSpecificCommonConfig,
+    GenericCommonConfig,
 >;
 
 pub type OpenSearchRoleGroup = RoleGroup<
     v1alpha1::OpenSearchConfigFragment,
-    GenericProductSpecificCommonConfig,
+    GenericCommonConfig,
     v1alpha1::OpenSearchConfigOverrides,
 >;
 

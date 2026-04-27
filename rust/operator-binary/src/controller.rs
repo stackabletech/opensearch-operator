@@ -41,7 +41,7 @@ use crate::{
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
-        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+        role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
             common::Port,
             kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName, Uid},
@@ -147,7 +147,7 @@ impl ReconcilerError for Error {
 }
 
 type OpenSearchRoleGroupConfig = RoleGroupConfig<
-    GenericProductSpecificCommonConfig,
+    GenericCommonConfig,
     ValidatedOpenSearchConfig,
     v1alpha1::OpenSearchConfigOverrides,
 >;
@@ -511,7 +511,7 @@ mod tests {
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
@@ -665,7 +665,7 @@ mod tests {
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         }
     }
 }

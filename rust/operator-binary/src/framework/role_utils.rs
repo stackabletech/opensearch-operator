@@ -22,12 +22,11 @@ use super::{
     },
 };
 
-/// Variant of [`stackable_operator::role_utils::GenericProductSpecificCommonConfig`] that
-/// implements [`Merge`]
+/// Variant of [`stackable_operator::role_utils::GenericCommonConfig`] that implements [`Merge`]
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
-pub struct GenericProductSpecificCommonConfig {}
+pub struct GenericCommonConfig {}
 
-impl Merge for GenericProductSpecificCommonConfig {
+impl Merge for GenericCommonConfig {
     fn merge(&mut self, _defaults: &Self) {}
 }
 
