@@ -1871,7 +1871,6 @@ spec:
                           nullable: true
                           type: string
                         default: {}
-                        description: Mergable variant of ...
                         type: object
                     type: object
                   envOverrides:
@@ -2565,7 +2564,6 @@ spec:
                                 nullable: true
                                 type: string
                               default: {}
-                              description: Mergable variant of ...
                               type: object
                           type: object
                         envOverrides:
