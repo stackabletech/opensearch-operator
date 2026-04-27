@@ -1945,9 +1945,7 @@ spec:
                     type: object
                   roleGroups:
                     additionalProperties:
-                      description: |-
-                        Variant of [`stackable_operator::role_utils::GenericProductSpecificCommonConfig`] that
-                        implements [`Merge`]
+                      description: Variant of [`stackable_operator::role_utils::GenericCommonConfig`] that implements [`Merge`]
                       properties:
                         cliOverrides:
                           additionalProperties:
