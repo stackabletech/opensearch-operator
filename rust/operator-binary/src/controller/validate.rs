@@ -620,23 +620,25 @@ mod tests {
                             termination_grace_period_seconds: 300,
                         },
                         config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                            opensearch_yml: KeyValueConfigOverrides {
-                                overrides: [
-                                    (
-                                        "setting1".to_owned(),
-                                        Some("value from role level".to_owned())
-                                    ),
-                                    (
-                                        "setting2".to_owned(),
-                                        Some("value from role-group level".to_owned())
-                                    ),
-                                    (
-                                        "setting3".to_owned(),
-                                        Some("value from role-group level".to_owned())
-                                    ),
-                                ]
-                                .into()
-                            }
+                            opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(
+                                KeyValueConfigOverrides {
+                                    overrides: [
+                                        (
+                                            "setting1".to_owned(),
+                                            Some("value from role level".to_owned())
+                                        ),
+                                        (
+                                            "setting2".to_owned(),
+                                            Some("value from role-group level".to_owned())
+                                        ),
+                                        (
+                                            "setting3".to_owned(),
+                                            Some("value from role-group level".to_owned())
+                                        ),
+                                    ]
+                                    .into()
+                                }
+                            )
                         },
                         env_overrides: EnvVarSet::new().with_values([
                             (
@@ -1039,13 +1041,13 @@ mod tests {
                             ..v1alpha1::OpenSearchConfigFragment::default()
                         },
                         config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                            opensearch_yml: KeyValueConfigOverrides {
+                            opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(KeyValueConfigOverrides {
                                 overrides: [
                                     ("setting1".to_owned(), Some("value from role level".to_owned())),
                                     ("setting2".to_owned(), Some("value from role level".to_owned())),
                                 ]
                                 .into()
-                            }
+                            })
                         },
                         env_overrides: [
                             ("ENV1".to_owned(), "value from role level".to_owned()),
@@ -1085,7 +1087,7 @@ mod tests {
                                     ..v1alpha1::OpenSearchConfigFragment::default()
                                 },
                                 config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                                    opensearch_yml: KeyValueConfigOverrides {
+                                    opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(KeyValueConfigOverrides {
                                         overrides: [
                                             (
                                                 "setting2".to_owned(),
@@ -1097,7 +1099,7 @@ mod tests {
                                             ),
                                         ]
                                         .into()
-                                    }
+                                    })
                                 },
                                 env_overrides: [
                                     ("ENV2".to_owned(), "value from role-group level".to_owned()),

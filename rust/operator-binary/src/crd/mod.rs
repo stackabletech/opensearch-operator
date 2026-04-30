@@ -33,7 +33,7 @@ use crate::{
     attributed_string_type, constant,
     framework::{
         NameIsValidLabelValue,
-        config_overrides::KeyValueConfigOverrides,
+        config_overrides::{JsonConfigOverrides, KeyValueConfigOverrides},
         role_utils::GenericCommonConfig,
         types::{
             kubernetes::{
@@ -489,9 +489,16 @@ pub mod versioned {
 
     #[derive(Clone, Debug, Default, Deserialize, JsonSchema, Merge, PartialEq, Serialize)]
     pub struct OpenSearchConfigOverrides {
-        // File name defined in [`crate::controller::build::node_config::CONFIGURATION_FILE_OPENSEARCH_YML`]
-        #[serde(default, rename = "opensearch.yml")]
-        pub opensearch_yml: KeyValueConfigOverrides,
+        // File name defined in
+        // [`crate::controller::build::node_config::CONFIGURATION_FILE_OPENSEARCH_YML`]
+        #[serde(default, rename = "opensearch.yml", flatten)]
+        pub opensearch_yml: ConfigOverridesChoice,
+    }
+
+    #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+    pub enum ConfigOverridesChoice {
+        KeyValue(KeyValueConfigOverrides),
+        Json(JsonConfigOverrides),
     }
 
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -502,6 +509,39 @@ pub mod versioned {
         pub discovery_hash: Option<String>,
         #[serde(default)]
         pub conditions: Vec<ClusterCondition>,
+    }
+}
+
+impl Merge for v1alpha1::ConfigOverridesChoice {
+    fn merge(&mut self, defaults: &Self) {
+        todo!();
+        // let json_config_overrides = match &self {
+        //     v1alpha1::ConfigOverridesChoice::KeyValue(key_value_config_overrides) => {
+        //         &key_value_config_overrides.clone().into()
+        //     }
+        //     v1alpha1::ConfigOverridesChoice::Json(json_config_overrides) => json_config_overrides,
+        // };
+
+        // match json_config_overrides {
+        //     JsonConfigOverrides::JsonMergePatch(value) => {
+        //         json_patch::merge(&mut json_config_overrides, value);
+        //         self = &mut v1alpha1::ConfigOverridesChoice::Json(json_config_overrides);
+        //     }
+        //     JsonConfigOverrides::UserProvided(value) => {
+        //         self = value.as_object().unwrap().clone();
+        //     }
+        // };
+    }
+}
+
+// impl v1alpha1::ConfigOverridesChoice {
+//
+//     pub fn apply()
+// }
+
+impl Default for v1alpha1::ConfigOverridesChoice {
+    fn default() -> Self {
+        v1alpha1::ConfigOverridesChoice::Json(JsonConfigOverrides::JsonMergePatch(json!({})))
     }
 }
 

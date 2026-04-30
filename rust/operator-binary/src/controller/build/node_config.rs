@@ -4,7 +4,6 @@ use serde_json::{Value, json};
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
 };
-use tracing::warn;
 
 use super::ValidatedCluster;
 use crate::{
@@ -15,6 +14,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        config_overrides::JsonConfigOverrides,
         product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
@@ -178,23 +178,27 @@ impl NodeConfig {
     }
 
     pub fn opensearch_config(&self) -> serde_json::Map<String, Value> {
-        let mut config = self.static_opensearch_config();
-
-        config.append(&mut self.tls_config());
-
-        for (setting, value) in &self
-            .role_group_config
-            .config_overrides
-            .opensearch_yml
-            .overrides
-        {
-            let old_value = config.insert(setting.to_owned(), json!(value));
-            if let Some(old_value) = old_value {
-                warn!(
-                    "configOverrides: Configuration setting {setting:?} changed from {old_value} to {value:?}."
-                );
+        let json_config_overrides = match &self.role_group_config.config_overrides.opensearch_yml {
+            v1alpha1::ConfigOverridesChoice::KeyValue(key_value_config_overrides) => {
+                &key_value_config_overrides.clone().into()
             }
-        }
+            v1alpha1::ConfigOverridesChoice::Json(json_config_overrides) => json_config_overrides,
+        };
+
+        let mut config = match json_config_overrides {
+            JsonConfigOverrides::JsonMergePatch(value) => {
+                let mut config = self.static_opensearch_config();
+
+                config.append(&mut self.tls_config());
+
+                let mut config: serde_json::Value = config.clone().into();
+
+                json_patch::merge(&mut config, value);
+
+                config.as_object().unwrap().clone()
+            }
+            JsonConfigOverrides::UserProvided(value) => value.as_object().unwrap().clone(),
+        };
 
         // Ensure a deterministic result
         config.sort_keys();
@@ -619,13 +623,15 @@ mod tests {
                 termination_grace_period_seconds: 30,
             },
             config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                opensearch_yml: KeyValueConfigOverrides {
-                    overrides: test_config
-                        .config_settings
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), Some(v.to_string())))
-                        .collect(),
-                },
+                opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(
+                    KeyValueConfigOverrides {
+                        overrides: test_config
+                            .config_settings
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                            .collect(),
+                    },
+                ),
             },
             env_overrides: EnvVarSet::new().with_values(
                 test_config

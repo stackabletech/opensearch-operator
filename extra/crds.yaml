@@ -1865,12 +1865,35 @@ spec:
                       [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                       and consult the operator specific usage guide documentation for details on the
                       available config files and settings for the specific product.
+                    oneOf:
+                    - required:
+                      - KeyValue
+                    - required:
+                      - Json
                     properties:
-                      opensearch.yml:
+                      Json:
+                        description: ConfigOverrides that can be applied to a JSON file.
+                        oneOf:
+                        - required:
+                          - jsonMergePatch
+                        - required:
+                          - userProvided
+                        properties:
+                          jsonMergePatch:
+                            description: |-
+                              Can be set to arbitrary YAML content, which is converted to JSON and used as
+                              [RFC 7396](https://datatracker.ietf.org/doc/html/rfc7396) JSON merge patch.
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          userProvided:
+                            description: Override the entire config file with the specified JSON value.
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                        type: object
+                      KeyValue:
                         additionalProperties:
                           nullable: true
                           type: string
-                        default: {}
                         description: |-
                           Flat key-value overrides for `*.properties`, Hadoop XML, etc.
 
@@ -2561,12 +2584,35 @@ spec:
                             [config overrides documentation](https://docs.stackable.tech/home/nightly/concepts/overrides#config-overrides)
                             and consult the operator specific usage guide documentation for details on the
                             available config files and settings for the specific product.
+                          oneOf:
+                          - required:
+                            - KeyValue
+                          - required:
+                            - Json
                           properties:
-                            opensearch.yml:
+                            Json:
+                              description: ConfigOverrides that can be applied to a JSON file.
+                              oneOf:
+                              - required:
+                                - jsonMergePatch
+                              - required:
+                                - userProvided
+                              properties:
+                                jsonMergePatch:
+                                  description: |-
+                                    Can be set to arbitrary YAML content, which is converted to JSON and used as
+                                    [RFC 7396](https://datatracker.ietf.org/doc/html/rfc7396) JSON merge patch.
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                userProvided:
+                                  description: Override the entire config file with the specified JSON value.
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                              type: object
+                            KeyValue:
                               additionalProperties:
                                 nullable: true
                                 type: string
-                              default: {}
                               description: |-
                                 Flat key-value overrides for `*.properties`, Hadoop XML, etc.
 
