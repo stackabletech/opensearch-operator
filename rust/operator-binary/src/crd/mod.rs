@@ -488,8 +488,8 @@ pub mod versioned {
     }
 
     #[derive(Clone, Debug, Default, Deserialize, JsonSchema, Merge, PartialEq, Serialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct OpenSearchConfigOverrides {
+        // File name defined in [`crate::controller::build::node_config::CONFIGURATION_FILE_OPENSEARCH_YML`]
         #[serde(default, rename = "opensearch.yml")]
         pub opensearch_yml: KeyValueConfigOverrides,
     }

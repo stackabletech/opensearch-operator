@@ -37,7 +37,7 @@ impl Merge for GenericCommonConfig {
 /// * `config` is flattened.
 /// * The [`HashMap`] in `env_overrides` is replaced with an [`EnvVarSet`].
 #[derive(Clone, Debug, PartialEq)]
-pub struct RoleGroupConfig<ProductSpecificCommonConfig, Config, ConfigOverrides> {
+pub struct RoleGroupConfig<Config, CommonConfig, ConfigOverrides> {
     pub replicas: u16,
     pub config: Config,
     pub config_overrides: ConfigOverrides,
@@ -46,12 +46,10 @@ pub struct RoleGroupConfig<ProductSpecificCommonConfig, Config, ConfigOverrides>
     pub pod_overrides: PodTemplateSpec,
     // allow(dead_code) is not necessary anymore when moved to operator-rs
     #[allow(dead_code)]
-    pub product_specific_common_config: ProductSpecificCommonConfig,
+    pub product_specific_common_config: CommonConfig,
 }
 
-impl<ProductSpecificCommonConfig, Config, ConfigOverrides>
-    RoleGroupConfig<ProductSpecificCommonConfig, Config, ConfigOverrides>
-{
+impl<Config, CommonConfig, ConfigOverrides> RoleGroupConfig<Config, CommonConfig, ConfigOverrides> {
     pub fn cli_overrides_to_vec(&self) -> Vec<String> {
         self.cli_overrides
             .clone()
@@ -62,13 +60,13 @@ impl<ProductSpecificCommonConfig, Config, ConfigOverrides>
 }
 
 /// Merges and validates the [`RoleGroup`] with the given `role` and `default_config`
-pub fn with_validated_config<C, CommonConfig, Config, RoleConfig, ConfigOverrides>(
+pub fn with_validated_config<ValidatedConfig, CommonConfig, Config, RoleConfig, ConfigOverrides>(
     role_group: &RoleGroup<Config, CommonConfig, ConfigOverrides>,
     role: &Role<Config, ConfigOverrides, RoleConfig, CommonConfig>,
     default_config: &Config,
-) -> Result<RoleGroup<C, CommonConfig, ConfigOverrides>, fragment::ValidationError>
+) -> Result<RoleGroup<ValidatedConfig, CommonConfig, ConfigOverrides>, fragment::ValidationError>
 where
-    C: FromFragment<Fragment = Config>,
+    ValidatedConfig: FromFragment<Fragment = Config>,
     CommonConfig: Clone + Default + JsonSchema + Merge + Serialize,
     Config: Clone + Merge,
     RoleConfig: Default + JsonSchema + Serialize,

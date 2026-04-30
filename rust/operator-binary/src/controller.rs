@@ -147,8 +147,8 @@ impl ReconcilerError for Error {
 }
 
 type OpenSearchRoleGroupConfig = RoleGroupConfig<
-    GenericCommonConfig,
     ValidatedOpenSearchConfig,
+    GenericCommonConfig,
     v1alpha1::OpenSearchConfigOverrides,
 >;
 

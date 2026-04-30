@@ -1073,6 +1073,8 @@ impl<'a> RoleGroupBuilder<'a> {
     ) -> Vec<Volume> {
         let mut volume_source_builder = SecretOperatorVolumeSourceBuilder::new(
             tls_internal_secret_class,
+            // OpenSearch requires both the public certificate and the private key to serve the
+            // transport layer via TLS.
             SecretClassVolumeProvisionParts::PublicPrivate,
         );
 
@@ -1110,6 +1112,8 @@ impl<'a> RoleGroupBuilder<'a> {
     ) -> Vec<Volume> {
         let mut volume_source_builder = SecretOperatorVolumeSourceBuilder::new(
             tls_server_secret_class,
+            // OpenSearch requires both the public certificate and the private key to serve the
+            // REST layer via TLS.
             SecretClassVolumeProvisionParts::PublicPrivate,
         );
 
