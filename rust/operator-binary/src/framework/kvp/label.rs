@@ -29,7 +29,7 @@ pub fn recommended_labels(
         role: &role_name.to_label_value(),
         role_group: &role_group_name.to_label_value(),
     };
-    Labels::recommended(object_labels).expect(
+    Labels::recommended(&object_labels).expect(
         "Labels should be created because the owner has an object name and all given parameters \
         produce valid label values.",
     )

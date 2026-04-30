@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
         Command::Crd => {
             OpenSearchCluster::merged_crd(OpenSearchClusterVersion::V1Alpha1)
                 .context(MergeCrdSnafu)?
-                .print_yaml_schema(built_info::PKG_VERSION, SerializeOptions::default())
+                .print_yaml_schema(built_info::PKG_VERSION, &SerializeOptions::default())
                 .context(SerializeCrdSnafu)?;
         }
         Command::Run(RunArguments {
@@ -139,7 +139,7 @@ async fn main() -> Result<()> {
             let sigterm_watcher = SignalWatcher::sigterm().context(CreateSignalWatcherSnafu)?;
 
             let eos_checker =
-                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, maintenance.end_of_support)
+                EndOfSupportChecker::new(built_info::BUILT_TIME_UTC, &maintenance.end_of_support)
                     .context(InitEndOfSupportCheckerSnafu)?
                     .run(sigterm_watcher.handle())
                     .map(Ok);

@@ -3,14 +3,11 @@
 use stackable_operator::{
     commons::resources::{PvcConfigFragment, ResourcesFragment},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    role_utils::{CommonConfiguration, RoleGroup},
+    role_utils::CommonConfiguration,
 };
 use tracing::info;
 
-use crate::{
-    crd::{NodeRoles, v1alpha1},
-    framework::role_utils::GenericProductSpecificCommonConfig,
-};
+use crate::crd::{NodeRoles, OpenSearchRoleGroup, v1alpha1};
 
 /// Preprocesses the OpenSearchCluster and adds configurations that the user is allowed to leave
 /// out
@@ -39,27 +36,26 @@ pub fn preprocess_security_managing_role_group(
             role_group = security.managing_role_group
         );
 
-        let role_group =
-            RoleGroup::<v1alpha1::OpenSearchConfigFragment, GenericProductSpecificCommonConfig> {
-                config: CommonConfiguration {
-                    config: v1alpha1::OpenSearchConfigFragment {
-                        discovery_service_exposed: Some(false),
-                        node_roles: Some(NodeRoles(vec![v1alpha1::NodeRole::CoordinatingOnly])),
-                        resources: ResourcesFragment {
-                            storage: v1alpha1::StorageConfigFragment {
-                                data: PvcConfigFragment {
-                                    capacity: Some(Quantity("100Mi".to_owned())),
-                                    ..PvcConfigFragment::default()
-                                },
+        let role_group = OpenSearchRoleGroup {
+            config: CommonConfiguration {
+                config: v1alpha1::OpenSearchConfigFragment {
+                    discovery_service_exposed: Some(false),
+                    node_roles: Some(NodeRoles(vec![v1alpha1::NodeRole::CoordinatingOnly])),
+                    resources: ResourcesFragment {
+                        storage: v1alpha1::StorageConfigFragment {
+                            data: PvcConfigFragment {
+                                capacity: Some(Quantity("100Mi".to_owned())),
+                                ..PvcConfigFragment::default()
                             },
-                            ..ResourcesFragment::default()
                         },
-                        ..v1alpha1::OpenSearchConfigFragment::default()
+                        ..ResourcesFragment::default()
                     },
-                    ..CommonConfiguration::default()
+                    ..v1alpha1::OpenSearchConfigFragment::default()
                 },
-                replicas: Some(1),
-            };
+                ..CommonConfiguration::default()
+            },
+            replicas: Some(1),
+        };
 
         cluster
             .spec

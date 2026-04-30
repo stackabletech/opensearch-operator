@@ -13,7 +13,10 @@ use stackable_operator::{
             volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
         },
     },
-    commons::resources::{CpuLimits, MemoryLimits, Resources},
+    commons::{
+        resources::{CpuLimits, MemoryLimits, Resources},
+        secret_class::SecretClassVolumeProvisionParts,
+    },
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     crd::listener::{self},
     k8s_openapi::{
@@ -607,7 +610,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 .args(vec![
                     include_str!("scripts/create-admin-certificate.sh").to_owned(),
                 ])
-                .add_env_vars(env_vars.into())
+                .add_env_vars(env_vars)
                 .add_volume_mounts(volume_mounts)
                 .expect("The mount paths are statically defined and there should be no duplicates.")
                 .resources(
@@ -776,7 +779,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 create_vector_shutdown_file_command =
                     create_vector_shutdown_file_command(STACKABLE_LOG_DIR),
             )])
-            .add_env_vars(self.node_config.environment_variables().into())
+            .add_env_vars(self.node_config.environment_variables())
             .add_volume_mounts(volume_mounts)
             .expect("The mount paths are statically defined and there should be no duplicates.")
             .add_container_ports(vec![
@@ -942,7 +945,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 .args(vec![
                     include_str!("scripts/update-security-config.sh").to_owned(),
                 ])
-                .add_env_vars(env_vars.into())
+                .add_env_vars(env_vars)
                 .add_volume_mounts(volume_mounts)
                 .expect("The mount paths are statically defined and there should be no duplicates.")
                 .resources(
@@ -1068,8 +1071,12 @@ impl<'a> RoleGroupBuilder<'a> {
         &self,
         tls_internal_secret_class: &SecretClassName,
     ) -> Vec<Volume> {
-        let mut volume_source_builder =
-            SecretOperatorVolumeSourceBuilder::new(tls_internal_secret_class);
+        let mut volume_source_builder = SecretOperatorVolumeSourceBuilder::new(
+            tls_internal_secret_class,
+            // OpenSearch requires both the public certificate and the private key to serve the
+            // transport layer via TLS.
+            SecretClassVolumeProvisionParts::PublicPrivate,
+        );
 
         volume_source_builder
             .with_pod_scope()
@@ -1103,8 +1110,12 @@ impl<'a> RoleGroupBuilder<'a> {
         &self,
         tls_server_secret_class: &SecretClassName,
     ) -> Vec<Volume> {
-        let mut volume_source_builder =
-            SecretOperatorVolumeSourceBuilder::new(tls_server_secret_class);
+        let mut volume_source_builder = SecretOperatorVolumeSourceBuilder::new(
+            tls_server_secret_class,
+            // OpenSearch requires both the public certificate and the private key to serve the
+            // REST layer via TLS.
+            SecretClassVolumeProvisionParts::PublicPrivate,
+        );
 
         volume_source_builder
             .with_pod_scope()
@@ -1428,10 +1439,7 @@ impl<'a> RoleGroupBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
     use rstest::rstest;
@@ -1467,7 +1475,7 @@ mod tests {
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{
                     ConfigMapKey, ConfigMapName, ListenerClassName, ListenerName, NamespaceName,
@@ -1575,11 +1583,11 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         };
 
         let security_settings = v1alpha1::SecuritySettings {
@@ -2542,6 +2550,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
                                 }
                             },
@@ -2568,6 +2577,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
                                 }
                             },
@@ -2752,6 +2762,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
                                 }
                             },
@@ -2778,6 +2789,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
                                 }
                             },
@@ -2974,6 +2986,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,service=my-opensearch-cluster-seed-nodes"
                                 }
                             },
@@ -3000,6 +3013,7 @@ mod tests {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
+                                    "secrets.stackable.tech/provision-parts": "public-private",
                                     "secrets.stackable.tech/scope": "pod,listener-volume=listener,listener-volume=discovery-service-listener"
                                 }
                             },

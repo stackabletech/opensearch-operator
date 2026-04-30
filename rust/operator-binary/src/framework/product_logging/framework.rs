@@ -209,7 +209,7 @@ pub fn vector_container(
                 kill $vector_pid",
                 vector_control_directory = format!("{STACKABLE_LOG_DIR}/{VECTOR_CONTROL_DIR}"),
             )])
-            .add_env_vars(env_vars.into())
+            .add_env_vars(env_vars)
             .add_volume_mounts([
                 VolumeMount {
                     mount_path: format!(

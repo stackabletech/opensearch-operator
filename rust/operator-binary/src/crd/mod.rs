@@ -20,7 +20,7 @@ use stackable_operator::{
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role},
+    role_utils::{GenericRoleConfig, Role, RoleGroup},
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -33,7 +33,8 @@ use crate::{
     attributed_string_type, constant,
     framework::{
         NameIsValidLabelValue,
-        role_utils::GenericProductSpecificCommonConfig,
+        config_overrides::KeyValueConfigOverrides,
+        role_utils::GenericCommonConfig,
         types::{
             kubernetes::{
                 ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName, SecretClassName,
@@ -47,6 +48,19 @@ use crate::{
 constant!(DEFAULT_ROLE_GROUP_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 constant!(DEFAULT_DISCOVERY_SERVICE_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 constant!(TLS_DEFAULT_SECRET_CLASS: SecretClassName = "tls");
+
+type OpenSearchRole = Role<
+    v1alpha1::OpenSearchConfigFragment,
+    v1alpha1::OpenSearchConfigOverrides,
+    v1alpha1::OpenSearchRoleConfig,
+    GenericCommonConfig,
+>;
+
+pub type OpenSearchRoleGroup = RoleGroup<
+    v1alpha1::OpenSearchConfigFragment,
+    GenericCommonConfig,
+    v1alpha1::OpenSearchConfigOverrides,
+>;
 
 #[versioned(
     version(name = "v1alpha1"),
@@ -90,11 +104,7 @@ pub mod versioned {
         pub object_overrides: ObjectOverrides,
 
         // no doc - docs in Role struct
-        pub nodes: Role<
-            OpenSearchConfigFragment,
-            OpenSearchRoleConfig,
-            GenericProductSpecificCommonConfig,
-        >,
+        pub nodes: OpenSearchRole,
     }
 
     #[derive(Clone, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
@@ -475,6 +485,13 @@ pub mod versioned {
         /// The [ListenerClass](https://docs.stackable.tech/home/nightly/listener-operator/listenerclass.html) that is used for the discovery service.
         #[serde(default = "discovery_service_listener_class_default")]
         pub discovery_service_listener_class: ListenerClassName,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, JsonSchema, Merge, PartialEq, Serialize)]
+    pub struct OpenSearchConfigOverrides {
+        // File name defined in [`crate::controller::build::node_config::CONFIGURATION_FILE_OPENSEARCH_YML`]
+        #[serde(default, rename = "opensearch.yml")]
+        pub opensearch_yml: KeyValueConfigOverrides,
     }
 
     #[derive(Clone, Default, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]

@@ -174,6 +174,15 @@ impl From<EnvVarSet> for Vec<EnvVar> {
     }
 }
 
+impl IntoIterator for EnvVarSet {
+    type IntoIter = std::collections::btree_map::IntoValues<EnvVarName, Self::Item>;
+    type Item = EnvVar;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_values()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;

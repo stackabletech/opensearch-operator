@@ -62,10 +62,7 @@ pub fn build(names: &ContextNames, cluster: ValidatedCluster) -> KubernetesResou
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use stackable_operator::{
         commons::{
@@ -90,7 +87,7 @@ mod tests {
         crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 common::Port,
                 kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName},
@@ -248,11 +245,11 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         }
     }
 }

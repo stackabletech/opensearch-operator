@@ -182,12 +182,11 @@ impl NodeConfig {
 
         config.append(&mut self.tls_config());
 
-        for (setting, value) in self
+        for (setting, value) in &self
             .role_group_config
             .config_overrides
-            .get(CONFIGURATION_FILE_OPENSEARCH_YML)
-            .into_iter()
-            .flatten()
+            .opensearch_yml
+            .overrides
         {
             let old_value = config.insert(setting.to_owned(), json!(value));
             if let Some(old_value) = old_value {
@@ -561,8 +560,9 @@ mod tests {
         controller::{ValidatedLogging, ValidatedOpenSearchConfig, ValidatedSecurity},
         crd::v1alpha1,
         framework::{
+            config_overrides::KeyValueConfigOverrides,
             product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{
                     ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
@@ -618,15 +618,15 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: [(
-                CONFIGURATION_FILE_OPENSEARCH_YML.to_owned(),
-                test_config
-                    .config_settings
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect(),
-            )]
-            .into(),
+            config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                opensearch_yml: KeyValueConfigOverrides {
+                    overrides: test_config
+                        .config_settings
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                        .collect(),
+                },
+            },
             env_overrides: EnvVarSet::new().with_values(
                 test_config
                     .env_vars
@@ -635,7 +635,7 @@ mod tests {
             ),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         };
 
         let security_settings = v1alpha1::SecuritySettings {
