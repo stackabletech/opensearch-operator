@@ -3,7 +3,9 @@ use std::{borrow::Cow, collections::BTreeMap};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use stackable_operator::{config::merge::Merge, schemars, utils::crds::raw_object_schema};
+use stackable_operator::{
+    config::merge::Merge, k8s_openapi::DeepMerge, schemars, utils::crds::raw_object_schema,
+};
 
 // Variant of [`stackable_operator::config_overrides::KeyValueConfigOverrides`] that implements
 // Merge
@@ -42,9 +44,9 @@ impl JsonConfigOverrides {
     pub fn apply(&self, base: &serde_json::Value) -> Cow<'_, serde_json::Value> {
         match self {
             Self::JsonMergePatch(patch) => {
-                let mut doc = base.clone();
-                json_patch::merge(&mut doc, patch);
-                Cow::Owned(doc)
+                let mut merged = base.clone();
+                merged.merge_from(patch.clone());
+                Cow::Owned(merged)
             }
             Self::UserProvided(content) => Cow::Borrowed(content),
         }
@@ -64,17 +66,17 @@ impl Merge for JsonConfigOverrides {
                 JsonConfigOverrides::JsonMergePatch(patch),
                 JsonConfigOverrides::JsonMergePatch(base),
             ) => {
-                let mut doc = base.clone();
-                json_patch::merge(&mut doc, patch);
-                *self = JsonConfigOverrides::JsonMergePatch(doc);
+                let mut merged = base.clone();
+                merged.merge_from(patch.clone());
+                *self = JsonConfigOverrides::JsonMergePatch(merged);
             }
             (
                 JsonConfigOverrides::JsonMergePatch(patch),
                 JsonConfigOverrides::UserProvided(base),
             ) => {
-                let mut doc = base.clone();
-                json_patch::merge(&mut doc, patch);
-                *self = JsonConfigOverrides::UserProvided(doc);
+                let mut merged = base.clone();
+                merged.merge_from(patch.clone());
+                *self = JsonConfigOverrides::UserProvided(merged);
             }
             (JsonConfigOverrides::UserProvided(patch), _) => {
                 *self = JsonConfigOverrides::UserProvided(patch.clone());
