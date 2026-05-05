@@ -1465,7 +1465,7 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedNodeRole,
-            ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
             build::role_group_builder::{
                 DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
                 TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_CA_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
@@ -1583,7 +1583,7 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),

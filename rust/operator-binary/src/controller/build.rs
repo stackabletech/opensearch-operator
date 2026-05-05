@@ -82,7 +82,8 @@ mod tests {
         controller::{
             ContextNames, OpenSearchNodeResources, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedNodeRole, ValidatedNodeRoles, ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedNodeRole, ValidatedNodeRoles, ValidatedOpenSearchConfig,
+            ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
         framework::{
@@ -245,7 +246,7 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),

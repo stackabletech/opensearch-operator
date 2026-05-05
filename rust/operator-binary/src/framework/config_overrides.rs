@@ -21,8 +21,8 @@ pub struct KeyValueConfigOverrides {
 
 // Variant of [`stackable_operator::config_overrides::JsonConfigOverrides`] with the following
 // changes:
-// - It implements Default.
-// - It implements Merge.
+// - Implements Default
+// - Implements Merge
 // - The JsonPatches variant was removed because it could fail in the build stage.
 // - The UserProvided variant also contains a JSON value instead of a string.
 /// ConfigOverrides that can be applied to a JSON file.
@@ -91,14 +91,157 @@ impl From<KeyValueConfigOverrides> for JsonConfigOverrides {
     }
 }
 
+/// Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+///
+/// Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
+/// a JSON value.
+#[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
+#[serde(untagged)]
+#[schemars(schema_with = "raw_object_schema")]
+pub enum JsonOrKeyValueConfigOverrides {
+    Json(JsonConfigOverrides),
+    KeyValue(KeyValueConfigOverrides),
+}
+
+impl Default for JsonOrKeyValueConfigOverrides {
+    fn default() -> Self {
+        Self::Json(JsonConfigOverrides::default())
+    }
+}
+
+impl From<JsonOrKeyValueConfigOverrides> for JsonConfigOverrides {
+    fn from(value: JsonOrKeyValueConfigOverrides) -> Self {
+        match value {
+            JsonOrKeyValueConfigOverrides::KeyValue(key_value_config_overrides) => {
+                key_value_config_overrides.into()
+            }
+            JsonOrKeyValueConfigOverrides::Json(json_config_overrides) => json_config_overrides,
+        }
+    }
+}
+
+impl Merge for JsonOrKeyValueConfigOverrides {
+    fn merge(&mut self, defaults: &Self) {
+        let mut self_json_config_overrides: JsonConfigOverrides = self.clone().into();
+        let defaults_json_config_overrides = defaults.clone().into();
+
+        self_json_config_overrides.merge(&defaults_json_config_overrides);
+
+        *self = Self::Json(self_json_config_overrides);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use stackable_operator::config::merge;
 
     use super::*;
 
     #[test]
-    fn json_config_overrides_from_key_value_config_overrides() {
+    fn test_json_config_overrides_apply() {
+        let base = json!({
+            "keyA": "valueA1",
+            "keyB": "valueB1"
+        });
+
+        let json_merge_patch = JsonConfigOverrides::JsonMergePatch(json!({
+            "keyA": "valueA2"
+        }));
+
+        assert_eq!(
+            json!({
+                "keyA": "valueA2",
+                "keyB": "valueB1"
+            }),
+            json_merge_patch.apply(&base).into_owned()
+        );
+
+        let user_provided = JsonConfigOverrides::UserProvided(json!({
+            "keyB": "valueB2"
+        }));
+
+        assert_eq!(
+            json!({
+                "keyB": "valueB2",
+            }),
+            user_provided.apply(&base).into_owned()
+        );
+    }
+
+    #[test]
+    fn test_json_config_overrides_merge() {
+        let json_merge_patch = JsonConfigOverrides::JsonMergePatch(json!({
+            "keyA": "base A",
+            "keyB": "base B"
+        }));
+
+        let user_provided = JsonConfigOverrides::UserProvided(json!({
+            "keyA": "base A",
+            "keyB": "base B"
+        }));
+
+        assert_eq!(
+            JsonConfigOverrides::JsonMergePatch(json!({
+                "keyA": "base A",
+                "keyB": "patch B",
+                "keyC": "patch C"
+            })),
+            merge::merge(
+                JsonConfigOverrides::JsonMergePatch(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+                })),
+                &json_merge_patch
+            )
+        );
+
+        assert_eq!(
+            JsonConfigOverrides::UserProvided(json!({
+                "keyA": "base A",
+                "keyB": "patch B",
+                "keyC": "patch C"
+            })),
+            merge::merge(
+                JsonConfigOverrides::JsonMergePatch(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+                })),
+                &user_provided
+            )
+        );
+
+        assert_eq!(
+            JsonConfigOverrides::UserProvided(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+            })),
+            merge::merge(
+                JsonConfigOverrides::UserProvided(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+                })),
+                &json_merge_patch
+            )
+        );
+
+        assert_eq!(
+            JsonConfigOverrides::UserProvided(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+            })),
+            merge::merge(
+                JsonConfigOverrides::UserProvided(json!({
+                "keyB": "patch B",
+                "keyC": "patch C"
+                })),
+                &user_provided
+            )
+        );
+    }
+
+    #[test]
+    fn test_json_config_overrides_from_key_value_config_overrides() {
         let key_value_config_overrides = KeyValueConfigOverrides {
             overrides: [("a".to_owned(), Some("b".to_owned()))].into(),
         };

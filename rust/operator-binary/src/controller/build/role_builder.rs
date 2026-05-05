@@ -225,8 +225,9 @@ impl<'a> RoleBuilder<'a> {
                 {
                     data.insert(
                         file_type.filename.to_owned(),
-                        serde_yaml::to_string(value)
-                            .expect("serde_json::Value should be serializable"),
+                        serde_yaml::to_string(value).expect(
+                            "serde_json::Value should always be serializable as a string of YAML",
+                        ),
                     );
                 }
             }
@@ -386,7 +387,8 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides,
+            ValidatedSecurity,
             build::role_builder::{
                 discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
             },
@@ -447,7 +449,7 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),

@@ -211,6 +211,7 @@ mod tests {
 
     use super::ResourceNames;
     use crate::framework::{
+        config_overrides::KeyValueConfigOverrides,
         role_utils::with_validated_config,
         types::{
             kubernetes::{ClusterRoleName, RoleBindingName, ServiceAccountName},
@@ -245,14 +246,11 @@ mod tests {
         property: Option<String>,
     }
 
-    #[derive(Clone, Debug, Default, JsonSchema, Merge, PartialEq, Serialize)]
-    struct ConfigOverrides(HashMap<String, Option<String>>);
-
     fn new_common_config<Config>(
         config: Config,
         override_value: Option<&str>,
-    ) -> CommonConfiguration<Config, CommonConfig, ConfigOverrides> {
-        let mut config_file_overrides = HashMap::new();
+    ) -> CommonConfiguration<Config, CommonConfig, KeyValueConfigOverrides> {
+        let mut config_file_overrides = BTreeMap::new();
         let mut env_overrides = HashMap::new();
         let mut cli_overrides = BTreeMap::new();
 
@@ -264,7 +262,9 @@ mod tests {
 
         CommonConfiguration {
             config,
-            config_overrides: ConfigOverrides(config_file_overrides),
+            config_overrides: KeyValueConfigOverrides {
+                overrides: config_file_overrides,
+            },
             env_overrides,
             cli_overrides,
             pod_overrides: PodTemplateSpec {

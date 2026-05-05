@@ -74,26 +74,27 @@ spec:
         replicas: 1
     configOverrides:
       opensearch.yml:
-        # Disable memory mapping in this test; If memory mapping were activated, the kernel setting
-        # vm.max_map_count would have to be increased to 262144 on the node.
-        node.store.allow_mmap: "false"
-        # Disable the disk allocation decider in this test; Otherwise the test depends on the disk
-        # usage of the node and if the relative watermark set in
-        # `cluster.routing.allocation.disk.watermark.high` is reached then the security index could
-        # not be created even if enough disk space would be available.
-        cluster.routing.allocation.disk.threshold_enabled: "false"
-        plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
-        plugins.security.restapi.roles_enabled: all_access
-        plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
+        jsonMergePatch:
+          # Disable memory mapping in this test; If memory mapping were activated, the kernel
+          # setting vm.max_map_count would have to be increased to 262144 on the node.
+          node.store.allow_mmap: false
+          # Disable the disk allocation decider in this test; Otherwise the test depends on the disk
+          # usage of the node and if the relative watermark set in
+          # `cluster.routing.allocation.disk.watermark.high` is reached then the security index
+          # could not be created even if enough disk space would be available.
+          cluster.routing.allocation.disk.threshold_enabled: false
+          plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
+          plugins.security.restapi.roles_enabled: all_access
+          plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
 {% if test_scenario['values']['s3-use-tls'] == 'true' %}
-        s3.client.default.endpoint: https://minio:9000/
-        s3.client.default.protocol: https
+          s3.client.default.endpoint: https://minio:9000/
+          s3.client.default.protocol: https
 {% else %}
-        s3.client.default.endpoint: http://minio:9000/
-        s3.client.default.protocol: http
+          s3.client.default.endpoint: http://minio:9000/
+          s3.client.default.protocol: http
 {% endif %}
-        s3.client.default.region: unused # but required
-        s3.client.default.path_style_access: "true"
+          s3.client.default.region: unused # but required
+          s3.client.default.path_style_access: true
     podOverrides:
       spec:
         initContainers:

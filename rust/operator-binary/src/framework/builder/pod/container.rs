@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, fmt::Display, str::FromStr};
+use std::{
+    collections::{BTreeMap, btree_map},
+    fmt::Display,
+    str::FromStr,
+};
 
 use snafu::Snafu;
 use stackable_operator::{
@@ -175,7 +179,7 @@ impl From<EnvVarSet> for Vec<EnvVar> {
 }
 
 impl IntoIterator for EnvVarSet {
-    type IntoIter = std::collections::btree_map::IntoValues<EnvVarName, Self::Item>;
+    type IntoIter = btree_map::IntoValues<EnvVarName, Self::Item>;
     type Item = EnvVar;
 
     fn into_iter(self) -> Self::IntoIter {

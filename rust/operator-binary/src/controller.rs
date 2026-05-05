@@ -40,6 +40,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
+        config_overrides::JsonConfigOverrides,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
         role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
@@ -149,7 +150,7 @@ impl ReconcilerError for Error {
 type OpenSearchRoleGroupConfig = RoleGroupConfig<
     ValidatedOpenSearchConfig,
     GenericCommonConfig,
-    v1alpha1::OpenSearchConfigOverrides,
+    ValidatedOpenSearchConfigOverrides,
 >;
 
 type OpenSearchNodeResources =
@@ -171,6 +172,11 @@ pub struct ValidatedOpenSearchConfig {
     pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ValidatedOpenSearchConfigOverrides {
+    pub opensearch_yml: JsonConfigOverrides,
 }
 
 /// Validated log configuration per container
@@ -505,7 +511,7 @@ mod tests {
     use crate::{
         controller::{
             OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
-            ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
         framework::{
@@ -661,7 +667,7 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: v1alpha1::OpenSearchConfigOverrides::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
