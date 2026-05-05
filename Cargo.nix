@@ -4667,9 +4667,9 @@ rec {
       };
       "json-patch" = rec {
         crateName = "json-patch";
-        version = "4.1.0";
+        version = "4.2.0";
         edition = "2021";
-        sha256 = "147yaxmv3i4s0bdna86rgwpmqh2507fn4ighfpplaiqkw8ay807k";
+        sha256 = "0wkv896d0pzq56i2kkl0giqpv117fwvhbpgs8iz85805w66l68bl";
         libName = "json_patch";
         authors = [
           "Ivan Dubrov <dubrov.ivan@gmail.com>"
@@ -4690,7 +4690,7 @@ rec {
           }
           {
             name = "thiserror";
-            packageId = "thiserror 1.0.69";
+            packageId = "thiserror 2.0.18";
           }
         ];
         devDependencies = [
@@ -9640,6 +9640,10 @@ rec {
             features = [ "compat" ];
           }
           {
+            name = "json-patch";
+            packageId = "json-patch";
+          }
+          {
             name = "regex";
             packageId = "regex";
           }
@@ -9651,6 +9655,10 @@ rec {
           {
             name = "serde_json";
             packageId = "serde_json";
+          }
+          {
+            name = "serde_yaml";
+            packageId = "serde_yaml";
           }
           {
             name = "snafu";

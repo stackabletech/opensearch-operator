@@ -423,6 +423,7 @@ mod tests {
     use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
+    use serde_json::json;
     use stackable_operator::{
         commons::{
             affinity::StackableAffinity,
@@ -461,7 +462,7 @@ mod tests {
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
-            config_overrides::KeyValueConfigOverrides,
+            config_overrides::{JsonConfigOverrides, KeyValueConfigOverrides},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
@@ -620,23 +621,13 @@ mod tests {
                             termination_grace_period_seconds: 300,
                         },
                         config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                            opensearch_yml: KeyValueConfigOverrides {
-                                overrides: [
-                                    (
-                                        "setting1".to_owned(),
-                                        Some("value from role level".to_owned())
-                                    ),
-                                    (
-                                        "setting2".to_owned(),
-                                        Some("value from role-group level".to_owned())
-                                    ),
-                                    (
-                                        "setting3".to_owned(),
-                                        Some("value from role-group level".to_owned())
-                                    ),
-                                ]
-                                .into()
-                            }
+                            opensearch_yml: v1alpha1::ConfigOverridesChoice::Json(
+                                JsonConfigOverrides::JsonMergePatch(json!({
+                                    "setting1": "value from role level",
+                                    "setting2": "value from role-group level",
+                                    "setting3": "value from role-group level",
+                                })),
+                            )
                         },
                         env_overrides: EnvVarSet::new().with_values([
                             (
@@ -1039,13 +1030,13 @@ mod tests {
                             ..v1alpha1::OpenSearchConfigFragment::default()
                         },
                         config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                            opensearch_yml: KeyValueConfigOverrides {
+                            opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(KeyValueConfigOverrides {
                                 overrides: [
                                     ("setting1".to_owned(), Some("value from role level".to_owned())),
                                     ("setting2".to_owned(), Some("value from role level".to_owned())),
                                 ]
                                 .into()
-                            }
+                            })
                         },
                         env_overrides: [
                             ("ENV1".to_owned(), "value from role level".to_owned()),
@@ -1085,7 +1076,7 @@ mod tests {
                                     ..v1alpha1::OpenSearchConfigFragment::default()
                                 },
                                 config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                                    opensearch_yml: KeyValueConfigOverrides {
+                                    opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(KeyValueConfigOverrides {
                                         overrides: [
                                             (
                                                 "setting2".to_owned(),
@@ -1097,7 +1088,7 @@ mod tests {
                                             ),
                                         ]
                                         .into()
-                                    }
+                                    })
                                 },
                                 env_overrides: [
                                     ("ENV2".to_owned(), "value from role-group level".to_owned()),

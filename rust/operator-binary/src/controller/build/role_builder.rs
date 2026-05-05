@@ -223,7 +223,11 @@ impl<'a> RoleBuilder<'a> {
                     v1alpha1::SecuritySettingsFileTypeContentValue { value },
                 ) = &file_type.content
                 {
-                    data.insert(file_type.filename.to_owned(), value.to_string());
+                    data.insert(
+                        file_type.filename.to_owned(),
+                        serde_yaml::to_string(value)
+                            .expect("serde_json::Value should be serializable"),
+                    );
                 }
             }
         }

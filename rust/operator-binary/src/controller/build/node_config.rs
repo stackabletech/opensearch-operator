@@ -1,10 +1,10 @@
 //! Configuration of an OpenSearch node
 
-use serde_json::{Value, json};
+use serde_json::json;
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
+    k8s_openapi::DeepMerge,
 };
-use tracing::warn;
 
 use super::ValidatedCluster;
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
     crd::v1alpha1,
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
+        config_overrides::JsonConfigOverrides,
         product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
@@ -174,39 +175,30 @@ impl NodeConfig {
 
     /// Creates the main OpenSearch configuration file in YAML format
     pub fn opensearch_config_file_content(&self) -> String {
-        Self::to_yaml(self.opensearch_config())
+        serde_yaml::to_string(&self.opensearch_config())
+            .expect("serde_json::Value should always be serializable")
     }
 
-    pub fn opensearch_config(&self) -> serde_json::Map<String, Value> {
+    pub fn opensearch_config(&self) -> serde_json::Value {
         let mut config = self.static_opensearch_config();
 
-        config.append(&mut self.tls_config());
+        config.merge_from(self.tls_config());
 
-        for (setting, value) in &self
+        let json_config_overrides: JsonConfigOverrides = self
             .role_group_config
             .config_overrides
             .opensearch_yml
-            .overrides
-        {
-            let old_value = config.insert(setting.to_owned(), json!(value));
-            if let Some(old_value) = old_value {
-                warn!(
-                    "configOverrides: Configuration setting {setting:?} changed from {old_value} to {value:?}."
-                );
-            }
-        }
+            .clone()
+            .into();
 
-        // Ensure a deterministic result
-        config.sort_keys();
-
-        config
+        json_config_overrides.apply(&config).into_owned()
     }
 
     /// Creates the main OpenSearch configuration file as JSON map
     ///
     /// The file should only contain cluster-wide configuration options. Node-specific options
     /// should be defined as environment variables.
-    pub fn static_opensearch_config(&self) -> serde_json::Map<String, Value> {
+    pub fn static_opensearch_config(&self) -> serde_json::Value {
         let mut config = serde_json::Map::new();
 
         config.insert(
@@ -262,7 +254,7 @@ impl NodeConfig {
             }
         };
 
-        config
+        json!(config)
     }
 
     /// Distinguished name (DN) of the super admin certificate
@@ -271,7 +263,7 @@ impl NodeConfig {
         format!("CN=update-security-config.{}", self.cluster.uid)
     }
 
-    pub fn tls_config(&self) -> serde_json::Map<String, Value> {
+    pub fn tls_config(&self) -> serde_json::Value {
         let mut config = serde_json::Map::new();
 
         let opensearch_path_conf = self.opensearch_path_conf();
@@ -327,7 +319,7 @@ impl NodeConfig {
             );
         }
 
-        config
+        json!(config)
     }
 
     /// Creates environment variables for the OpenSearch configurations
@@ -394,13 +386,6 @@ impl NodeConfig {
         }
 
         env_vars.merge(self.role_group_config.env_overrides.clone())
-    }
-
-    fn to_yaml(kv: serde_json::Map<String, Value>) -> String {
-        kv.iter()
-            .map(|(key, value)| format!("{key}: {value}"))
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 
     /// Configuration for `discovery.type`
@@ -619,13 +604,15 @@ mod tests {
                 termination_grace_period_seconds: 30,
             },
             config_overrides: v1alpha1::OpenSearchConfigOverrides {
-                opensearch_yml: KeyValueConfigOverrides {
-                    overrides: test_config
-                        .config_settings
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), Some(v.to_string())))
-                        .collect(),
-                },
+                opensearch_yml: v1alpha1::ConfigOverridesChoice::KeyValue(
+                    KeyValueConfigOverrides {
+                        overrides: test_config
+                            .config_settings
+                            .iter()
+                            .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                            .collect(),
+                    },
+                ),
             },
             env_overrides: EnvVarSet::new().with_values(
                 test_config
@@ -712,22 +699,23 @@ mod tests {
 
         assert_eq!(
             concat!(
-                "cluster.name: \"my-opensearch-cluster\"\n",
-                "discovery.type: \"zen\"\n",
-                "network.host: \"0.0.0.0\"\n",
-                "node.attr.role-group: \"data\"\n",
-                "path.logs: \"/stackable/log/opensearch\"\n",
-                "plugins.security.authcz.admin_dn: \"CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b\"\n",
-                "plugins.security.nodes_dn: [\"CN=generated certificate for pod\"]\n",
+                "cluster.name: my-opensearch-cluster\n",
+                "discovery.type: zen\n",
+                "network.host: 0.0.0.0\n",
+                "node.attr.role-group: data\n",
+                "path.logs: /stackable/log/opensearch\n",
+                "plugins.security.authcz.admin_dn: CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b\n",
+                "plugins.security.nodes_dn:\n",
+                "- CN=generated certificate for pod\n",
                 "plugins.security.ssl.http.enabled: true\n",
-                "plugins.security.ssl.http.pemcert_filepath: \"/stackable/opensearch/config/tls/server/tls.crt\"\n",
-                "plugins.security.ssl.http.pemkey_filepath: \"/stackable/opensearch/config/tls/server/tls.key\"\n",
-                "plugins.security.ssl.http.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/server/ca.crt\"\n",
+                "plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/server/tls.crt\n",
+                "plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/server/tls.key\n",
+                "plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/server/ca.crt\n",
                 "plugins.security.ssl.transport.enabled: true\n",
-                "plugins.security.ssl.transport.pemcert_filepath: \"/stackable/opensearch/config/tls/internal/tls.crt\"\n",
-                "plugins.security.ssl.transport.pemkey_filepath: \"/stackable/opensearch/config/tls/internal/tls.key\"\n",
-                "plugins.security.ssl.transport.pemtrustedcas_filepath: \"/stackable/opensearch/config/tls/internal/ca.crt\"\n",
-                "test: \"value\"",
+                "plugins.security.ssl.transport.pemcert_filepath: /stackable/opensearch/config/tls/internal/tls.crt\n",
+                "plugins.security.ssl.transport.pemkey_filepath: /stackable/opensearch/config/tls/internal/tls.key\n",
+                "plugins.security.ssl.transport.pemtrustedcas_filepath: /stackable/opensearch/config/tls/internal/ca.crt\n",
+                "test: value\n",
             )
             .to_owned(),
             node_config.opensearch_config_file_content()
