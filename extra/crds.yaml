@@ -1869,6 +1869,11 @@ spec:
                       opensearch.yml:
                         default:
                           jsonMergePatch: {}
+                        description: |-
+                          Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+
+                          Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
+                          a JSON value.
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                     type: object
@@ -2559,6 +2564,11 @@ spec:
                             opensearch.yml:
                               default:
                                 jsonMergePatch: {}
+                              description: |-
+                                Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+
+                                Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
+                                a JSON value.
                               type: object
                               x-kubernetes-preserve-unknown-fields: true
                           type: object

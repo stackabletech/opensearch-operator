@@ -243,13 +243,61 @@ mod tests {
     #[test]
     fn test_json_config_overrides_from_key_value_config_overrides() {
         let key_value_config_overrides = KeyValueConfigOverrides {
-            overrides: [("a".to_owned(), Some("b".to_owned()))].into(),
+            overrides: [("key".to_owned(), Some("value".to_owned()))].into(),
         };
 
         let actual_json_config_overrides: JsonConfigOverrides = key_value_config_overrides.into();
 
-        let expected_json_config_overrides = JsonConfigOverrides::JsonMergePatch(json!({"a": "b"}));
+        let expected_json_config_overrides =
+            JsonConfigOverrides::JsonMergePatch(json!({"key": "value"}));
 
         assert_eq!(expected_json_config_overrides, actual_json_config_overrides);
+    }
+
+    #[test]
+    fn test_json_config_overrides_from_json_or_key_value_config_overrides() {
+        let key_value_config_overrides =
+            JsonOrKeyValueConfigOverrides::KeyValue(KeyValueConfigOverrides {
+                overrides: [("key".to_owned(), Some("value".to_owned()))].into(),
+            });
+
+        let actual_json_config_overrides: JsonConfigOverrides = key_value_config_overrides.into();
+
+        let expected_json_config_overrides =
+            JsonConfigOverrides::JsonMergePatch(json!({"key": "value"}));
+
+        assert_eq!(expected_json_config_overrides, actual_json_config_overrides);
+    }
+
+    #[test]
+    fn test_json_or_key_value_config_overrides_merge() {
+        let base = JsonOrKeyValueConfigOverrides::KeyValue(KeyValueConfigOverrides {
+            overrides: [
+                ("keyA".to_owned(), Some("base A".to_owned())),
+                ("keyB".to_owned(), Some("base B".to_owned())),
+            ]
+            .into(),
+        });
+
+        let patch = JsonOrKeyValueConfigOverrides::KeyValue(KeyValueConfigOverrides {
+            overrides: [
+                ("keyB".to_owned(), Some("patch B".to_owned())),
+                ("keyC".to_owned(), Some("patch C".to_owned())),
+            ]
+            .into(),
+        });
+
+        // The merge implementation internally converts KeyValueConfigOverrides to
+        // JsonConfigOverrides. It is already tested in [`test_json_config_overrides_merge`] that
+        // merging JsonConfigOverrides works. Therefore, one test case with KeyValueConfigOverrides
+        // is sufficient.
+        assert_eq!(
+            JsonOrKeyValueConfigOverrides::Json(JsonConfigOverrides::JsonMergePatch(json!({
+                "keyA": "base A",
+                "keyB": "patch B",
+                "keyC": "patch C"
+            }))),
+            merge::merge(patch, &base)
+        );
     }
 }
