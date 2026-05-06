@@ -22,7 +22,7 @@ use super::{
     },
 };
 
-/// Variant of [`stackable_operator::role_utils::GenericCommonConfig`] that implements [`Merge`]
+// Variant of [`stackable_operator::role_utils::GenericCommonConfig`] that implements [`Merge`]
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, PartialEq, Serialize)]
 pub struct GenericCommonConfig {}
 

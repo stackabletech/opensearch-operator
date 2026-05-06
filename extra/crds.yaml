@@ -1870,10 +1870,31 @@ spec:
                         default:
                           jsonMergePatch: {}
                         description: |-
-                          Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+                          ConfigOverrides as key-value pairs, JSON merge patch or JSON object.
 
-                          Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
-                          a JSON value.
+                          The key-value pairs and the JSON merge patch are merged with the configuration provided by the
+                          operator. The user provided JSON object replaces the configuration of the operator.
+
+                          Example for key-value pairs:
+
+                              stringProperty: new value
+                              booleanProperty: "true"
+
+                          Example for a JSON merge patch:
+
+                              jsonMergePatch:
+                                stringProperty: new value
+                                booleanProperty: true
+                                nestedProperty:
+                                  key: value
+
+                          Example for a JSON object:
+
+                              userProvided:
+                                stringProperty: new value
+                                booleanProperty: true
+                                nestedProperty:
+                                  key: value
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                     type: object
@@ -1949,7 +1970,6 @@ spec:
                     type: object
                   roleGroups:
                     additionalProperties:
-                      description: Variant of [`stackable_operator::role_utils::GenericCommonConfig`] that implements [`Merge`]
                       properties:
                         cliOverrides:
                           additionalProperties:
@@ -2565,10 +2585,31 @@ spec:
                               default:
                                 jsonMergePatch: {}
                               description: |-
-                                Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+                                ConfigOverrides as key-value pairs, JSON merge patch or JSON object.
 
-                                Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
-                                a JSON value.
+                                The key-value pairs and the JSON merge patch are merged with the configuration provided by the
+                                operator. The user provided JSON object replaces the configuration of the operator.
+
+                                Example for key-value pairs:
+
+                                    stringProperty: new value
+                                    booleanProperty: "true"
+
+                                Example for a JSON merge patch:
+
+                                    jsonMergePatch:
+                                      stringProperty: new value
+                                      booleanProperty: true
+                                      nestedProperty:
+                                        key: value
+
+                                Example for a JSON object:
+
+                                    userProvided:
+                                      stringProperty: new value
+                                      booleanProperty: true
+                                      nestedProperty:
+                                        key: value
                               type: object
                               x-kubernetes-preserve-unknown-fields: true
                           type: object

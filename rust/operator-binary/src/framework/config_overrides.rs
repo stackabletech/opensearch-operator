@@ -91,10 +91,31 @@ impl From<KeyValueConfigOverrides> for JsonConfigOverrides {
     }
 }
 
-/// Combination of [`JsonConfigOverrides`] and [`KeyValueConfigOverrides`]
+/// ConfigOverrides as key-value pairs, JSON merge patch or JSON object.
 ///
-/// Provides a backwards-compatible way to supply config overrides either as key-value pairs or as
-/// a JSON value.
+/// The key-value pairs and the JSON merge patch are merged with the configuration provided by the
+/// operator. The user provided JSON object replaces the configuration of the operator.
+///
+/// Example for key-value pairs:
+///
+///     stringProperty: new value
+///     booleanProperty: "true"
+///
+/// Example for a JSON merge patch:
+///
+///     jsonMergePatch:
+///       stringProperty: new value
+///       booleanProperty: true
+///       nestedProperty:
+///         key: value
+///
+/// Example for a JSON object:
+///
+///     userProvided:
+///       stringProperty: new value
+///       booleanProperty: true
+///       nestedProperty:
+///         key: value
 #[derive(Clone, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 #[schemars(schema_with = "raw_object_schema")]
