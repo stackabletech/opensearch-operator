@@ -7,7 +7,7 @@ use clap::Parser as _;
 use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
 use framework::types::operator::OperatorName;
 use futures::{FutureExt, StreamExt};
-use snafu::{ResultExt as _, Snafu, futures::TryFutureExt};
+use snafu::{ResultExt, Snafu, futures::TryFutureExt};
 use stackable_operator::{
     YamlSchema as _,
     cli::{Command, RunArguments},
@@ -72,7 +72,8 @@ pub enum Error {
 
     #[snafu(display("failed to create Kubernetes client"))]
     CreateClient {
-        source: stackable_operator::client::Error,
+        #[snafu(source(from(stackable_operator::client::Error, Box::new)))]
+        source: Box<stackable_operator::client::Error>,
     },
 
     #[snafu(display("failed to create SIGTERM signal watcher"))]
@@ -81,17 +82,22 @@ pub enum Error {
     },
 
     #[snafu(display("failed to create webhook server"))]
-    CreateWebhook { source: webhooks::conversion::Error },
+    CreateWebhook {
+        #[snafu(source(from(webhooks::conversion::Error, Box::new)))]
+        source: Box<webhooks::conversion::Error>,
+    },
 
     #[snafu(display("failed to run webhook server"))]
     RunWebhook {
-        source: stackable_operator::webhook::WebhookServerError,
+        #[snafu(source(from(stackable_operator::webhook::WebhookServerError, Box::new)))]
+        source: Box<stackable_operator::webhook::WebhookServerError>,
     },
 
     #[snafu(display("failed to establish if CRD {crd_name:?} is available"))]
     EstablishCrd {
         crd_name: String,
-        source: stackable_operator::utils::signal::CrdEstablishedError,
+        #[snafu(source(from(stackable_operator::utils::signal::CrdEstablishedError, Box::new)))]
+        source: Box<stackable_operator::utils::signal::CrdEstablishedError>,
     },
 }
 
