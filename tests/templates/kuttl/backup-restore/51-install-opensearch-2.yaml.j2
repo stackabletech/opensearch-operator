@@ -85,7 +85,8 @@ spec:
           cluster.routing.allocation.disk.threshold_enabled: false
           # Allows the test jobs to access the security REST API.
           plugins.security.restapi.roles_enabled: all_access
-          plugins.security.authcz.admin_dn: CN=opensearch-2-admin-certificate
+          plugins.security.authcz.admin_dn:
+            - CN=opensearch-2-admin-certificate
           plugins.security.restapi.roles_enabled: all_access
           plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
 {% if test_scenario['values']['s3-use-tls'] == 'true' %}

@@ -83,7 +83,8 @@ spec:
           # `cluster.routing.allocation.disk.watermark.high` is reached then the security index
           # could not be created even if enough disk space would be available.
           cluster.routing.allocation.disk.threshold_enabled: false
-          plugins.security.authcz.admin_dn: CN=opensearch-1-admin-certificate
+          plugins.security.authcz.admin_dn:
+            - CN=opensearch-1-admin-certificate
           plugins.security.restapi.roles_enabled: all_access
           plugins.security.ssl.http.pemtrustedcas_filepath: /stackable/opensearch/config/tls/concatenated/ca.crt
 {% if test_scenario['values']['s3-use-tls'] == 'true' %}
