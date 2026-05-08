@@ -4,7 +4,7 @@ The cluster definition also supports overriding configuration properties, enviro
 either per role or per role group, where the more specific override (role group) has precedence over
 the less specific one (role).
 
-IMPORTANT: Overriding certain properties which are set by the operator (such as the `network.host`) can interfere with the operator and can lead to problems.
+CAUTION: Overriding certain properties which are set by the operator (such as the `network.host`) can interfere with the operator and can lead to problems.
 
 == Configuration Properties
 
@@ -36,7 +36,7 @@ nodes:
 ----
 
 Property values must be strings when defined as key-value pairs.
-To override properties using other types or nested structures, use a JSON merge patch by placing the properties under `jsonMergePatch`:
+To override properties using other types or nested structures, use a JSON Merge Patch by placing the properties under `jsonMergePatch`:
 
 [source,yaml]
 ----
@@ -50,6 +50,26 @@ nodes:
           - CN=opensearch-admin-certificate
 ----
 
+NOTE: A JSON Merge Patch is the recommended method for overriding configuration settings.
+
+Use a JSON Patch when you need finer-grained control, e.g. to remove a setting.
+Define a JSON Patch using the `jsonPatch` property, which accepts a list of operations:
+
+[source,yaml]
+----
+nodes:
+  configOverrides:
+    opensearch.yml:
+      jsonPatch:
+        - op: add
+          path: /plugins.security.authcz.admin_dn
+          value: CN=opensearch-admin-certificate
+        - op: remove
+          path: /plugins.security.allow_default_init_securityindex
+----
+
+CAUTION: The operator only logs a warning if the JSON Patch could not be applied and continues with the unpatched configuration.
+
 The entire configuration file can be replaced using the `userProvided` property:
 
 [source,yaml]
@@ -61,7 +81,7 @@ nodes:
         plugins.security.restapi.roles_enabled: all_access
 ----
 
-NOTE: Replacing the entire configuration file is not recommended, as all properties normally managed by the operator must be explicitly provided to obtain a working OpenSearch cluster.
+WARNING: Replacing the entire configuration file is not recommended, as all properties normally managed by the operator must be explicitly provided to obtain a working OpenSearch cluster.
 
 For a list of configuration options, we refer to the
 https://docs.opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index/[Configuring OpenSearch{external-link-icon}^] section in the OpenSearch documentation.
