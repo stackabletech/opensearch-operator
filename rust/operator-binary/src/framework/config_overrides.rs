@@ -79,6 +79,8 @@ impl JsonConfigOverrides {
             Self::UserProvided(content) => content.clone(),
             Self::Sequence(sequence) => {
                 let mut doc = base.clone();
+                // `sequence` starts with the latest patch. Iterate in reverse order, to apply the
+                // patches from the first to the last one.
                 for patch in sequence.iter().rev() {
                     doc = patch.apply(&doc);
                 }
