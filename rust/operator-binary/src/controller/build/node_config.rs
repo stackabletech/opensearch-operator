@@ -190,7 +190,7 @@ impl NodeConfig {
             .opensearch_yml
             .clone();
 
-        overrides.apply(&config).into_owned()
+        overrides.apply(&config)
     }
 
     /// Creates the main OpenSearch configuration file as JSON map

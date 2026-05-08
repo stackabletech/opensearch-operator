@@ -1870,10 +1870,11 @@ spec:
                         default:
                           jsonMergePatch: {}
                         description: |-
-                          ConfigOverrides as key-value pairs, JSON merge patch or JSON object.
+                          ConfigOverrides as key-value pairs, JSON merge patch, JSON patch or JSON object.
 
-                          The key-value pairs and the JSON merge patch are merged with the configuration provided by the
-                          operator. The user provided JSON object replaces the configuration of the operator.
+                          The key-value pairs, JSON merge patch and JSON patch are merged with/applied to the
+                          configuration provided by the operator. The user-provided JSON object replaces the
+                          configuration of the operator.
 
                           Example for key-value pairs:
 
@@ -1887,6 +1888,13 @@ spec:
                                 booleanProperty: true
                                 nestedProperty:
                                   key: value
+
+                          Example for a JSON patch:
+
+                              jsonPatch:
+                                - op: replace
+                                  path: /stringProperty
+                                  value: new value
 
                           Example for a JSON object:
 
@@ -2585,10 +2593,11 @@ spec:
                               default:
                                 jsonMergePatch: {}
                               description: |-
-                                ConfigOverrides as key-value pairs, JSON merge patch or JSON object.
+                                ConfigOverrides as key-value pairs, JSON merge patch, JSON patch or JSON object.
 
-                                The key-value pairs and the JSON merge patch are merged with the configuration provided by the
-                                operator. The user provided JSON object replaces the configuration of the operator.
+                                The key-value pairs, JSON merge patch and JSON patch are merged with/applied to the
+                                configuration provided by the operator. The user-provided JSON object replaces the
+                                configuration of the operator.
 
                                 Example for key-value pairs:
 
@@ -2602,6 +2611,13 @@ spec:
                                       booleanProperty: true
                                       nestedProperty:
                                         key: value
+
+                                Example for a JSON patch:
+
+                                    jsonPatch:
+                                      - op: replace
+                                        path: /stringProperty
+                                        value: new value
 
                                 Example for a JSON object:
 

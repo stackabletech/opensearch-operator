@@ -630,11 +630,20 @@ mod tests {
                             termination_grace_period_seconds: 300,
                         },
                         config_overrides: ValidatedOpenSearchConfigOverrides {
-                            opensearch_yml: JsonConfigOverrides::JsonMergePatch(json!({
-                                "setting1": "value from role level",
-                                "setting2": "value from role-group level",
-                                "setting3": "value from role-group level",
-                            }),)
+                            opensearch_yml: JsonConfigOverrides::Sequence(vec![
+                                JsonConfigOverrides::JsonMergePatch(json!(
+                                    {
+                                        "setting2": "value from role-group level",
+                                        "setting3": "value from role-group level"
+                                    }
+                                )),
+                                JsonConfigOverrides::JsonMergePatch(json!(
+                                    {
+                                        "setting1": "value from role level",
+                                        "setting2": "value from role level"
+                                    }
+                                ))
+                            ]),
                         },
                         env_overrides: EnvVarSet::new().with_values([
                             (

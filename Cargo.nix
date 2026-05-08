@@ -4723,6 +4723,11 @@ rec {
             packageId = "jsonptr";
           }
           {
+            name = "schemars";
+            packageId = "schemars";
+            optional = true;
+          }
+          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
@@ -4738,6 +4743,10 @@ rec {
         ];
         devDependencies = [
           {
+            name = "schemars";
+            packageId = "schemars";
+          }
+          {
             name = "serde_json";
             packageId = "serde_json";
             features = [ "preserve_order" ];
@@ -4748,7 +4757,7 @@ rec {
           "schemars" = [ "dep:schemars" ];
           "utoipa" = [ "dep:utoipa" ];
         };
-        resolvedDefaultFeatures = [ "default" "diff" ];
+        resolvedDefaultFeatures = [ "default" "diff" "schemars" ];
       };
       "jsonpath-rust" = rec {
         crateName = "jsonpath-rust";
@@ -9707,6 +9716,11 @@ rec {
             name = "futures";
             packageId = "futures 0.3.32";
             features = [ "compat" ];
+          }
+          {
+            name = "json-patch";
+            packageId = "json-patch";
+            features = [ "schemars" ];
           }
           {
             name = "regex";

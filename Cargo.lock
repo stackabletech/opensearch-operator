@@ -1487,6 +1487,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7421438de105a0827e44fadd05377727847d717c80ce29a229f85fd04c427b72"
 dependencies = [
  "jsonptr",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2943,6 +2944,7 @@ dependencies = [
  "built",
  "clap",
  "futures 0.3.32",
+ "json-patch",
  "pretty_assertions",
  "regex",
  "rstest",
