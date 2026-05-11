@@ -40,8 +40,9 @@ use crate::{
     crd::v1alpha1,
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
+        config_overrides::JsonConfigOverrides,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
-        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+        role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
             common::Port,
             kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName, Uid},
@@ -146,8 +147,11 @@ impl ReconcilerError for Error {
     }
 }
 
-type OpenSearchRoleGroupConfig =
-    RoleGroupConfig<GenericProductSpecificCommonConfig, ValidatedOpenSearchConfig>;
+type OpenSearchRoleGroupConfig = RoleGroupConfig<
+    ValidatedOpenSearchConfig,
+    GenericCommonConfig,
+    ValidatedOpenSearchConfigOverrides,
+>;
 
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
@@ -168,6 +172,11 @@ pub struct ValidatedOpenSearchConfig {
     pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ValidatedOpenSearchConfigOverrides {
+    pub opensearch_yml: JsonConfigOverrides,
 }
 
 /// Validated log configuration per container
@@ -484,10 +493,7 @@ pub async fn reconcile(
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use stackable_operator::{
         commons::{
@@ -505,13 +511,13 @@ mod tests {
     use crate::{
         controller::{
             OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
-            ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
@@ -661,11 +667,11 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         }
     }
 }
