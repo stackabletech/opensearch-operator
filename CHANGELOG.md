@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- BREAKING: Add required CLI argument and env var to set the image repository used to construct final product image names: `IMAGE_REPOSITORY` (`--image-repository`), eg. `oci.example.org/my/namespace` ([#141]).
 - Support hot-reloading of security configuration files ([#130]).
 
 ### Changed
@@ -18,6 +19,7 @@ All notable changes to this project will be documented in this file.
 [#129]: https://github.com/stackabletech/opensearch-operator/pull/129
 [#130]: https://github.com/stackabletech/opensearch-operator/pull/130
 [#137]: https://github.com/stackabletech/opensearch-operator/pull/137
+[#141]: https://github.com/stackabletech/opensearch-operator/pull/141
 
 ## [26.3.0] - 2026-03-16
 
