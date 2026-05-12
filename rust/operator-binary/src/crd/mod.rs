@@ -874,6 +874,7 @@ attributed_string_type! {
 
 #[cfg(test)]
 mod tests {
+    use stackable_operator::versioned::test_utils::RoundtripTestData;
     use strum::IntoEnumIterator;
 
     use crate::crd::{security_config_managing_role_group_default, v1alpha1};
@@ -911,5 +912,11 @@ mod tests {
     fn test_security_config_managing_role_group_default() {
         // Test that the function does not panic
         security_config_managing_role_group_default();
+    }
+
+    impl RoundtripTestData for v1alpha1::OpenSearchClusterSpec {
+        fn roundtrip_test_data() -> Vec<Self> {
+            vec![]
+        }
     }
 }
