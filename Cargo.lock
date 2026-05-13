@@ -2944,6 +2944,7 @@ dependencies = [
  "built",
  "clap",
  "futures 0.3.32",
+ "indoc",
  "json-patch",
  "pretty_assertions",
  "regex",
