@@ -9777,6 +9777,10 @@ rec {
         ];
         devDependencies = [
           {
+            name = "indoc";
+            packageId = "indoc";
+          }
+          {
             name = "pretty_assertions";
             packageId = "pretty_assertions";
           }
