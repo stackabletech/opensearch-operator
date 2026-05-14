@@ -1006,7 +1006,7 @@ mod tests {
 
     fn operator_environment() -> OperatorEnvironmentOptions {
         OperatorEnvironmentOptions {
-            operator_namespace: "stackable_operators".to_owned(),
+            operator_namespace: "stackable-operators".to_owned(),
             operator_service_name: "opensearch-operator".to_owned(),
             image_repository: "oci.example.org".to_owned(),
         }
