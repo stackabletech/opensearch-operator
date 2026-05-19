@@ -15,6 +15,7 @@ use build::build;
 use dereference::dereference;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
+    cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         affinity::StackableAffinity, networking::DomainName,
@@ -80,16 +81,22 @@ pub struct ContextNames {
 
 /// The controller context
 pub struct Context {
+    operator_environment: OperatorEnvironmentOptions,
     client: stackable_operator::client::Client,
     names: ContextNames,
 }
 
 impl Context {
-    pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
+    pub fn new(
+        client: stackable_operator::client::Client,
+        operator_environment: OperatorEnvironmentOptions,
+        operator_name: OperatorName,
+    ) -> Self {
         let cluster_domain_name = client.kubernetes_cluster_info.cluster_domain.clone();
 
         Context {
             client,
+            operator_environment,
             names: Self::context_names(operator_name, cluster_domain_name),
         }
     }
@@ -454,8 +461,13 @@ pub async fn reconcile(
     let preprocessed_cluster = preprocess(cluster);
 
     // validate (no client required)
-    let validated_cluster = validate(&context.names, &preprocessed_cluster, &dereferenced_objects)
-        .context(ValidateClusterSnafu)?;
+    let validated_cluster = validate(
+        &context.names,
+        &context.operator_environment,
+        &preprocessed_cluster,
+        &dereferenced_objects,
+    )
+    .context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());

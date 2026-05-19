@@ -172,7 +172,8 @@ async fn main() -> Result<()> {
                 .run(sigterm_watcher.handle())
                 .context(RunWebhookSnafu);
 
-            let controller_context = controller::Context::new(client.clone(), operator_name);
+            let controller_context =
+                controller::Context::new(client.clone(), operator_environment, operator_name);
             let full_controller_name = controller_context.full_controller_name();
 
             let event_recorder = Arc::new(Recorder::new(

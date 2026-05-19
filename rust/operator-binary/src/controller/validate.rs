@@ -4,8 +4,8 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
-    crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
-    shared::time::Duration,
+    cli::OperatorEnvironmentOptions, crd::listener, kube::ResourceExt,
+    product_logging::spec::Logging, role_utils::RoleGroup, shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -124,7 +124,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
+const CONTAINER_IMAGE_BASE_NAME: &str = "opensearch";
 
 /// Validates the [`v1alpha1::OpenSearchCluster`] and returns a [`ValidatedCluster`]
 ///
@@ -135,6 +135,7 @@ const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
 /// already be dereferenced in a prior step.
 pub fn validate(
     context_names: &ContextNames,
+    operator_environment: &OperatorEnvironmentOptions,
     cluster: &v1alpha1::OpenSearchCluster,
     dereferenced_objects: &DereferencedObjects,
 ) -> Result<ValidatedCluster> {
@@ -145,7 +146,11 @@ pub fn validate(
     let product_image = cluster
         .spec
         .image
-        .resolve(DEFAULT_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            &operator_environment.image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
     // Cannot fail because `ProductImage::resolve` already validated it and would have thrown a
@@ -433,6 +438,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use stackable_operator::{
+        cli::OperatorEnvironmentOptions,
         commons::{
             affinity::StackableAffinity,
             cluster_operation::ClusterOperation,
@@ -492,7 +498,12 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let result = validate(&context_names(), &cluster(), &dereferenced_objects());
+        let result = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster(),
+            &dereferenced_objects(),
+        );
 
         assert_eq!(
             Some(ValidatedCluster::new(
@@ -504,7 +515,7 @@ mod tests {
                     ))
                     .expect("should be a valid label value"),
                     image: format!(
-                        "oci.stackable.tech/sdp/opensearch:3.4.0-stackable{pkg_version}",
+                        "oci.example.org/opensearch:3.4.0-stackable{pkg_version}",
                         pkg_version = built_info::PKG_VERSION
                     ),
                     image_pull_policy: "Always".to_owned(),
@@ -973,7 +984,12 @@ mod tests {
         let mut dereferenced_objects = dereferenced_objects();
         change_test_objects(&mut cluster, &mut dereferenced_objects);
 
-        let result = validate(&context_names(), &cluster, &dereferenced_objects);
+        let result = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster,
+            &dereferenced_objects,
+        );
 
         assert_eq!(Err(expected_err), result.map_err(ErrorDiscriminants::from));
     }
@@ -985,6 +1001,14 @@ mod tests {
             controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
             cluster_domain_name: DomainName::from_str("cluster.local")
                 .expect("should be a valid domain name"),
+        }
+    }
+
+    fn operator_environment() -> OperatorEnvironmentOptions {
+        OperatorEnvironmentOptions {
+            operator_namespace: "stackable-operators".to_owned(),
+            operator_service_name: "opensearch-operator".to_owned(),
+            image_repository: "oci.example.org".to_owned(),
         }
     }
 
