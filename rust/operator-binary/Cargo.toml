@@ -29,6 +29,5 @@ uuid.workspace = true
 built.workspace = true
 
 [dev-dependencies]
-indoc.workspace = true
 pretty_assertions.workspace = true
 rstest.workspace = true
