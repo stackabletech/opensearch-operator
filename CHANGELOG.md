@@ -15,11 +15,14 @@ All notable changes to this project will be documented in this file.
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
 - Bump `stackable-operator` to 0.110.1 ([#137]).
+- Replace the generic subject DN in the configuration setting `plugins.security.nodes_dn` with the
+  FQDNs of the OpenSearch nodes ([#144]).
 
 [#129]: https://github.com/stackabletech/opensearch-operator/pull/129
 [#130]: https://github.com/stackabletech/opensearch-operator/pull/130
 [#137]: https://github.com/stackabletech/opensearch-operator/pull/137
 [#141]: https://github.com/stackabletech/opensearch-operator/pull/141
+[#144]: https://github.com/stackabletech/opensearch-operator/pull/144
 
 ## [26.3.0] - 2026-03-16
 
