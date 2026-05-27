@@ -15,6 +15,7 @@ use build::build;
 use dereference::dereference;
 use snafu::{ResultExt, Snafu};
 use stackable_operator::{
+    cli::OperatorEnvironmentOptions,
     cluster_resources::ClusterResourceApplyStrategy,
     commons::{
         affinity::StackableAffinity, networking::DomainName,
@@ -40,8 +41,9 @@ use crate::{
     crd::v1alpha1,
     framework::{
         HasName, HasUid, NameIsValidLabelValue,
+        config_overrides::JsonConfigOverrides,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
-        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+        role_utils::{GenericCommonConfig, RoleGroupConfig},
         types::{
             common::Port,
             kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName, Uid},
@@ -79,16 +81,22 @@ pub struct ContextNames {
 
 /// The controller context
 pub struct Context {
+    operator_environment: OperatorEnvironmentOptions,
     client: stackable_operator::client::Client,
     names: ContextNames,
 }
 
 impl Context {
-    pub fn new(client: stackable_operator::client::Client, operator_name: OperatorName) -> Self {
+    pub fn new(
+        client: stackable_operator::client::Client,
+        operator_environment: OperatorEnvironmentOptions,
+        operator_name: OperatorName,
+    ) -> Self {
         let cluster_domain_name = client.kubernetes_cluster_info.cluster_domain.clone();
 
         Context {
             client,
+            operator_environment,
             names: Self::context_names(operator_name, cluster_domain_name),
         }
     }
@@ -146,8 +154,11 @@ impl ReconcilerError for Error {
     }
 }
 
-type OpenSearchRoleGroupConfig =
-    RoleGroupConfig<GenericProductSpecificCommonConfig, ValidatedOpenSearchConfig>;
+type OpenSearchRoleGroupConfig = RoleGroupConfig<
+    ValidatedOpenSearchConfig,
+    GenericCommonConfig,
+    ValidatedOpenSearchConfigOverrides,
+>;
 
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
@@ -168,6 +179,11 @@ pub struct ValidatedOpenSearchConfig {
     pub requested_secret_lifetime: Duration,
     pub resources: OpenSearchNodeResources,
     pub termination_grace_period_seconds: i64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ValidatedOpenSearchConfigOverrides {
+    pub opensearch_yml: JsonConfigOverrides,
 }
 
 /// Validated log configuration per container
@@ -445,8 +461,13 @@ pub async fn reconcile(
     let preprocessed_cluster = preprocess(cluster);
 
     // validate (no client required)
-    let validated_cluster = validate(&context.names, &preprocessed_cluster, &dereferenced_objects)
-        .context(ValidateClusterSnafu)?;
+    let validated_cluster = validate(
+        &context.names,
+        &context.operator_environment,
+        &preprocessed_cluster,
+        &dereferenced_objects,
+    )
+    .context(ValidateClusterSnafu)?;
 
     // build (no client required; infallible)
     let prepared_resources = build(&context.names, validated_cluster.clone());
@@ -484,10 +505,7 @@ pub async fn reconcile(
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use stackable_operator::{
         commons::{
@@ -505,13 +523,13 @@ mod tests {
     use crate::{
         controller::{
             OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
-            ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
                 operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
@@ -661,11 +679,11 @@ mod tests {
                 resources: OpenSearchNodeResources::default(),
                 termination_grace_period_seconds: 120,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         }
     }
 }

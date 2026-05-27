@@ -4,8 +4,8 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
-    crd::listener, kube::ResourceExt, product_logging::spec::Logging, role_utils::RoleGroup,
-    shared::time::Duration,
+    cli::OperatorEnvironmentOptions, crd::listener, kube::ResourceExt,
+    product_logging::spec::Logging, role_utils::RoleGroup, shared::time::Duration,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -16,16 +16,16 @@ use super::{
 use crate::{
     controller::{
         DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedNodeRole,
-        ValidatedNodeRoles, ValidatedSecurity,
+        ValidatedNodeRoles, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
     },
-    crd::{NodeRoles, v1alpha1},
+    crd::{NodeRoles, OpenSearchRoleGroup, v1alpha1},
     framework::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
-        role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig, with_validated_config},
+        role_utils::{RoleGroupConfig, with_validated_config},
         types::{
             common::Port,
             kubernetes::{ConfigMapName, Hostname},
@@ -124,7 +124,7 @@ pub enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
+const CONTAINER_IMAGE_BASE_NAME: &str = "opensearch";
 
 /// Validates the [`v1alpha1::OpenSearchCluster`] and returns a [`ValidatedCluster`]
 ///
@@ -135,6 +135,7 @@ const DEFAULT_IMAGE_BASE_NAME: &str = "opensearch";
 /// already be dereferenced in a prior step.
 pub fn validate(
     context_names: &ContextNames,
+    operator_environment: &OperatorEnvironmentOptions,
     cluster: &v1alpha1::OpenSearchCluster,
     dereferenced_objects: &DereferencedObjects,
 ) -> Result<ValidatedCluster> {
@@ -145,7 +146,11 @@ pub fn validate(
     let product_image = cluster
         .spec
         .image
-        .resolve(DEFAULT_IMAGE_BASE_NAME, crate::built_info::PKG_VERSION)
+        .resolve(
+            CONTAINER_IMAGE_BASE_NAME,
+            &operator_environment.image_repository,
+            crate::built_info::PKG_VERSION,
+        )
         .context(ResolveProductImageSnafu)?;
 
     // Cannot fail because `ProductImage::resolve` already validated it and would have thrown a
@@ -190,12 +195,9 @@ fn validate_role_group_config(
     context_names: &ContextNames,
     cluster_name: &ClusterName,
     cluster: &v1alpha1::OpenSearchCluster,
-    role_group_config: &RoleGroup<
-        v1alpha1::OpenSearchConfigFragment,
-        GenericProductSpecificCommonConfig,
-    >,
+    role_group_config: &OpenSearchRoleGroup,
 ) -> Result<OpenSearchRoleGroupConfig> {
-    let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _> = with_validated_config(
+    let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _, _> = with_validated_config(
         role_group_config,
         &cluster.spec.nodes,
         &v1alpha1::OpenSearchConfig::default_config(
@@ -234,6 +236,14 @@ fn validate_role_group_config(
         termination_grace_period_seconds,
     };
 
+    let validated_config_overrides = ValidatedOpenSearchConfigOverrides {
+        opensearch_yml: merged_role_group
+            .config
+            .config_overrides
+            .opensearch_yml
+            .into(),
+    };
+
     let mut env_overrides = EnvVarSet::new();
 
     for (env_var_name, env_var_value) in merged_role_group.config.env_overrides {
@@ -247,7 +257,7 @@ fn validate_role_group_config(
         // Kubernetes defaults to 1 if not set
         replicas: merged_role_group.replicas.unwrap_or(1),
         config: validated_config,
-        config_overrides: merged_role_group.config.config_overrides,
+        config_overrides: validated_config_overrides,
         env_overrides,
         cli_overrides: merged_role_group.config.cli_overrides,
         pod_overrides: merged_role_group.config.pod_overrides,
@@ -426,7 +436,9 @@ mod tests {
     use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
+    use serde_json::json;
     use stackable_operator::{
+        cli::OperatorEnvironmentOptions,
         commons::{
             affinity::StackableAffinity,
             cluster_operation::ClusterOperation,
@@ -459,15 +471,17 @@ mod tests {
         built_info,
         controller::{
             ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
-            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig,
+            ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
         framework::{
             builder::pod::container::{EnvVarName, EnvVarSet},
+            config_overrides::{JsonConfigOverrides, JsonOrKeyValueConfigOverrides},
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
-            role_utils::{GenericProductSpecificCommonConfig, RoleGroupConfig},
+            role_utils::{GenericCommonConfig, RoleGroupConfig},
             types::{
                 common::Port,
                 kubernetes::{
@@ -484,7 +498,12 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let result = validate(&context_names(), &cluster(), &dereferenced_objects());
+        let result = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster(),
+            &dereferenced_objects(),
+        );
 
         assert_eq!(
             Some(ValidatedCluster::new(
@@ -496,7 +515,7 @@ mod tests {
                     ))
                     .expect("should be a valid label value"),
                     image: format!(
-                        "oci.stackable.tech/sdp/opensearch:3.4.0-stackable{pkg_version}",
+                        "oci.example.org/opensearch:3.4.0-stackable{pkg_version}",
                         pkg_version = built_info::PKG_VERSION
                     ),
                     image_pull_policy: "Always".to_owned(),
@@ -621,22 +640,22 @@ mod tests {
                             },
                             termination_grace_period_seconds: 300,
                         },
-                        config_overrides: [(
-                            "opensearch.yml".to_owned(),
-                            [
-                                ("setting1".to_owned(), "value from role level".to_owned()),
-                                (
-                                    "setting2".to_owned(),
-                                    "value from role-group level".to_owned()
-                                ),
-                                (
-                                    "setting3".to_owned(),
-                                    "value from role-group level".to_owned()
-                                ),
-                            ]
-                            .into()
-                        )]
-                        .into(),
+                        config_overrides: ValidatedOpenSearchConfigOverrides {
+                            opensearch_yml: JsonConfigOverrides::Sequence(vec![
+                                JsonConfigOverrides::JsonMergePatch(json!(
+                                    {
+                                        "setting2": "value from role-group level",
+                                        "setting3": "value from role-group level"
+                                    }
+                                )),
+                                JsonConfigOverrides::JsonMergePatch(json!(
+                                    {
+                                        "setting1": "value from role level",
+                                        "setting2": "value from role level"
+                                    }
+                                ))
+                            ]),
+                        },
                         env_overrides: EnvVarSet::new().with_values([
                             (
                                 EnvVarName::from_str_unsafe("ENV1"),
@@ -683,8 +702,7 @@ mod tests {
                             }),
                             ..PodTemplateSpec::default()
                         },
-                        product_specific_common_config: GenericProductSpecificCommonConfig::default(
-                        )
+                        product_specific_common_config: GenericCommonConfig::default()
                     }
                 )]
                 .into(),
@@ -966,7 +984,12 @@ mod tests {
         let mut dereferenced_objects = dereferenced_objects();
         change_test_objects(&mut cluster, &mut dereferenced_objects);
 
-        let result = validate(&context_names(), &cluster, &dereferenced_objects);
+        let result = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster,
+            &dereferenced_objects,
+        );
 
         assert_eq!(Err(expected_err), result.map_err(ErrorDiscriminants::from));
     }
@@ -978,6 +1001,14 @@ mod tests {
             controller_name: ControllerName::from_str_unsafe("opensearchcluster"),
             cluster_domain_name: DomainName::from_str("cluster.local")
                 .expect("should be a valid domain name"),
+        }
+    }
+
+    fn operator_environment() -> OperatorEnvironmentOptions {
+        OperatorEnvironmentOptions {
+            operator_namespace: "stackable-operators".to_owned(),
+            operator_service_name: "opensearch-operator".to_owned(),
+            image_repository: "oci.example.org".to_owned(),
         }
     }
 
@@ -1038,15 +1069,16 @@ mod tests {
                             },
                             ..v1alpha1::OpenSearchConfigFragment::default()
                         },
-                        config_overrides: [(
-                            "opensearch.yml".to_owned(),
-                            [
-                                ("setting1".to_owned(), "value from role level".to_owned()),
-                                ("setting2".to_owned(), "value from role level".to_owned()),
-                            ]
-                            .into(),
-                        )]
-                        .into(),
+                        config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                            opensearch_yml: JsonOrKeyValueConfigOverrides::Json(
+                                JsonConfigOverrides::JsonMergePatch(
+                                    json!({
+                                        "setting1": "value from role level",
+                                        "setting2": "value from role level",
+                                    })
+                                )
+                            )
+                        },
                         env_overrides: [
                             ("ENV1".to_owned(), "value from role level".to_owned()),
                             ("ENV2".to_owned(), "value from role level".to_owned()),
@@ -1070,7 +1102,7 @@ mod tests {
                             }),
                             ..PodTemplateSpec::default()
                         },
-                        product_specific_common_config: GenericProductSpecificCommonConfig::default(
+                        product_specific_common_config: GenericCommonConfig::default(
                         ),
                     },
                     role_config: v1alpha1::OpenSearchRoleConfig::default(),
@@ -1084,21 +1116,16 @@ mod tests {
                                     )),
                                     ..v1alpha1::OpenSearchConfigFragment::default()
                                 },
-                                config_overrides: [(
-                                    "opensearch.yml".to_owned(),
-                                    [
-                                        (
-                                            "setting2".to_owned(),
-                                            "value from role-group level".to_owned(),
-                                        ),
-                                        (
-                                            "setting3".to_owned(),
-                                            "value from role-group level".to_owned(),
-                                        ),
-                                    ]
-                                    .into(),
-                                )]
-                                .into(),
+                                config_overrides: v1alpha1::OpenSearchConfigOverrides {
+                                    opensearch_yml: JsonOrKeyValueConfigOverrides::Json(
+                                        JsonConfigOverrides::JsonMergePatch(
+                                            json!({
+                                                "setting2": "value from role-group level",
+                                                "setting3": "value from role-group level",
+                                            })
+                                        )
+                                    )
+                                },
                                 env_overrides: [
                                     ("ENV2".to_owned(), "value from role-group level".to_owned()),
                                     ("ENV3".to_owned(), "value from role-group level".to_owned()),
@@ -1135,7 +1162,7 @@ mod tests {
                                     ..PodTemplateSpec::default()
                                 },
                                 product_specific_common_config:
-                                    GenericProductSpecificCommonConfig::default(),
+                                    GenericCommonConfig::default(),
                             },
                             replicas: Some(3),
                         },

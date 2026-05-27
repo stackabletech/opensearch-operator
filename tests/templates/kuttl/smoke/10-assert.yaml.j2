@@ -327,6 +327,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
+                secrets.stackable.tech/provision-parts: public-private
                 secrets.stackable.tech/scope: pod,listener-volume=listener,service=opensearch-seed-nodes
             spec:
               accessModes:
@@ -345,6 +346,7 @@ spec:
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
+                secrets.stackable.tech/provision-parts: public-private
                 secrets.stackable.tech/scope: pod,listener-volume=listener,listener-volume=discovery-service-listener
             spec:
               accessModes:
@@ -963,15 +965,70 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  action_groups.yml: '{"_meta":{"config_version":2,"type":"actiongroups"}}'
-  allowlist.yml: '{"_meta":{"config_version":2,"type":"allowlist"},"config":{"enabled":false}}'
-  audit.yml: '{"_meta":{"config_version":2,"type":"audit"},"config":{"enabled":false}}'
-  config.yml: '{"_meta":{"config_version":2,"type":"config"},"config":{"dynamic":{"authc":{"basic_internal_auth_domain":{"authentication_backend":{"type":"intern"},"description":"Authenticate via HTTP Basic against internal users database","http_authenticator":{"challenge":true,"type":"basic"},"http_enabled":true,"order":1,"transport_enabled":true}},"authz":{}}}}'
-  internal_users.yml: '{"_meta":{"config_version":2,"type":"internalusers"},"admin":{"backend_roles":["admin"],"description":"OpenSearch admin user","hash":"$2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e","reserved":true}}'
-  nodes_dn.yml: '{"_meta":{"config_version":2,"type":"nodesdn"}}'
-  roles.yml: '{"_meta":{"config_version":2,"type":"roles"}}'
-  roles_mapping.yml: '{"_meta":{"config_version":2,"type":"rolesmapping"},"all_access":{"backend_roles":["admin"],"reserved":false}}'
-  tenants.yml: '{"_meta":{"config_version":2,"type":"tenants"}}'
+  action_groups.yml: |
+    _meta:
+      config_version: 2
+      type: actiongroups
+  allowlist.yml: |
+    _meta:
+      config_version: 2
+      type: allowlist
+    config:
+      enabled: false
+  audit.yml: |
+    _meta:
+      config_version: 2
+      type: audit
+    config:
+      enabled: false
+  config.yml: |
+    _meta:
+      config_version: 2
+      type: config
+    config:
+      dynamic:
+        authc:
+          basic_internal_auth_domain:
+            authentication_backend:
+              type: intern
+            description: Authenticate via HTTP Basic against internal users database
+            http_authenticator:
+              challenge: true
+              type: basic
+            http_enabled: true
+            order: 1
+            transport_enabled: true
+        authz: {}
+  internal_users.yml: |
+    _meta:
+      config_version: 2
+      type: internalusers
+    admin:
+      backend_roles:
+      - admin
+      description: OpenSearch admin user
+      hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+      reserved: true
+  nodes_dn.yml: |
+    _meta:
+      config_version: 2
+      type: nodesdn
+  roles.yml: |
+    _meta:
+      config_version: 2
+      type: roles
+  roles_mapping.yml: |
+    _meta:
+      config_version: 2
+      type: rolesmapping
+    all_access:
+      backend_roles:
+      - admin
+      reserved: false
+  tenants.yml: |
+    _meta:
+      config_version: 2
+      type: tenants
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -991,28 +1048,30 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  opensearch.yml: |-
-    cluster.name: "opensearch"
-    cluster.routing.allocation.disk.threshold_enabled: "false"
-    discovery.type: "zen"
-    network.host: "0.0.0.0"
-    node.attr.role-group: "cluster-manager"
-    node.store.allow_mmap: "false"
-    path.logs: "/stackable/log/opensearch"
+  opensearch.yml: |
+    cluster.name: opensearch
+    cluster.routing.allocation.disk.threshold_enabled: false
+    discovery.type: zen
+    network.host: 0.0.0.0
+    node.attr.role-group: cluster-manager
+    node.store.allow_mmap: false
+    path.logs: /stackable/log/opensearch
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn: ["DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*","DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*"]
+    plugins.security.nodes_dn:
+    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
+    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
+    plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+    plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
 {% else %}
     plugins.security.ssl.http.enabled: false
 {% endif %}
     plugins.security.ssl.transport.enabled: true
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt
+    plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key
+    plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -1032,28 +1091,30 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  opensearch.yml: |-
-    cluster.name: "opensearch"
-    cluster.routing.allocation.disk.threshold_enabled: "false"
-    discovery.type: "zen"
-    network.host: "0.0.0.0"
-    node.attr.role-group: "data"
-    node.store.allow_mmap: "false"
-    path.logs: "/stackable/log/opensearch"
+  opensearch.yml: |
+    cluster.name: opensearch
+    cluster.routing.allocation.disk.threshold_enabled: false
+    discovery.type: zen
+    network.host: 0.0.0.0
+    node.attr.role-group: data
+    node.store.allow_mmap: false
+    path.logs: /stackable/log/opensearch
     plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn: ["DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*","DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*"]
+    plugins.security.nodes_dn:
+    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
+    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
-    plugins.security.ssl.http.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt"
-    plugins.security.ssl.http.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key"
-    plugins.security.ssl.http.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt"
+    plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
+    plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
+    plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
 {% else %}
     plugins.security.ssl.http.enabled: false
 {% endif %}
     plugins.security.ssl.transport.enabled: true
-    plugins.security.ssl.transport.pemcert_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt"
-    plugins.security.ssl.transport.pemkey_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key"
-    plugins.security.ssl.transport.pemtrustedcas_filepath: "{{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt"
+    plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt
+    plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key
+    plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
 ---
 apiVersion: v1
 kind: Service

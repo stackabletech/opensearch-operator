@@ -1,0 +1,133 @@
+---
+image:
+  productVersion: 3.4.0
+  pullPolicy: IfNotPresent
+clusterOperation:
+  reconciliationPaused: false
+  stopped: false
+clusterConfig:
+  keystore:
+    - key: s3.client.default.access_key
+      secretKeyRef:
+        name: s3-credentials
+        key: ACCESS_KEY
+    - key: s3.client.default.secret_key
+      secretKeyRef:
+        name: s3-credentials
+        key: SECRET_KEY
+  security:
+    enabled: true
+    managingRoleGroup: security-coord
+    settings:
+      config:
+        managedBy: operator
+        content:
+          value:
+            _meta:
+              type: config
+              config_version: 2
+            config:
+              dynamic:
+                authc:
+                  basic_internal_auth_domain:
+                    description: Authenticate via HTTP Basic against internal users database
+                    http_enabled: true
+                    transport_enabled: true
+                    order: 1
+                    http_authenticator:
+                      type: basic
+                      challenge: true
+                    authentication_backend:
+                      type: intern
+                authz: {}
+      internalUsers:
+        managedBy: API
+        content:
+          valueFrom:
+            secretKeyRef:
+              name: opensearch-security-config
+              key: internal_users.yml
+      roles:
+        managedBy: API
+        content:
+          valueFrom:
+            configMapKeyRef:
+              name: opensearch-security-config
+              key: roles.yml
+      rolesMapping:
+        managedBy: API
+        content:
+          value:
+            _meta:
+              type: rolesmapping
+              config_version: 2
+            all_access:
+              reserved: false
+              backend_roles:
+                - admin
+  tls:
+    serverSecretClass: tls
+    internalSecretClass: tls
+  vectorAggregatorConfigMapName: vector-aggregator-discovery
+nodes:
+  config:
+    logging:
+      enableVectorAgent: true
+    gracefulShutdownTimeout: 2m
+    requestedSecretLifetime: 1d
+  envOverrides:
+    DISABLE_INSTALL_DEMO_CONFIG: "true"
+    OPENSEARCH_HOME: /stackable/opensearch
+  configOverrides:
+    opensearch.yml:
+      jsonMergePatch:
+        node.store.allow_mmap: false
+        cluster.routing.allocation.disk.threshold_enabled: false
+  roleConfig:
+    discoveryServiceListenerClass: external-unstable
+  roleGroups:
+    cluster-manager:
+      config:
+        discoveryServiceExposed: true
+        nodeRoles:
+          - cluster_manager
+        resources:
+          storage:
+            data:
+              capacity: 100Mi
+      replicas: 3
+    data:
+      config:
+        discoveryServiceExposed: false
+        nodeRoles:
+          - ingest
+          - data
+          - remote_cluster_client
+        listenerClass: cluster-internal
+        resources:
+          storage:
+            data:
+              capacity: 2Gi
+      configOverrides:
+        opensearch.yml:
+          jsonMergePatch:
+            node.attr.zone: eu-central-1a
+      envOverrides:
+        OPENSEARCH_JAVA_OPTS: -Xms1g -Xmx1g
+      replicas: 2
+---
+image:
+  custom: oci.example.com/namespace/opensearch:3.4.0-custom
+  productVersion: 3.4.0
+  pullPolicy: Always
+  pullSecrets:
+    - name: registry-credentials
+clusterConfig:
+  tls:
+    serverSecretClass: null
+  security:
+    enabled: false
+nodes:
+  roleGroups:
+    default:
+      replicas: 1

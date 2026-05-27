@@ -223,7 +223,12 @@ impl<'a> RoleBuilder<'a> {
                     v1alpha1::SecuritySettingsFileTypeContentValue { value },
                 ) = &file_type.content
                 {
-                    data.insert(file_type.filename.to_owned(), value.to_string());
+                    data.insert(
+                        file_type.filename.to_owned(),
+                        serde_yaml::to_string(value).expect(
+                            "serde_json::Value should always be serializable as a string of YAML",
+                        ),
+                    );
                 }
             }
         }
@@ -359,10 +364,7 @@ pub fn discovery_service_listener_name(cluster_name: &ClusterName) -> ListenerNa
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        str::FromStr,
-    };
+    use std::{collections::BTreeMap, str::FromStr};
 
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -385,7 +387,8 @@ mod tests {
         controller::{
             ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
             ValidatedContainerLogConfigChoice, ValidatedDiscoveryEndpoint, ValidatedLogging,
-            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedSecurity,
+            ValidatedNodeRole, ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides,
+            ValidatedSecurity,
             build::role_builder::{
                 discovery_config_map_name, discovery_service_listener_name, seed_nodes_service_name,
             },
@@ -393,7 +396,7 @@ mod tests {
         crd::v1alpha1,
         framework::{
             builder::pod::container::EnvVarSet,
-            role_utils::GenericProductSpecificCommonConfig,
+            role_utils::GenericCommonConfig,
             types::{
                 common::Port,
                 kubernetes::{
@@ -446,11 +449,11 @@ mod tests {
                 resources: Resources::default(),
                 termination_grace_period_seconds: 30,
             },
-            config_overrides: HashMap::default(),
+            config_overrides: ValidatedOpenSearchConfigOverrides::default(),
             env_overrides: EnvVarSet::default(),
             cli_overrides: BTreeMap::default(),
             pod_overrides: PodTemplateSpec::default(),
-            product_specific_common_config: GenericProductSpecificCommonConfig::default(),
+            product_specific_common_config: GenericCommonConfig::default(),
         };
 
         let cluster = ValidatedCluster::new(
@@ -768,15 +771,15 @@ mod tests {
                     ],
                 },
                 "data": {
-                    "action_groups.yml":  "{\"_meta\":{\"config_version\":2,\"type\":\"actiongroups\"}}",
-                    "allowlist.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"allowlist\"},\"config\":{\"enabled\":false}}",
-                    "audit.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"audit\"},\"config\":{\"enabled\":false}}",
-                    "config.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"config\"},\"config\":{\"dynamic\":{\"authc\":{},\"authz\":{},\"http\":{}}}}",
-                    "internal_users.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"internalusers\"}}",
-                    "nodes_dn.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"nodesdn\"}}",
-                    "roles.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"roles\"}}",
-                    "roles_mapping.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"rolesmapping\"}}",
-                    "tenants.yml": "{\"_meta\":{\"config_version\":2,\"type\":\"tenants\"}}",
+                    "action_groups.yml": "_meta:\n  config_version: 2\n  type: actiongroups\n",
+                    "allowlist.yml": "_meta:\n  config_version: 2\n  type: allowlist\nconfig:\n  enabled: false\n",
+                    "audit.yml": "_meta:\n  config_version: 2\n  type: audit\nconfig:\n  enabled: false\n",
+                    "config.yml": "_meta:\n  config_version: 2\n  type: config\nconfig:\n  dynamic:\n    authc: {}\n    authz: {}\n    http: {}\n",
+                    "internal_users.yml": "_meta:\n  config_version: 2\n  type: internalusers\n",
+                    "nodes_dn.yml": "_meta:\n  config_version: 2\n  type: nodesdn\n",
+                    "roles.yml": "_meta:\n  config_version: 2\n  type: roles\n",
+                    "roles_mapping.yml": "_meta:\n  config_version: 2\n  type: rolesmapping\n",
+                    "tenants.yml": "_meta:\n  config_version: 2\n  type: tenants\n",
                 },
             }),
             security_config_map
