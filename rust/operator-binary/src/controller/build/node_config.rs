@@ -1,5 +1,7 @@
 //! Configuration of an OpenSearch node
 
+use std::iter;
+
 use serde_json::json;
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
@@ -238,6 +240,10 @@ impl NodeConfig {
     /// The list looks similar to:
     /// - DC=local,DC=cluster,DC=svc,DC=my-namespace,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
     /// - DC=local,DC=cluster,DC=svc,DC=my-namespace,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
+    /// - CN=generated certificate for pod
+    ///
+    /// The entry "CN=generated certificate for pod" is still added to make the transition from
+    /// SDP 26.3 to 26.7 possible.
     fn nodes_dn(&self) -> Vec<String> {
         self.cluster
             .role_group_configs
@@ -265,6 +271,11 @@ impl NodeConfig {
                     .collect::<Vec<_>>()
                     .join(",")
             })
+            // TODO Remove "CN=generated certificate for pod" after the release of SDP 26.7 and
+            // adapt the comment of the function and the tests.
+            //
+            // tracked in https://github.com/stackabletech/opensearch-operator/issues/145
+            .chain(iter::once("CN=generated certificate for pod".to_owned()))
             .collect()
     }
 
@@ -691,6 +702,7 @@ mod tests {
                 "plugins.security.authcz.admin_dn: CN=update-security-config.0b1e30e6-326e-4c1a-868d-ad6598b49e8b\n",
                 "plugins.security.nodes_dn:\n",
                 "- DC=local,DC=cluster,DC=svc,DC=default,DC=my-opensearch-cluster-nodes-default-headless,DC=my-opensearch-cluster-nodes-default-*\n",
+                "- CN=generated certificate for pod\n",
                 "plugins.security.ssl.http.enabled: true\n",
                 "plugins.security.ssl.http.pemcert_filepath: /stackable/opensearch/config/tls/server/tls.crt\n",
                 "plugins.security.ssl.http.pemkey_filepath: /stackable/opensearch/config/tls/server/tls.key\n",

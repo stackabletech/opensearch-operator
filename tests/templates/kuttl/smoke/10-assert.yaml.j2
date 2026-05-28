@@ -1060,6 +1060,7 @@ data:
     plugins.security.nodes_dn:
     - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
     - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
+    - CN=generated certificate for pod
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
@@ -1103,6 +1104,7 @@ data:
     plugins.security.nodes_dn:
     - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
     - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
+    - CN=generated certificate for pod
 {% if test_scenario['values']['server-use-tls'] == 'true' %}
     plugins.security.ssl.http.enabled: true
     plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
