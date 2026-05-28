@@ -2550,6 +2550,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2577,6 +2578,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2762,6 +2764,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2789,6 +2792,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2986,6 +2990,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -3013,6 +3018,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
