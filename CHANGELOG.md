@@ -15,11 +15,13 @@ All notable changes to this project will be documented in this file.
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
 - Bump `stackable-operator` to 0.110.1 ([#137]).
+- test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#146]).
 
 [#129]: https://github.com/stackabletech/opensearch-operator/pull/129
 [#130]: https://github.com/stackabletech/opensearch-operator/pull/130
 [#137]: https://github.com/stackabletech/opensearch-operator/pull/137
 [#141]: https://github.com/stackabletech/opensearch-operator/pull/141
+[#146]: https://github.com/stackabletech/opensearch-operator/pull/146
 
 ## [26.3.0] - 2026-03-16
 
