@@ -1082,7 +1082,8 @@ impl<'a> RoleGroupBuilder<'a> {
             .with_pod_scope()
             .with_listener_volume_scope(ROLE_GROUP_LISTENER_VOLUME_NAME.to_string())
             .with_format(SecretFormat::TlsPem)
-            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime);
+            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime)
+            .with_auto_tls_cert_domain_components_in_subject_dn(true);
 
         if self
             .role_group_config
@@ -1121,7 +1122,8 @@ impl<'a> RoleGroupBuilder<'a> {
             .with_pod_scope()
             .with_listener_volume_scope(ROLE_GROUP_LISTENER_VOLUME_NAME.to_string())
             .with_format(SecretFormat::TlsPem)
-            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime);
+            .with_auto_tls_cert_lifetime(self.role_group_config.config.requested_secret_lifetime)
+            .with_auto_tls_cert_domain_components_in_subject_dn(true);
 
         if self.role_group_config.config.discovery_service_exposed {
             volume_source_builder
@@ -2548,6 +2550,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2575,6 +2578,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2760,6 +2764,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2787,6 +2792,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -2984,6 +2990,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
@@ -3011,6 +3018,7 @@ mod tests {
                             "metadata": {
                                 "annotations": {
                                     "secrets.stackable.tech/backend.autotls.cert.lifetime": "1d",
+                                    "secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn": "true",
                                     "secrets.stackable.tech/class": "tls",
                                     "secrets.stackable.tech/format": "tls-pem",
                                     "secrets.stackable.tech/provision-parts": "public-private",
