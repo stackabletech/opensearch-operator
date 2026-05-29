@@ -45,94 +45,81 @@ metadata:
   name: test-log-aggregation
 data:
   test.py: |
-    import requests
+    import json
+    import subprocess
+
+
+    def grpc_get_components(host):
+        """Call the Vector gRPC observability API and return the parsed result."""
+        response = subprocess.run(
+            [
+                "grpcurl",
+                "-plaintext",
+                "-d",
+                '{"limit": 100}',
+                host,
+                "vector.observability.v1.ObservabilityService/GetComponents",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=20,
+        )
+        result = json.loads(response.stdout)
+        # TODO: Remove this debug dump once the gRPC response shape is confirmed
+        print(f"gRPC response from {host}:")
+        print(json.dumps(result, indent=2))
+        return result
 
 
     def check_sent_events():
-        response = requests.post(
-            'http://opensearch-vector-aggregator:8686/graphql',
-            json={
-                'query': """
-                    {
-                        transforms(first:100) {
-                            nodes {
-                                componentId
-                                metrics {
-                                    sentEventsTotal {
-                                        sentEventsTotal
-                                    }
-                                }
-                            }
-                        }
-                    }
-                """
-            }
-        )
+        result = grpc_get_components("opensearch-vector-aggregator:8686")
+        components = result.get("components", [])
+        transforms = [
+            c for c in components if c.get("componentType") == "COMPONENT_TYPE_TRANSFORM"
+        ]
 
-        assert response.status_code == 200, \
-            'Cannot access the API of the vector aggregator.'
+        assert len(transforms) > 0, "No transform components found"
 
-        result = response.json()
-
-        transforms = result['data']['transforms']['nodes']
         for transform in transforms:
-            sentEvents = transform['metrics']['sentEventsTotal']
-            componentId = transform['componentId']
+            sentEvents = transform["metrics"]["sentEventsTotal"]
+            componentId = transform["componentId"]
 
-            if componentId == 'filteredInvalidEvents':
-                assert sentEvents is None or \
-                       sentEvents['sentEventsTotal'] == 0, \
-                       'Invalid log events were sent.'
+            if componentId == "filteredInvalidEvents":
+                assert sentEvents is None or int(sentEvents) == 0, (
+                    "Invalid log events were sent."
+                )
             else:
-                assert sentEvents is not None and \
-                       sentEvents['sentEventsTotal'] > 0, \
-                       f'No events were sent in "{componentId}".'
+                assert sentEvents is not None and int(sentEvents) > 0, (
+                    f'No events were sent in "{componentId}".'
+                )
 
 
     def check_log_file_rollover():
-        response = requests.post(
-            'http://opensearch-nodes-automatic-vector:8686/graphql',
-            json={
-                'query': """
-                    {
-                        sources {
-                            nodes {
-                                componentId
-                                metrics {
-                                    receivedBytesTotal {
-                                        receivedBytesTotal
-                                    }
-                                }
-                            }
-                        }
-                    }
-                """
-            }
-        )
+        result = grpc_get_components("opensearch-nodes-automatic-vector:8686")
+        components = result.get("components", [])
+        sources = [
+            c for c in components if c.get("componentType") == "COMPONENT_TYPE_SOURCE"
+        ]
 
-        assert response.status_code == 200, \
-            'Cannot access the API of the vector agent.'
-
-        result = response.json()
-
-        sources = result['data']['sources']['nodes']
         for source in sources:
-            receivedBytes = source['metrics']['receivedBytesTotal']
-            componentId = source['componentId']
+            receivedBytes = source["metrics"]["receivedBytesTotal"]
+            componentId = source["componentId"]
 
-            if componentId == 'files_opensearch_server':
+            if componentId == "files_opensearch_server":
                 assert receivedBytes is not None
-                receivedBytes = receivedBytes['receivedBytesTotal']
+                receivedBytes = int(receivedBytes)
                 MAX_LOG_FILE_SIZE = 5_500_000
                 expectedBytes = 2 * MAX_LOG_FILE_SIZE
-                assert receivedBytes >= expectedBytes, \
-                       'Log file rollover did not yet happen twice ' \
-                       f'({receivedBytes:,.0f} Bytes of {expectedBytes:,d} Bytes received). ' \
-                       'The first rollover requires write permission to rename the log file, ' \
-                       'the second rollover additionally requires delete permission to remove the old log file.'
+                assert receivedBytes >= expectedBytes, (
+                    "Log file rollover did not yet happen twice "
+                    f"({receivedBytes:,.0f} Bytes of {expectedBytes:,d} Bytes received). "
+                    "The first rollover requires write permission to rename the log file, "
+                    "the second rollover additionally requires delete permission to remove the old log file."
+                )
 
 
-    if __name__ == '__main__':
+    if __name__ == "__main__":
         check_sent_events()
         check_log_file_rollover()
-        print('Test successful!')
+        print("Test successful!")
