@@ -1048,31 +1048,36 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  opensearch.yml: |
-    cluster.name: opensearch
-    cluster.routing.allocation.disk.threshold_enabled: false
-    discovery.type: zen
-    network.host: 0.0.0.0
-    node.attr.role-group: cluster-manager
-    node.store.allow_mmap: false
-    path.logs: /stackable/log/opensearch
-    plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn:
-    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
-    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
-    - CN=generated certificate for pod
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
-    plugins.security.ssl.http.enabled: true
-    plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
-    plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
-    plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
-{% else %}
-    plugins.security.ssl.http.enabled: false
-{% endif %}
-    plugins.security.ssl.transport.enabled: true
-    plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt
-    plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key
-    plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
+  log4j2.properties: |
+{% raw %}
+    rootLogger.level = INFO
+    rootLogger.appenderRef.CONSOLE.ref = CONSOLE
+    rootLogger.appenderRef.FILE.ref = FILE
+    appender.CONSOLE.type = Console
+    appender.CONSOLE.name = CONSOLE
+    appender.CONSOLE.target = SYSTEM_ERR
+    appender.CONSOLE.layout.type = PatternLayout
+    appender.CONSOLE.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
+    appender.CONSOLE.filter.threshold.type = ThresholdFilter
+    appender.CONSOLE.filter.threshold.level = INFO
+    appender.FILE.type = RollingFile
+    appender.FILE.name = FILE
+    appender.FILE.fileName = /stackable/log/opensearch/opensearch_server.json
+    appender.FILE.filePattern = /stackable/log/opensearch/opensearch_server.json.%i
+    appender.FILE.layout.type = OpenSearchJsonLayout
+    appender.FILE.layout.type_name = server
+    appender.FILE.policies.type = Policies
+    appender.FILE.policies.size.type = SizeBasedTriggeringPolicy
+    appender.FILE.policies.size.size = 5MB
+    appender.FILE.strategy.type = DefaultRolloverStrategy
+    appender.FILE.strategy.max = 1
+    appender.FILE.filter.threshold.type = ThresholdFilter
+    appender.FILE.filter.threshold.level = INFO
+{% endraw %}
+  # opensearch.yml: |
+    # The property "plugins.security.nodes_dn" in opensearch.yml contains the namespace and cluster
+    # domain. Since these cannot be substituted here, opensearch.yml is omitted in this assertion.
+    # This is okay, because the configuration file is already covered by the unit tests.
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -1092,31 +1097,36 @@ metadata:
     kind: OpenSearchCluster
     name: opensearch
 data:
-  opensearch.yml: |
-    cluster.name: opensearch
-    cluster.routing.allocation.disk.threshold_enabled: false
-    discovery.type: zen
-    network.host: 0.0.0.0
-    node.attr.role-group: data
-    node.store.allow_mmap: false
-    path.logs: /stackable/log/opensearch
-    plugins.security.allow_default_init_securityindex: true
-    plugins.security.nodes_dn:
-    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-cluster-manager-headless,DC=opensearch-nodes-cluster-manager-*
-    - DC=local,DC=cluster,DC=svc,DC=test,DC=opensearch-nodes-data-headless,DC=opensearch-nodes-data-*
-    - CN=generated certificate for pod
-{% if test_scenario['values']['server-use-tls'] == 'true' %}
-    plugins.security.ssl.http.enabled: true
-    plugins.security.ssl.http.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.crt
-    plugins.security.ssl.http.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/tls.key
-    plugins.security.ssl.http.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/server/ca.crt
-{% else %}
-    plugins.security.ssl.http.enabled: false
-{% endif %}
-    plugins.security.ssl.transport.enabled: true
-    plugins.security.ssl.transport.pemcert_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.crt
-    plugins.security.ssl.transport.pemkey_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/tls.key
-    plugins.security.ssl.transport.pemtrustedcas_filepath: {{ test_scenario['values']['opensearch_home'] }}/config/tls/internal/ca.crt
+  log4j2.properties: |
+{% raw %}
+    rootLogger.level = INFO
+    rootLogger.appenderRef.CONSOLE.ref = CONSOLE
+    rootLogger.appenderRef.FILE.ref = FILE
+    appender.CONSOLE.type = Console
+    appender.CONSOLE.name = CONSOLE
+    appender.CONSOLE.target = SYSTEM_ERR
+    appender.CONSOLE.layout.type = PatternLayout
+    appender.CONSOLE.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
+    appender.CONSOLE.filter.threshold.type = ThresholdFilter
+    appender.CONSOLE.filter.threshold.level = INFO
+    appender.FILE.type = RollingFile
+    appender.FILE.name = FILE
+    appender.FILE.fileName = /stackable/log/opensearch/opensearch_server.json
+    appender.FILE.filePattern = /stackable/log/opensearch/opensearch_server.json.%i
+    appender.FILE.layout.type = OpenSearchJsonLayout
+    appender.FILE.layout.type_name = server
+    appender.FILE.policies.type = Policies
+    appender.FILE.policies.size.type = SizeBasedTriggeringPolicy
+    appender.FILE.policies.size.size = 5MB
+    appender.FILE.strategy.type = DefaultRolloverStrategy
+    appender.FILE.strategy.max = 1
+    appender.FILE.filter.threshold.type = ThresholdFilter
+    appender.FILE.filter.threshold.level = INFO
+{% endraw %}
+  # opensearch.yml: |
+    # The property "plugins.security.nodes_dn" in opensearch.yml contains the namespace and cluster
+    # domain. Since these cannot be substituted here, opensearch.yml is omitted in this assertion.
+    # This is okay, because the configuration file is already covered by the unit tests.
 ---
 apiVersion: v1
 kind: Service
