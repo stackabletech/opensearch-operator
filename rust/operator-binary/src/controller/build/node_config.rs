@@ -2,24 +2,25 @@
 
 use serde_json::json;
 use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
+    builder::pod::container::FieldPathEnvVar,
+    commons::networking::DomainName,
     k8s_openapi::DeepMerge,
-};
-
-use super::ValidatedCluster;
-use crate::{
-    controller::{
-        OpenSearchRoleGroupConfig, ValidatedNodeRole,
-        build::role_group_builder::RoleGroupSecurityMode,
-    },
-    crd::v1alpha1,
-    framework::{
+    v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         config_overrides::JsonConfigOverrides,
         product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
     },
+};
+
+use super::ValidatedCluster;
+use crate::{
+    controller::{
+        OpenSearchRoleGroupConfig, ValidatedNodeRole,
+        build::role_group_builder::RoleGroupSecurityMode, replicas,
+    },
+    crd::v1alpha1,
 };
 
 /// The main configuration file of OpenSearch
@@ -295,13 +296,13 @@ impl NodeConfig {
                 // Prefix with an underscore, so that it occurs before the other environment
                 // variables which depend on it.
                 &EnvVarName::from_str_unsafe("_POD_NAME"),
-                FieldPathEnvVar::Name,
+                &FieldPathEnvVar::Name,
             )
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
-                FieldPathEnvVar::Name,
+                &FieldPathEnvVar::Name,
             )
             .with_value(
                 &EnvVarName::from_str_unsafe(CONFIG_OPTION_NETWORK_PUBLISH_HOST),
@@ -443,7 +444,7 @@ impl NodeConfig {
                 };
 
                 pod_names.extend(
-                    (0..role_group_config.replicas)
+                    (0..replicas(&role_group_config))
                         .map(|i| format!("{}-{i}", role_group_resource_names.stateful_set_name())),
                 );
             }
@@ -495,6 +496,16 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+            role_utils::GenericCommonConfig,
+            types::{
+                kubernetes::{
+                    ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
+                },
+                operator::{ClusterName, ProductVersion},
+            },
+        },
     };
     use uuid::uuid;
 
@@ -505,16 +516,6 @@ mod tests {
             ValidatedSecurity,
         },
         crd::v1alpha1,
-        framework::{
-            product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericCommonConfig,
-            types::{
-                kubernetes::{
-                    ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
-                },
-                operator::{ClusterName, ProductVersion, RoleGroupName},
-            },
-        },
     };
 
     struct TestConfig {
@@ -540,7 +541,7 @@ mod tests {
         let role_group_name = RoleGroupName::from_str_unsafe("data");
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: test_config.replicas,
+            replicas: Some(test_config.replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,
@@ -704,7 +705,7 @@ mod tests {
                 .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("_POD_NAME"),
-                    FieldPathEnvVar::Name
+                    &FieldPathEnvVar::Name
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
@@ -724,7 +725,7 @@ mod tests {
                 )
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("node.name"),
-                    FieldPathEnvVar::Name
+                    &FieldPathEnvVar::Name
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("node.roles"),

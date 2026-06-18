@@ -5,15 +5,13 @@ use std::{cmp, collections::BTreeMap};
 use stackable_operator::{
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::spec::{AppenderConfig, AutomaticContainerLogConfig, LogLevel, LoggerConfig},
-};
-
-use crate::{
-    crd::v1alpha1::{self},
-    framework::{
+    v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         product_logging::framework::STACKABLE_LOG_DIR,
     },
 };
+
+use crate::crd::v1alpha1::{self};
 
 /// OpenSearch log configuration file
 pub const CONFIGURATION_FILE_LOG4J2_PROPERTIES: &str = "log4j2.properties";

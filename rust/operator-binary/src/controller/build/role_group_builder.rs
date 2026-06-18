@@ -17,6 +17,7 @@ use stackable_operator::{
         resources::{CpuLimits, MemoryLimits, Resources},
         secret_class::SecretClassVolumeProvisionParts,
     },
+    constant,
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     crd::listener::{self},
     k8s_openapi::{
@@ -40,28 +41,7 @@ use stackable_operator::{
         remove_vector_shutdown_file_command,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-};
-
-use super::{
-    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
-    product_logging::config::{
-        CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
-    },
-};
-use crate::{
-    constant,
-    controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
-        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
-        build::{
-            product_logging::config::{
-                MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
-            },
-            role_builder::security_config_map_name,
-        },
-    },
-    crd::{ExtendedSecuritySettingsFileType, v1alpha1},
-    framework::{
+    v2::{
         builder::{
             meta::ownerreference_from_resource,
             pod::{
@@ -85,6 +65,27 @@ use crate::{
             operator::RoleGroupName,
         },
     },
+};
+
+use super::{
+    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
+    product_logging::config::{
+        CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
+    },
+};
+use crate::{
+    controller::{
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
+        build::{
+            product_logging::config::{
+                MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
+            },
+            role_builder::security_config_map_name,
+        },
+        replicas,
+    },
+    crd::{ExtendedSecuritySettingsFileType, v1alpha1},
 };
 
 constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
@@ -365,7 +366,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: Some(self.role_group_config.replicas.into()),
+            replicas: Some(replicas(&self.role_group_config).into()),
             selector: LabelSelector {
                 match_labels: Some(self.pod_selector().into()),
                 ..LabelSelector::default()
@@ -578,7 +579,7 @@ impl<'a> RoleGroupBuilder<'a> {
             )
             .with_field_path(
                 &EnvVarName::from_str_unsafe("POD_NAME"),
-                FieldPathEnvVar::Name,
+                &FieldPathEnvVar::Name,
             );
 
         let volume_mounts = vec![
@@ -925,7 +926,7 @@ impl<'a> RoleGroupBuilder<'a> {
             )
             .with_field_path(
                 &EnvVarName::from_str_unsafe("POD_NAME"),
-                FieldPathEnvVar::Name,
+                &FieldPathEnvVar::Name,
             );
 
         for file_type in settings {
@@ -1453,6 +1454,21 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            builder::pod::container::EnvVarSet,
+            product_logging::framework::VectorContainerLogConfig,
+            role_utils::GenericCommonConfig,
+            types::{
+                kubernetes::{
+                    ConfigMapKey, ConfigMapName, ListenerClassName, ListenerName, NamespaceName,
+                    SecretClassName, SecretKey, SecretName, ServiceAccountName, ServiceName,
+                },
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
+        },
     };
     use strum::IntoEnumIterator;
     use uuid::uuid;
@@ -1472,21 +1488,6 @@ mod tests {
             },
         },
         crd::{OpenSearchKeystoreKey, v1alpha1},
-        framework::{
-            builder::pod::container::EnvVarSet,
-            product_logging::framework::VectorContainerLogConfig,
-            role_utils::GenericCommonConfig,
-            types::{
-                kubernetes::{
-                    ConfigMapKey, ConfigMapName, ListenerClassName, ListenerName, NamespaceName,
-                    SecretClassName, SecretKey, SecretName, ServiceAccountName, ServiceName,
-                },
-                operator::{
-                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
-                    RoleGroupName,
-                },
-            },
-        },
     };
 
     #[test]
@@ -1553,7 +1554,7 @@ mod tests {
         };
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: 1,
+            replicas: Some(1),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,

@@ -4,8 +4,25 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use snafu::{OptionExt, ResultExt, Snafu, ensure};
 use stackable_operator::{
-    cli::OperatorEnvironmentOptions, crd::listener, kube::ResourceExt,
-    product_logging::spec::Logging, role_utils::RoleGroup, shared::time::Duration,
+    cli::OperatorEnvironmentOptions,
+    crd::listener,
+    kube::ResourceExt,
+    product_logging::spec::Logging,
+    role_utils::RoleGroup,
+    shared::time::Duration,
+    v2::{
+        builder::pod::container::{EnvVarName, EnvVarSet},
+        controller_utils::{get_cluster_name, get_namespace, get_uid},
+        product_logging::framework::{
+            VectorContainerLogConfig, validate_logging_configuration_for_container,
+        },
+        role_utils::{RoleGroupConfig, with_validated_config},
+        types::{
+            common::Port,
+            kubernetes::{ConfigMapName, Hostname},
+            operator::ClusterName,
+        },
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -19,19 +36,6 @@ use crate::{
         ValidatedNodeRoles, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
     },
     crd::{NodeRoles, OpenSearchRoleGroup, v1alpha1},
-    framework::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
-        controller_utils::{get_cluster_name, get_namespace, get_uid},
-        product_logging::framework::{
-            VectorContainerLogConfig, validate_logging_configuration_for_container,
-        },
-        role_utils::{RoleGroupConfig, with_validated_config},
-        types::{
-            common::Port,
-            kubernetes::{ConfigMapName, Hostname},
-            operator::ClusterName,
-        },
-    },
 };
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -54,17 +58,17 @@ pub enum Error {
 
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {
-        source: crate::framework::controller_utils::Error,
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to get the cluster namespace"))]
     GetClusterNamespace {
-        source: crate::framework::controller_utils::Error,
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to get the cluster UID"))]
     GetClusterUid {
-        source: crate::framework::controller_utils::Error,
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to get the port of the Listener status"))]
@@ -77,27 +81,27 @@ pub enum Error {
 
     #[snafu(display("failed to parse environment variable"))]
     ParseEnvironmentVariable {
-        source: crate::framework::builder::pod::container::Error,
+        source: stackable_operator::v2::builder::pod::container::Error,
     },
 
     #[snafu(display("failed to parse the hostname of the Listener status"))]
     ParseListenerStatusHostname {
-        source: crate::framework::macros::attributed_string_type::Error,
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("failed to parse the port of the Listener status"))]
     ParseListenerStatusPort {
-        source: crate::framework::types::common::Error,
+        source: stackable_operator::v2::types::common::Error,
     },
 
     #[snafu(display("failed to set product version"))]
     ParseProductVersion {
-        source: crate::framework::macros::attributed_string_type::Error,
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("failed to set role-group name"))]
     ParseRoleGroupName {
-        source: crate::framework::macros::attributed_string_type::Error,
+        source: stackable_operator::v2::macros::attributed_string_type::Error,
     },
 
     #[snafu(display("failed to resolve product image"))]
@@ -113,7 +117,7 @@ pub enum Error {
 
     #[snafu(display("failed to validate the logging configuration"))]
     ValidateLoggingConfig {
-        source: crate::framework::product_logging::framework::Error,
+        source: stackable_operator::v2::product_logging::framework::Error,
     },
 
     #[snafu(display("fragment validation failure"))]
@@ -254,8 +258,7 @@ fn validate_role_group_config(
     }
 
     Ok(RoleGroupConfig {
-        // Kubernetes defaults to 1 if not set
-        replicas: merged_role_group.replicas.unwrap_or(1),
+        replicas: merged_role_group.replicas,
         config: validated_config,
         config_overrides: validated_config_overrides,
         env_overrides,
@@ -270,7 +273,7 @@ fn validate_logging_configuration(
     vector_aggregator_config_map_name: &Option<ConfigMapName>,
 ) -> Result<ValidatedLogging> {
     let opensearch_container =
-        validate_logging_configuration_for_container(logging, v1alpha1::Container::OpenSearch)
+        validate_logging_configuration_for_container(logging, &v1alpha1::Container::OpenSearch)
             .context(ValidateLoggingConfigSnafu)?;
 
     let vector_container = if logging.enable_vector_agent {
@@ -280,7 +283,7 @@ fn validate_logging_configuration(
         Some(VectorContainerLogConfig {
             log_config: validate_logging_configuration_for_container(
                 logging,
-                v1alpha1::Container::Vector,
+                &v1alpha1::Container::Vector,
             )
             .context(ValidateLoggingConfigSnafu)?,
             vector_aggregator_config_map_name,
@@ -463,19 +466,7 @@ mod tests {
         },
         role_utils::{CommonConfiguration, Role, RoleGroup},
         shared::time::Duration,
-    };
-    use uuid::uuid;
-
-    use super::{ErrorDiscriminants, validate};
-    use crate::{
-        built_info,
-        controller::{
-            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
-            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig,
-            ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
-        },
-        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
-        framework::{
+        v2::{
             builder::pod::container::{EnvVarName, EnvVarSet},
             config_overrides::{JsonConfigOverrides, JsonOrKeyValueConfigOverrides},
             product_logging::framework::{
@@ -494,6 +485,18 @@ mod tests {
                 },
             },
         },
+    };
+    use uuid::uuid;
+
+    use super::{ErrorDiscriminants, validate};
+    use crate::{
+        built_info,
+        controller::{
+            ContextNames, DereferencedObjects, ValidatedCluster, ValidatedDiscoveryEndpoint,
+            ValidatedLogging, ValidatedNodeRole, ValidatedOpenSearchConfig,
+            ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
+        },
+        crd::{NodeRoles, OpenSearchKeystoreKey, v1alpha1},
     };
 
     #[test]
@@ -529,7 +532,7 @@ mod tests {
                 [(
                     RoleGroupName::from_str_unsafe("default"),
                     RoleGroupConfig {
-                        replicas: 3,
+                        replicas: Some(3),
                         config: ValidatedOpenSearchConfig {
                             affinity: StackableAffinity {
                                 pod_anti_affinity: Some(PodAntiAffinity {
