@@ -1,8 +1,9 @@
 //! OpenSearch specific log configuration
 
-use std::{cmp, collections::BTreeMap};
+use std::{cmp, collections::BTreeMap, str::FromStr};
 
 use stackable_operator::{
+    constant,
     memory::{BinaryMultiple, MemoryQuantity},
     product_logging::spec::{AppenderConfig, AutomaticContainerLogConfig, LogLevel, LoggerConfig},
     v2::{
@@ -22,6 +23,8 @@ pub const MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE: MemoryQuantity = MemoryQuantity 
     value: 10.0,
     unit: BinaryMultiple::Mebi,
 };
+
+constant!(ENV_VAR_NAME_OPENSEARCH_SERVER_LOG_FILE: EnvVarName = "OPENSEARCH_SERVER_LOG_FILE");
 
 /// Create a log4j2 configuration from the given automatic log configuration
 pub fn create_log4j2_config(config: &AutomaticContainerLogConfig) -> String {
@@ -189,7 +192,7 @@ pub fn vector_config_file_content() -> String {
 /// [`crate::framework::product_logging::framework::vector_container`].
 pub fn vector_config_file_extra_env_vars() -> EnvVarSet {
     EnvVarSet::new().with_value(
-        &EnvVarName::from_str_unsafe("OPENSEARCH_SERVER_LOG_FILE"),
+        &ENV_VAR_NAME_OPENSEARCH_SERVER_LOG_FILE,
         "opensearch_server.json",
     )
 }
@@ -200,7 +203,16 @@ mod tests {
         AppenderConfig, AutomaticContainerLogConfig, LogLevel, LoggerConfig,
     };
 
-    use super::{create_log4j2_config, vector_config_file_extra_env_vars};
+    use super::{
+        ENV_VAR_NAME_OPENSEARCH_SERVER_LOG_FILE, create_log4j2_config,
+        vector_config_file_extra_env_vars,
+    };
+
+    #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *ENV_VAR_NAME_OPENSEARCH_SERVER_LOG_FILE;
+    }
 
     #[test]
     pub fn test_create_log4j2_config() {

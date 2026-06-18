@@ -117,6 +117,10 @@ const OPENSEARCH_KEYSTORE_SECRETS_DIRECTORY: &str = "keystore-secrets";
 constant!(OPENSEARCH_KEYSTORE_VOLUME_NAME: VolumeName = "keystore");
 const OPENSEARCH_KEYSTORE_VOLUME_SIZE: &str = "1Mi";
 
+constant!(ENV_VAR_NAME_ADMIN_DN: EnvVarName = "ADMIN_DN");
+constant!(ENV_VAR_NAME_POD_NAME: EnvVarName = "POD_NAME");
+constant!(ENV_VAR_NAME_OPENSEARCH_PATH_CONF: EnvVarName = "OPENSEARCH_PATH_CONF");
+
 /// Depending on the security settings, the role group builder operates in one of these modes.
 #[derive(Clone, Debug)]
 pub enum RoleGroupSecurityMode {
@@ -573,14 +577,8 @@ impl<'a> RoleGroupBuilder<'a> {
         };
 
         let env_vars = EnvVarSet::new()
-            .with_value(
-                &EnvVarName::from_str_unsafe("ADMIN_DN"),
-                self.node_config.super_admin_dn(),
-            )
-            .with_field_path(
-                &EnvVarName::from_str_unsafe("POD_NAME"),
-                &FieldPathEnvVar::Name,
-            );
+            .with_value(&ENV_VAR_NAME_ADMIN_DN, self.node_config.super_admin_dn())
+            .with_field_path(&ENV_VAR_NAME_POD_NAME, &FieldPathEnvVar::Name);
 
         let volume_mounts = vec![
             VolumeMount {
@@ -920,14 +918,8 @@ impl<'a> RoleGroupBuilder<'a> {
         volume_mounts.extend(self.security_config_volume_mounts(settings, false));
 
         let mut env_vars = EnvVarSet::new()
-            .with_value(
-                &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
-                opensearch_path_conf,
-            )
-            .with_field_path(
-                &EnvVarName::from_str_unsafe("POD_NAME"),
-                &FieldPathEnvVar::Name,
-            );
+            .with_value(&ENV_VAR_NAME_OPENSEARCH_PATH_CONF, opensearch_path_conf)
+            .with_field_path(&ENV_VAR_NAME_POD_NAME, &FieldPathEnvVar::Name);
 
         for file_type in settings {
             let managed_by_operator =
@@ -973,7 +965,10 @@ impl<'a> RoleGroupBuilder<'a> {
     fn security_settings_file_type_managed_by_env_var(
         file_type: &ExtendedSecuritySettingsFileType,
     ) -> EnvVarName {
-        EnvVarName::from_str_unsafe(&format!("MANAGE_{}", file_type.id.to_uppercase()))
+        EnvVarName::from_str(&format!("MANAGE_{}", file_type.id.to_uppercase())).expect(
+            "The file type IDs are static strings which should produce valid environment variable \
+            names.",
+        )
     }
 
     /// Builds the config volumes for the [`PodTemplateSpec`]
@@ -1474,8 +1469,9 @@ mod tests {
     use uuid::uuid;
 
     use super::{
-        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
-        ROLE_GROUP_LISTENER_VOLUME_NAME, RoleGroupBuilder,
+        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, ENV_VAR_NAME_ADMIN_DN,
+        ENV_VAR_NAME_OPENSEARCH_PATH_CONF, ENV_VAR_NAME_POD_NAME, LOG_CONFIG_VOLUME_NAME,
+        LOG_VOLUME_NAME, ROLE_GROUP_LISTENER_VOLUME_NAME, RoleGroupBuilder,
     };
     use crate::{
         controller::{
@@ -1492,17 +1488,20 @@ mod tests {
 
     #[test]
     fn test_constants() {
-        // Test that the functions do not panic
-        let _ = CONFIG_VOLUME_NAME;
-        let _ = LOG_CONFIG_VOLUME_NAME;
-        let _ = DATA_VOLUME_NAME;
-        let _ = ROLE_GROUP_LISTENER_VOLUME_NAME;
-        let _ = DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
-        let _ = TLS_SERVER_VOLUME_NAME;
-        let _ = TLS_SERVER_CA_VOLUME_NAME;
-        let _ = TLS_INTERNAL_VOLUME_NAME;
-        let _ = LOG_VOLUME_NAME;
-        let _ = OPENSEARCH_KEYSTORE_VOLUME_NAME;
+        // Test that dereferencing the constants does not panic.
+        let _ = *CONFIG_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *DATA_VOLUME_NAME;
+        let _ = *ROLE_GROUP_LISTENER_VOLUME_NAME;
+        let _ = *DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
+        let _ = *TLS_SERVER_VOLUME_NAME;
+        let _ = *TLS_SERVER_CA_VOLUME_NAME;
+        let _ = *TLS_INTERNAL_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+        let _ = *OPENSEARCH_KEYSTORE_VOLUME_NAME;
+        let _ = *ENV_VAR_NAME_ADMIN_DN;
+        let _ = *ENV_VAR_NAME_POD_NAME;
+        let _ = *ENV_VAR_NAME_OPENSEARCH_PATH_CONF;
     }
 
     #[test]
