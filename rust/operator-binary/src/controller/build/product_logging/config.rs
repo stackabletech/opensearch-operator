@@ -189,7 +189,7 @@ pub fn vector_config_file_content() -> String {
 /// Returns the OpenSearch specific environment variables used in the Vector configuration file
 ///
 /// The common environment variables are already set in
-/// [`crate::framework::product_logging::framework::vector_container`].
+/// [`stackable_operator::v2::product_logging::framework::vector_container`].
 pub fn vector_config_file_extra_env_vars() -> EnvVarSet {
     EnvVarSet::new().with_value(
         &ENV_VAR_NAME_OPENSEARCH_SERVER_LOG_FILE,
