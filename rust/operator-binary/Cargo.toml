@@ -20,7 +20,6 @@ stackable-operator.workspace = true
 
 clap.workspace = true
 futures.workspace = true
-json-patch.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -29,7 +28,6 @@ snafu.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-uuid.workspace = true
 
 [build-dependencies]
 built.workspace = true
@@ -38,3 +36,4 @@ built.workspace = true
 pretty_assertions.workspace = true
 rstest.workspace = true
 stackable-operator = { workspace = true, features = ["test-support"] }
+uuid.workspace = true
