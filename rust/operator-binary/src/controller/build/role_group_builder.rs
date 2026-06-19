@@ -1544,10 +1544,10 @@ mod tests {
 
     fn validated_cluster(security_mode: TestSecurityMode) -> ValidatedCluster {
         let image = ResolvedProductImage {
-            product_version: "3.4.0".to_owned(),
-            app_version_label_value: LabelValue::from_str("3.4.0-stackable0.0.0-dev")
+            product_version: "3.6.0".to_owned(),
+            app_version_label_value: LabelValue::from_str("3.6.0-stackable0.0.0-dev")
                 .expect("should be a valid label value"),
-            image: "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev".to_string(),
+            image: "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev".to_string(),
             image_pull_policy: "Always".to_owned(),
             pull_secrets: None,
         };
@@ -1733,7 +1733,7 @@ mod tests {
                         "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                         "app.kubernetes.io/name": "opensearch",
                         "app.kubernetes.io/role-group": "default",
-                        "app.kubernetes.io/version": "3.4.0",
+                        "app.kubernetes.io/version": "3.6.0",
                         "stackable.tech/vendor": "Stackable"
                     },
                     "name": "my-opensearch-cluster-nodes-default",
@@ -2131,7 +2131,7 @@ mod tests {
                     "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                 },
             ],
-            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
             "imagePullPolicy": "Always",
             "name": "opensearch",
             "ports": [
@@ -2241,7 +2241,7 @@ mod tests {
                     "value": "info",
                 },
             ],
-            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
             "imagePullPolicy": "Always",
             "name": "vector",
             "resources": {
@@ -2326,7 +2326,7 @@ mod tests {
                     },
                 },
             ],
-            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
             "imagePullPolicy": "Always",
             "name": "update-security-config",
             "resources": {
@@ -2437,7 +2437,7 @@ mod tests {
                 "/bin/bash",
                 "-c"
             ],
-            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
             "imagePullPolicy": "Always",
             "name": "init-keystore",
             "resources": {},
@@ -2477,7 +2477,7 @@ mod tests {
                     },
                 },
             ],
-            "image": "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev",
+            "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
             "imagePullPolicy": "Always",
             "name": "create-admin-certificate",
             "resources": {
@@ -3107,7 +3107,7 @@ mod tests {
                         "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                         "app.kubernetes.io/name": "opensearch",
                         "app.kubernetes.io/role-group": "default",
-                        "app.kubernetes.io/version": "3.4.0",
+                        "app.kubernetes.io/version": "3.6.0",
                         "stackable.tech/vendor": "Stackable",
                         "restarter.stackable.tech/enabled": "true"
                     },
@@ -3146,7 +3146,7 @@ mod tests {
                                 "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                                 "app.kubernetes.io/name": "opensearch",
                                 "app.kubernetes.io/role-group": "default",
-                                "app.kubernetes.io/version": "3.4.0",
+                                "app.kubernetes.io/version": "3.6.0",
                                 "stackable.tech/opensearch-role.cluster_manager": "true",
                                 "stackable.tech/opensearch-role.data": "true",
                                 "stackable.tech/opensearch-role.ingest": "true",
@@ -3195,7 +3195,7 @@ mod tests {
                                     "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                                     "app.kubernetes.io/name": "opensearch",
                                     "app.kubernetes.io/role-group": "default",
-                                    "app.kubernetes.io/version": "3.4.0",
+                                    "app.kubernetes.io/version": "3.6.0",
                                     "stackable.tech/vendor": "Stackable"
                                 },
                                 "name": "listener"
@@ -3225,7 +3225,7 @@ mod tests {
                                     "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                                     "app.kubernetes.io/name": "opensearch",
                                     "app.kubernetes.io/role-group": "default",
-                                    "app.kubernetes.io/version": "3.4.0",
+                                    "app.kubernetes.io/version": "3.6.0",
                                     "stackable.tech/vendor": "Stackable",
                                 },
                                 "name": "discovery-service-listener",
@@ -3310,7 +3310,7 @@ mod tests {
                         "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                         "app.kubernetes.io/name": "opensearch",
                         "app.kubernetes.io/role-group": "default",
-                        "app.kubernetes.io/version": "3.4.0",
+                        "app.kubernetes.io/version": "3.6.0",
                         "prometheus.io/scrape": "true",
                         "stackable.tech/vendor": "Stackable"
                     },
@@ -3376,7 +3376,7 @@ mod tests {
                         "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                         "app.kubernetes.io/name": "opensearch",
                         "app.kubernetes.io/role-group": "default",
-                        "app.kubernetes.io/version": "3.4.0",
+                        "app.kubernetes.io/version": "3.6.0",
                         "stackable.tech/vendor": "Stackable"
                     },
                     "name": "my-opensearch-cluster-nodes-default",

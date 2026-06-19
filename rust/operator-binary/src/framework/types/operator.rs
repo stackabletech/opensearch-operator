@@ -18,7 +18,7 @@ attributed_string_type! {
 attributed_string_type! {
     ProductVersion,
     "The version of a product",
-    "3.4.0",
+    "3.6.0",
     is_valid_label_value
 }
 
