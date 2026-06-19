@@ -48,6 +48,7 @@ use stackable_operator::{
                 container::{EnvVarName, EnvVarSet, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
+            service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
             statefulset::{
                 restarter_ignore_configmap_annotations, restarter_ignore_secret_annotations,
             },
@@ -1300,9 +1301,16 @@ impl<'a> RoleGroupBuilder<'a> {
     pub fn build_headless_service(&self) -> Service {
         let metadata = self
             .common_metadata(self.resource_names.headless_service_name())
-            .with_labels(Self::prometheus_labels())
-            .with_annotations(Self::prometheus_annotations(
-                self.security_mode.tls_server_secret_class().is_some(),
+            .with_labels(prometheus_labels(&Scraping::Enabled))
+            .with_annotations(prometheus_annotations(
+                &Scraping::Enabled,
+                if self.security_mode.tls_server_secret_class().is_some() {
+                    &Scheme::Https
+                } else {
+                    &Scheme::Http
+                },
+                "/_prometheus/metrics",
+                &HTTP_PORT,
             ))
             .build();
 
@@ -1334,36 +1342,6 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(service_spec),
             status: None,
         }
-    }
-
-    /// Common labels for Prometheus
-    fn prometheus_labels() -> Labels {
-        Labels::try_from([("prometheus.io/scrape", "true")]).expect("should be a valid label")
-    }
-
-    /// Common annotations for Prometheus
-    ///
-    /// These annotations can be used in a ServiceMonitor.
-    ///
-    /// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
-    fn prometheus_annotations(tls_on_http_port_enabled: bool) -> Annotations {
-        Annotations::try_from([
-            (
-                "prometheus.io/path".to_owned(),
-                "/_prometheus/metrics".to_owned(),
-            ),
-            ("prometheus.io/port".to_owned(), HTTP_PORT.to_string()),
-            (
-                "prometheus.io/scheme".to_owned(),
-                if tls_on_http_port_enabled {
-                    "https".to_owned()
-                } else {
-                    "http".to_owned()
-                },
-            ),
-            ("prometheus.io/scrape".to_owned(), "true".to_owned()),
-        ])
-        .expect("should be valid annotations")
     }
 
     /// Builds the [`listener::v1alpha1::Listener`] for the role group
@@ -3415,12 +3393,5 @@ mod tests {
         for node_role in ValidatedNodeRole::iter() {
             RoleGroupBuilder::build_node_role_label(&node_role);
         }
-    }
-
-    #[test]
-    fn test_prometheus_annotations() {
-        // Test that the function does not panic on all possible inputs
-        RoleGroupBuilder::prometheus_annotations(false);
-        RoleGroupBuilder::prometheus_annotations(true);
     }
 }
