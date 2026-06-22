@@ -15,10 +15,6 @@ All notable changes to this project will be documented in this file.
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
 - Bump `stackable-operator` to 0.112.0 ([#137], [#147]).
-- Bump `clap` to 4.6 ([#147]).
-- Bump `regex` to 1.12 ([#147]).
-- Bump `tokio` to 1.52 ([#147]).
-- Bump `uuid` to 1.23 ([#147]).
 - Move the framework code to operator-rs. This introduces no user-visible changes, except that the
   allowed length of role group names increases from 16 to 63 ([#147]).
 - test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#146]).
