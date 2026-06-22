@@ -966,7 +966,11 @@ impl<'a> RoleGroupBuilder<'a> {
     fn security_settings_file_type_managed_by_env_var(
         file_type: &ExtendedSecuritySettingsFileType,
     ) -> EnvVarName {
-        EnvVarName::from_str(&format!("MANAGE_{}", file_type.id.to_uppercase())).expect(
+        EnvVarName::from_str(&format!(
+            "MANAGE_{file_type_id}",
+            file_type_id = file_type.id.to_uppercase()
+        ))
+        .expect(
             "The file type IDs are static strings which should produce valid environment variable \
             names.",
         )
