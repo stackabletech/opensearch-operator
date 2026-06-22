@@ -50,7 +50,13 @@ transforms:
 
         timestamp_string, err = string(event.timestamp)
         if err == null {
-          parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3fZ")
+          # OpenSearch 3.4.0 uses log4j2 2.21.0 which renders the timezone using "Z" (Zulu).
+          # OpenSearch 3.6.0 uses log4j2 2.25.0 which renders the timezone as a numeric offset (e.g. "...,122+0000").
+          # Try the offset format first and fall back to the literal "Z" so both layouts are parsed.
+          parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3f%z")
+          if err != null {
+            parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3fZ")
+          }
           if err == null {
             .timestamp = parsed_timestamp
           } else {
