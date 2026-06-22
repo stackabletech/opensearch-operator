@@ -30,28 +30,28 @@ customConfig:
       inputs:
         - validEvents
       condition: >-
-        .pod == "opensearch-nodes-automatic-0" &&
+        .pod == "opensearch-nodes-automatic-log-config-0" &&
         .container == "opensearch"
     filteredAutomaticLogConfigVector:
       type: filter
       inputs:
         - validEvents
       condition: >-
-        .pod == "opensearch-nodes-automatic-0" &&
+        .pod == "opensearch-nodes-automatic-log-config-0" &&
         .container == "vector"
     filteredCustomLogConfigOpenSearch:
       type: filter
       inputs:
         - validEvents
       condition: >-
-        .pod == "opensearch-nodes-custom-0" &&
+        .pod == "opensearch-nodes-custom-log-config-0" &&
         .container == "opensearch"
     filteredCustomLogConfigVector:
       type: filter
       inputs:
         - validEvents
       condition: >-
-        .pod == "opensearch-nodes-custom-0" &&
+        .pod == "opensearch-nodes-custom-log-config-0" &&
         .container == "vector"
     filteredInvalidEvents:
       type: filter
