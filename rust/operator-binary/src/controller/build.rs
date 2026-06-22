@@ -74,6 +74,18 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            builder::pod::container::EnvVarSet,
+            role_utils::GenericCommonConfig,
+            types::{
+                common::Port,
+                kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName},
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
+        },
     };
     use uuid::uuid;
 
@@ -86,18 +98,6 @@ mod tests {
             ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
-        framework::{
-            builder::pod::container::EnvVarSet,
-            role_utils::GenericCommonConfig,
-            types::{
-                common::Port,
-                kubernetes::{Hostname, ListenerClassName, NamespaceName, SecretClassName},
-                operator::{
-                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
-                    RoleGroupName,
-                },
-            },
-        },
     };
 
     #[test]
@@ -229,7 +229,7 @@ mod tests {
         node_roles: impl Into<ValidatedNodeRoles>,
     ) -> OpenSearchRoleGroupConfig {
         OpenSearchRoleGroupConfig {
-            replicas,
+            replicas: Some(replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,

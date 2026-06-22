@@ -7,17 +7,17 @@ use stackable_operator::{
     client::Client,
     cluster_resources::{ClusterResource, ClusterResourceApplyStrategy, ClusterResources},
     deep_merger::ObjectOverrides,
+    v2::{
+        cluster_resources::cluster_resources_new,
+        types::{
+            kubernetes::{NamespaceName, Uid},
+            operator::ClusterName,
+        },
+    },
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use super::{Applied, ContextNames, KubernetesResources, Prepared};
-use crate::framework::{
-    cluster_resources::cluster_resources_new,
-    types::{
-        kubernetes::{NamespaceName, Uid},
-        operator::ClusterName,
-    },
-};
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(IntoStaticStr))]

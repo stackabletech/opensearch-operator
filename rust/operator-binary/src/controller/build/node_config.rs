@@ -1,25 +1,29 @@
 //! Configuration of an OpenSearch node
 
+use std::str::FromStr;
+
 use serde_json::json;
 use stackable_operator::{
-    builder::pod::container::FieldPathEnvVar, commons::networking::DomainName,
+    builder::pod::container::FieldPathEnvVar,
+    commons::networking::DomainName,
+    constant,
     k8s_openapi::DeepMerge,
-};
-
-use super::ValidatedCluster;
-use crate::{
-    controller::{
-        OpenSearchRoleGroupConfig, ValidatedNodeRole,
-        build::role_group_builder::RoleGroupSecurityMode,
-    },
-    crd::v1alpha1,
-    framework::{
+    v2::{
         builder::pod::container::{EnvVarName, EnvVarSet},
         config_overrides::JsonConfigOverrides,
         product_logging::framework::STACKABLE_LOG_DIR,
         role_group_utils,
         types::{kubernetes::ServiceName, operator::RoleGroupName},
     },
+};
+
+use super::ValidatedCluster;
+use crate::{
+    controller::{
+        OpenSearchRoleGroupConfig, ValidatedNodeRole,
+        build::role_group_builder::RoleGroupSecurityMode, replicas,
+    },
+    crd::v1alpha1,
 };
 
 /// The main configuration file of OpenSearch
@@ -138,6 +142,17 @@ const CONFIG_OPTION_PLUGINS_SECURITY_SSL_TRANSPORT_PEMTRUSTEDCAS_FILEPATH: &str 
 const CONFIG_OPTION_TRANSPORT_PUBLISH_HOST: &str = "transport.publish_host";
 
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
+
+constant!(ENV_VAR_NAME_DISCOVERY_SEED_HOSTS: EnvVarName = CONFIG_OPTION_DISCOVERY_SEED_HOSTS);
+constant!(ENV_VAR_NAME_HTTP_PUBLISH_HOST: EnvVarName = CONFIG_OPTION_HTTP_PUBLISH_HOST);
+constant!(ENV_VAR_NAME_INITIAL_CLUSTER_MANAGER_NODES: EnvVarName = CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES);
+constant!(ENV_VAR_NAME_NETWORK_PUBLISH_HOST: EnvVarName = CONFIG_OPTION_NETWORK_PUBLISH_HOST);
+constant!(ENV_VAR_NAME_NODE_NAME: EnvVarName = CONFIG_OPTION_NODE_NAME);
+constant!(ENV_VAR_NAME_NODE_ROLES: EnvVarName = CONFIG_OPTION_NODE_ROLES);
+constant!(ENV_VAR_NAME_OPENSEARCH_HOME: EnvVarName = "OPENSEARCH_HOME");
+constant!(ENV_VAR_NAME_OPENSEARCH_PATH_CONF: EnvVarName = "OPENSEARCH_PATH_CONF");
+constant!(ENV_VAR_NAME_POD_NAME: EnvVarName = "_POD_NAME");
+constant!(ENV_VAR_NAME_TRANSPORT_PUBLISH_HOST: EnvVarName = CONFIG_OPTION_TRANSPORT_PUBLISH_HOST);
 
 /// Configuration of an OpenSearch node based on the cluster and role-group configuration
 pub struct NodeConfig {
@@ -294,36 +309,36 @@ impl NodeConfig {
             .with_field_path(
                 // Prefix with an underscore, so that it occurs before the other environment
                 // variables which depend on it.
-                &EnvVarName::from_str_unsafe("_POD_NAME"),
-                FieldPathEnvVar::Name,
+                &ENV_VAR_NAME_POD_NAME,
+                &FieldPathEnvVar::Name,
             )
             // Set the OpenSearch node name to the Pod name.
             // The node name is used e.g. for INITIAL_CLUSTER_MANAGER_NODES.
             .with_field_path(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_NAME),
-                FieldPathEnvVar::Name,
+                &ENV_VAR_NAME_NODE_NAME,
+                &FieldPathEnvVar::Name,
             )
             .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NETWORK_PUBLISH_HOST),
+                &ENV_VAR_NAME_NETWORK_PUBLISH_HOST,
                 &fqdn,
             )
             .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_TRANSPORT_PUBLISH_HOST),
+                &ENV_VAR_NAME_TRANSPORT_PUBLISH_HOST,
                 &fqdn,
             )
             .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_HTTP_PUBLISH_HOST),
+                &ENV_VAR_NAME_HTTP_PUBLISH_HOST,
                 &fqdn,
             )
             .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_DISCOVERY_SEED_HOSTS),
+                &ENV_VAR_NAME_DISCOVERY_SEED_HOSTS,
                 format!(
                     "{}.{}.svc.{}",
                     self.seed_nodes_service_name, self.cluster.namespace, self.cluster_domain_name
                 ),
             )
             .with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_NODE_ROLES),
+                &ENV_VAR_NAME_NODE_ROLES,
                 Self::to_comma_separated_list(
                     &self
                         .role_group_config
@@ -338,7 +353,7 @@ impl NodeConfig {
 
         if let Some(initial_cluster_manager_nodes) = self.initial_cluster_manager_nodes() {
             env_vars = env_vars.with_value(
-                &EnvVarName::from_str_unsafe(CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES),
+                &ENV_VAR_NAME_INITIAL_CLUSTER_MANAGER_NODES,
                 initial_cluster_manager_nodes,
             );
         }
@@ -443,7 +458,7 @@ impl NodeConfig {
                 };
 
                 pod_names.extend(
-                    (0..role_group_config.replicas)
+                    (0..replicas(&role_group_config))
                         .map(|i| format!("{}-{i}", role_group_resource_names.stateful_set_name())),
                 );
             }
@@ -455,7 +470,7 @@ impl NodeConfig {
     /// Return content of the `OPENSEARCH_HOME` environment variable from envOverrides or default to `DEFAULT_OPENSEARCH_HOME`
     pub fn opensearch_home(&self) -> String {
         self.environment_variables()
-            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_HOME"))
+            .get(&ENV_VAR_NAME_OPENSEARCH_HOME)
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(DEFAULT_OPENSEARCH_HOME.to_owned())
     }
@@ -464,7 +479,7 @@ impl NodeConfig {
     pub fn opensearch_path_conf(&self) -> String {
         let opensearch_home = self.opensearch_home();
         self.environment_variables()
-            .get(&EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"))
+            .get(&ENV_VAR_NAME_OPENSEARCH_PATH_CONF)
             .and_then(|env_var| env_var.value.clone())
             .unwrap_or(format!("{opensearch_home}/config"))
     }
@@ -495,6 +510,16 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+            role_utils::GenericCommonConfig,
+            types::{
+                kubernetes::{
+                    ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
+                },
+                operator::{ClusterName, ProductVersion},
+            },
+        },
     };
     use uuid::uuid;
 
@@ -505,16 +530,6 @@ mod tests {
             ValidatedSecurity,
         },
         crd::v1alpha1,
-        framework::{
-            product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericCommonConfig,
-            types::{
-                kubernetes::{
-                    ConfigMapKey, ConfigMapName, ListenerClassName, NamespaceName, SecretClassName,
-                },
-                operator::{ClusterName, ProductVersion, RoleGroupName},
-            },
-        },
     };
 
     struct TestConfig {
@@ -540,7 +555,7 @@ mod tests {
         let role_group_name = RoleGroupName::from_str_unsafe("data");
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: test_config.replicas,
+            replicas: Some(test_config.replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,
@@ -675,6 +690,21 @@ mod tests {
     }
 
     #[test]
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *ENV_VAR_NAME_DISCOVERY_SEED_HOSTS;
+        let _ = *ENV_VAR_NAME_HTTP_PUBLISH_HOST;
+        let _ = *ENV_VAR_NAME_INITIAL_CLUSTER_MANAGER_NODES;
+        let _ = *ENV_VAR_NAME_NETWORK_PUBLISH_HOST;
+        let _ = *ENV_VAR_NAME_NODE_NAME;
+        let _ = *ENV_VAR_NAME_NODE_ROLES;
+        let _ = *ENV_VAR_NAME_OPENSEARCH_HOME;
+        let _ = *ENV_VAR_NAME_OPENSEARCH_PATH_CONF;
+        let _ = *ENV_VAR_NAME_POD_NAME;
+        let _ = *ENV_VAR_NAME_TRANSPORT_PUBLISH_HOST;
+    }
+
+    #[test]
     pub fn test_super_admin_dn() {
         let node_config = node_config(TestConfig::default());
 
@@ -704,7 +734,7 @@ mod tests {
                 .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("_POD_NAME"),
-                    FieldPathEnvVar::Name
+                    &FieldPathEnvVar::Name
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("cluster.initial_cluster_manager_nodes"),
@@ -724,7 +754,7 @@ mod tests {
                 )
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("node.name"),
-                    FieldPathEnvVar::Name
+                    &FieldPathEnvVar::Name
                 )
                 .with_value(
                     &EnvVarName::from_str_unsafe("node.roles"),

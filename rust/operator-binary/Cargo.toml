@@ -9,12 +9,17 @@ repository.workspace = true
 publish = false
 build = "build.rs"
 
+[features]
+# The macro attributed_string_type is used in this operator. It produces test
+# code if the feature "test-support" is set. This feature is defined here to
+# suppress a Clippy warning.
+test-support = []
+
 [dependencies]
 stackable-operator.workspace = true
 
 clap.workspace = true
 futures.workspace = true
-json-patch.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -23,7 +28,6 @@ snafu.workspace = true
 strum.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-uuid.workspace = true
 
 [build-dependencies]
 built.workspace = true
@@ -31,3 +35,5 @@ built.workspace = true
 [dev-dependencies]
 pretty_assertions.workspace = true
 rstest.workspace = true
+stackable-operator = { workspace = true, features = ["test-support"] }
+uuid.workspace = true
