@@ -17,6 +17,7 @@ use stackable_operator::{
         resources::{CpuLimits, MemoryLimits, Resources},
         secret_class::SecretClassVolumeProvisionParts,
     },
+    constant,
     constants::RESTART_CONTROLLER_ENABLED_LABEL,
     crd::listener::{self},
     k8s_openapi::{
@@ -40,34 +41,14 @@ use stackable_operator::{
         remove_vector_shutdown_file_command,
     },
     utils::COMMON_BASH_TRAP_FUNCTIONS,
-};
-
-use super::{
-    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
-    product_logging::config::{
-        CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
-    },
-};
-use crate::{
-    constant,
-    controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
-        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
-        build::{
-            product_logging::config::{
-                MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
-            },
-            role_builder::security_config_map_name,
-        },
-    },
-    crd::{ExtendedSecuritySettingsFileType, v1alpha1},
-    framework::{
+    v2::{
         builder::{
             meta::ownerreference_from_resource,
             pod::{
                 container::{EnvVarName, EnvVarSet, new_container_builder},
                 volume::{ListenerReference, listener_operator_volume_source_builder_build_pvc},
             },
+            service::{Scheme, Scraping, prometheus_annotations, prometheus_labels},
             statefulset::{
                 restarter_ignore_configmap_annotations, restarter_ignore_secret_annotations,
             },
@@ -85,6 +66,27 @@ use crate::{
             operator::RoleGroupName,
         },
     },
+};
+
+use super::{
+    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
+    product_logging::config::{
+        CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
+    },
+};
+use crate::{
+    controller::{
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
+        build::{
+            product_logging::config::{
+                MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
+            },
+            role_builder::security_config_map_name,
+        },
+        replicas,
+    },
+    crd::{ExtendedSecuritySettingsFileType, v1alpha1},
 };
 
 constant!(CONFIG_VOLUME_NAME: VolumeName = "config");
@@ -115,6 +117,10 @@ const OPENSEARCH_INITIALIZED_KEYSTORE_DIRECTORY_NAME: &str = "initialized-keysto
 const OPENSEARCH_KEYSTORE_SECRETS_DIRECTORY: &str = "keystore-secrets";
 constant!(OPENSEARCH_KEYSTORE_VOLUME_NAME: VolumeName = "keystore");
 const OPENSEARCH_KEYSTORE_VOLUME_SIZE: &str = "1Mi";
+
+constant!(ENV_VAR_NAME_ADMIN_DN: EnvVarName = "ADMIN_DN");
+constant!(ENV_VAR_NAME_POD_NAME: EnvVarName = "POD_NAME");
+constant!(ENV_VAR_NAME_OPENSEARCH_PATH_CONF: EnvVarName = "OPENSEARCH_PATH_CONF");
 
 /// Depending on the security settings, the role group builder operates in one of these modes.
 #[derive(Clone, Debug)]
@@ -365,7 +371,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let spec = StatefulSetSpec {
             // Order does not matter for OpenSearch
             pod_management_policy: Some("Parallel".to_string()),
-            replicas: Some(self.role_group_config.replicas.into()),
+            replicas: Some(replicas(&self.role_group_config).into()),
             selector: LabelSelector {
                 match_labels: Some(self.pod_selector().into()),
                 ..LabelSelector::default()
@@ -572,14 +578,8 @@ impl<'a> RoleGroupBuilder<'a> {
         };
 
         let env_vars = EnvVarSet::new()
-            .with_value(
-                &EnvVarName::from_str_unsafe("ADMIN_DN"),
-                self.node_config.super_admin_dn(),
-            )
-            .with_field_path(
-                &EnvVarName::from_str_unsafe("POD_NAME"),
-                FieldPathEnvVar::Name,
-            );
+            .with_value(&ENV_VAR_NAME_ADMIN_DN, self.node_config.super_admin_dn())
+            .with_field_path(&ENV_VAR_NAME_POD_NAME, &FieldPathEnvVar::Name);
 
         let volume_mounts = vec![
             VolumeMount {
@@ -919,14 +919,8 @@ impl<'a> RoleGroupBuilder<'a> {
         volume_mounts.extend(self.security_config_volume_mounts(settings, false));
 
         let mut env_vars = EnvVarSet::new()
-            .with_value(
-                &EnvVarName::from_str_unsafe("OPENSEARCH_PATH_CONF"),
-                opensearch_path_conf,
-            )
-            .with_field_path(
-                &EnvVarName::from_str_unsafe("POD_NAME"),
-                FieldPathEnvVar::Name,
-            );
+            .with_value(&ENV_VAR_NAME_OPENSEARCH_PATH_CONF, opensearch_path_conf)
+            .with_field_path(&ENV_VAR_NAME_POD_NAME, &FieldPathEnvVar::Name);
 
         for file_type in settings {
             let managed_by_operator =
@@ -972,7 +966,14 @@ impl<'a> RoleGroupBuilder<'a> {
     fn security_settings_file_type_managed_by_env_var(
         file_type: &ExtendedSecuritySettingsFileType,
     ) -> EnvVarName {
-        EnvVarName::from_str_unsafe(&format!("MANAGE_{}", file_type.id.to_uppercase()))
+        EnvVarName::from_str(&format!(
+            "MANAGE_{file_type_id}",
+            file_type_id = file_type.id.to_uppercase()
+        ))
+        .expect(
+            "The file type IDs are static strings which should produce valid environment variable \
+            names.",
+        )
     }
 
     /// Builds the config volumes for the [`PodTemplateSpec`]
@@ -1304,9 +1305,16 @@ impl<'a> RoleGroupBuilder<'a> {
     pub fn build_headless_service(&self) -> Service {
         let metadata = self
             .common_metadata(self.resource_names.headless_service_name())
-            .with_labels(Self::prometheus_labels())
-            .with_annotations(Self::prometheus_annotations(
-                self.security_mode.tls_server_secret_class().is_some(),
+            .with_labels(prometheus_labels(&Scraping::Enabled))
+            .with_annotations(prometheus_annotations(
+                &Scraping::Enabled,
+                if self.security_mode.tls_server_secret_class().is_some() {
+                    &Scheme::Https
+                } else {
+                    &Scheme::Http
+                },
+                "/_prometheus/metrics",
+                &HTTP_PORT,
             ))
             .build();
 
@@ -1338,36 +1346,6 @@ impl<'a> RoleGroupBuilder<'a> {
             spec: Some(service_spec),
             status: None,
         }
-    }
-
-    /// Common labels for Prometheus
-    fn prometheus_labels() -> Labels {
-        Labels::try_from([("prometheus.io/scrape", "true")]).expect("should be a valid label")
-    }
-
-    /// Common annotations for Prometheus
-    ///
-    /// These annotations can be used in a ServiceMonitor.
-    ///
-    /// see also <https://github.com/prometheus-community/helm-charts/blob/prometheus-27.32.0/charts/prometheus/values.yaml#L983-L1036>
-    fn prometheus_annotations(tls_on_http_port_enabled: bool) -> Annotations {
-        Annotations::try_from([
-            (
-                "prometheus.io/path".to_owned(),
-                "/_prometheus/metrics".to_owned(),
-            ),
-            ("prometheus.io/port".to_owned(), HTTP_PORT.to_string()),
-            (
-                "prometheus.io/scheme".to_owned(),
-                if tls_on_http_port_enabled {
-                    "https".to_owned()
-                } else {
-                    "http".to_owned()
-                },
-            ),
-            ("prometheus.io/scrape".to_owned(), "true".to_owned()),
-        ])
-        .expect("should be valid annotations")
     }
 
     /// Builds the [`listener::v1alpha1::Listener`] for the role group
@@ -1453,26 +1431,7 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
-    };
-    use strum::IntoEnumIterator;
-    use uuid::uuid;
-
-    use super::{
-        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, LOG_CONFIG_VOLUME_NAME, LOG_VOLUME_NAME,
-        ROLE_GROUP_LISTENER_VOLUME_NAME, RoleGroupBuilder,
-    };
-    use crate::{
-        controller::{
-            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
-            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedNodeRole,
-            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
-            build::role_group_builder::{
-                DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
-                TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_CA_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
-            },
-        },
-        crd::{OpenSearchKeystoreKey, v1alpha1},
-        framework::{
+        v2::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::VectorContainerLogConfig,
             role_utils::GenericCommonConfig,
@@ -1488,20 +1447,43 @@ mod tests {
             },
         },
     };
+    use strum::IntoEnumIterator;
+    use uuid::uuid;
+
+    use super::{
+        CONFIG_VOLUME_NAME, DATA_VOLUME_NAME, ENV_VAR_NAME_ADMIN_DN,
+        ENV_VAR_NAME_OPENSEARCH_PATH_CONF, ENV_VAR_NAME_POD_NAME, LOG_CONFIG_VOLUME_NAME,
+        LOG_VOLUME_NAME, ROLE_GROUP_LISTENER_VOLUME_NAME, RoleGroupBuilder,
+    };
+    use crate::{
+        controller::{
+            ContextNames, OpenSearchRoleGroupConfig, ValidatedCluster,
+            ValidatedContainerLogConfigChoice, ValidatedLogging, ValidatedNodeRole,
+            ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
+            build::role_group_builder::{
+                DISCOVERY_SERVICE_LISTENER_VOLUME_NAME, OPENSEARCH_KEYSTORE_VOLUME_NAME,
+                TLS_INTERNAL_VOLUME_NAME, TLS_SERVER_CA_VOLUME_NAME, TLS_SERVER_VOLUME_NAME,
+            },
+        },
+        crd::{OpenSearchKeystoreKey, v1alpha1},
+    };
 
     #[test]
     fn test_constants() {
-        // Test that the functions do not panic
-        let _ = CONFIG_VOLUME_NAME;
-        let _ = LOG_CONFIG_VOLUME_NAME;
-        let _ = DATA_VOLUME_NAME;
-        let _ = ROLE_GROUP_LISTENER_VOLUME_NAME;
-        let _ = DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
-        let _ = TLS_SERVER_VOLUME_NAME;
-        let _ = TLS_SERVER_CA_VOLUME_NAME;
-        let _ = TLS_INTERNAL_VOLUME_NAME;
-        let _ = LOG_VOLUME_NAME;
-        let _ = OPENSEARCH_KEYSTORE_VOLUME_NAME;
+        // Test that dereferencing the constants does not panic.
+        let _ = *CONFIG_VOLUME_NAME;
+        let _ = *LOG_CONFIG_VOLUME_NAME;
+        let _ = *DATA_VOLUME_NAME;
+        let _ = *ROLE_GROUP_LISTENER_VOLUME_NAME;
+        let _ = *DISCOVERY_SERVICE_LISTENER_VOLUME_NAME;
+        let _ = *TLS_SERVER_VOLUME_NAME;
+        let _ = *TLS_SERVER_CA_VOLUME_NAME;
+        let _ = *TLS_INTERNAL_VOLUME_NAME;
+        let _ = *LOG_VOLUME_NAME;
+        let _ = *OPENSEARCH_KEYSTORE_VOLUME_NAME;
+        let _ = *ENV_VAR_NAME_ADMIN_DN;
+        let _ = *ENV_VAR_NAME_POD_NAME;
+        let _ = *ENV_VAR_NAME_OPENSEARCH_PATH_CONF;
     }
 
     #[test]
@@ -1553,7 +1535,7 @@ mod tests {
         };
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: 1,
+            replicas: Some(1),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,
@@ -3415,12 +3397,5 @@ mod tests {
         for node_role in ValidatedNodeRole::iter() {
             RoleGroupBuilder::build_node_role_label(&node_role);
         }
-    }
-
-    #[test]
-    fn test_prometheus_annotations() {
-        // Test that the function does not panic on all possible inputs
-        RoleGroupBuilder::prometheus_annotations(false);
-        RoleGroupBuilder::prometheus_annotations(true);
     }
 }

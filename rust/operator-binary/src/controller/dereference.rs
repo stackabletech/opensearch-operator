@@ -1,16 +1,19 @@
 //! The dereference step in the OpenSearchCluster controller
 
 use snafu::{ResultExt, Snafu};
-use stackable_operator::{client::Client, crd::listener};
+use stackable_operator::{
+    client::Client,
+    crd::listener,
+    v2::{
+        controller_utils::{get_cluster_name, get_namespace},
+        types::{kubernetes::NamespaceName, operator::ClusterName},
+    },
+};
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 use crate::{
     controller::{DereferencedObjects, build::role_builder},
     crd::v1alpha1,
-    framework::{
-        controller_utils::{get_cluster_name, get_namespace},
-        types::{kubernetes::NamespaceName, operator::ClusterName},
-    },
 };
 
 #[derive(Snafu, Debug, EnumDiscriminants)]
@@ -18,12 +21,12 @@ use crate::{
 pub enum Error {
     #[snafu(display("failed to get the cluster name"))]
     GetClusterName {
-        source: crate::framework::controller_utils::Error,
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to get the cluster namespace"))]
     GetClusterNamespace {
-        source: crate::framework::controller_utils::Error,
+        source: stackable_operator::v2::controller_utils::Error,
     },
 
     #[snafu(display("failed to fetch the discovery service listener"))]

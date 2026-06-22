@@ -31,15 +31,7 @@ use stackable_operator::{
     kube::{Resource, api::ObjectMeta, core::DeserializeGuard, runtime::controller::Action},
     logging::controller::ReconcilerError,
     shared::time::Duration,
-};
-use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
-use update_status::update_status;
-use validate::validate;
-
-use crate::{
-    controller::preprocess::preprocess,
-    crd::v1alpha1,
-    framework::{
+    v2::{
         HasName, HasUid, NameIsValidLabelValue,
         config_overrides::JsonConfigOverrides,
         product_logging::framework::{ValidatedContainerLogConfigChoice, VectorContainerLogConfig},
@@ -54,6 +46,11 @@ use crate::{
         },
     },
 };
+use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
+use update_status::update_status;
+use validate::validate;
+
+use crate::{controller::preprocess::preprocess, crd::v1alpha1};
 
 mod apply;
 mod build;
@@ -159,6 +156,13 @@ type OpenSearchRoleGroupConfig = RoleGroupConfig<
     GenericCommonConfig,
     ValidatedOpenSearchConfigOverrides,
 >;
+
+/// Returns the replication count for the given role group config
+///
+/// Returns 1 if not set, as this is the Kubernetes default.
+pub fn replicas(role_group_config: &OpenSearchRoleGroupConfig) -> u16 {
+    role_group_config.replicas.unwrap_or(1)
+}
 
 type OpenSearchNodeResources =
     stackable_operator::commons::resources::Resources<v1alpha1::StorageConfig>;
@@ -313,11 +317,8 @@ impl ValidatedCluster {
     }
 
     /// Returns the sum of the replicas in all role-groups
-    pub fn node_count(&self) -> u32 {
-        self.role_group_configs
-            .values()
-            .map(|rg| rg.replicas as u32)
-            .sum()
+    pub fn node_count(&self) -> u16 {
+        self.role_group_configs.values().map(replicas).sum()
     }
 
     /// Returns all role-group configurations which contain the given node role
@@ -516,6 +517,15 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            builder::pod::container::EnvVarSet,
+            product_logging::framework::ValidatedContainerLogConfigChoice,
+            role_utils::GenericCommonConfig,
+            types::{
+                kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
+                operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
+            },
+        },
     };
     use uuid::uuid;
 
@@ -526,15 +536,6 @@ mod tests {
             ValidatedOpenSearchConfig, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
         },
         crd::v1alpha1,
-        framework::{
-            builder::pod::container::EnvVarSet,
-            product_logging::framework::ValidatedContainerLogConfigChoice,
-            role_utils::GenericCommonConfig,
-            types::{
-                kubernetes::{ListenerClassName, NamespaceName, SecretClassName},
-                operator::{ClusterName, OperatorName, ProductVersion, RoleGroupName},
-            },
-        },
     };
 
     #[test]
@@ -662,7 +663,7 @@ mod tests {
         node_roles: impl Into<ValidatedNodeRoles>,
     ) -> OpenSearchRoleGroupConfig {
         OpenSearchRoleGroupConfig {
-            replicas,
+            replicas: Some(replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,

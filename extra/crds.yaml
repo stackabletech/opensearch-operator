@@ -234,7 +234,7 @@ spec:
                       managingRoleGroup:
                         default: security-config
                         description: The role group that updates the security index if any setting is managed by the operator.
-                        maxLength: 16
+                        maxLength: 63
                         minLength: 1
                         type: string
                       settings:
@@ -1885,31 +1885,39 @@ spec:
 
                           Example for key-value pairs:
 
-                              stringProperty: new value
-                              booleanProperty: "true"
+                          ```yaml
+                          stringProperty: new value
+                          booleanProperty: "true"
+                          ```
 
                           Example for a JSON merge patch:
 
-                              jsonMergePatch:
-                                stringProperty: new value
-                                booleanProperty: true
-                                nestedProperty:
-                                  key: value
+                          ```yaml
+                          jsonMergePatch:
+                            stringProperty: new value
+                            booleanProperty: true
+                            nestedProperty:
+                              key: value
+                          ```
 
                           Example for a JSON patch:
 
-                              jsonPatch:
-                                - op: replace
-                                  path: /stringProperty
-                                  value: new value
+                          ```yaml
+                          jsonPatch:
+                            - op: replace
+                              path: /stringProperty
+                              value: new value
+                          ```
 
                           Example for a JSON object:
 
-                              userProvided:
-                                stringProperty: new value
-                                booleanProperty: true
-                                nestedProperty:
-                                  key: value
+                          ```yaml
+                          userProvided:
+                            stringProperty: new value
+                            booleanProperty: true
+                            nestedProperty:
+                              key: value
+                          ```
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                     type: object
@@ -2608,31 +2616,39 @@ spec:
 
                                 Example for key-value pairs:
 
-                                    stringProperty: new value
-                                    booleanProperty: "true"
+                                ```yaml
+                                stringProperty: new value
+                                booleanProperty: "true"
+                                ```
 
                                 Example for a JSON merge patch:
 
-                                    jsonMergePatch:
-                                      stringProperty: new value
-                                      booleanProperty: true
-                                      nestedProperty:
-                                        key: value
+                                ```yaml
+                                jsonMergePatch:
+                                  stringProperty: new value
+                                  booleanProperty: true
+                                  nestedProperty:
+                                    key: value
+                                ```
 
                                 Example for a JSON patch:
 
-                                    jsonPatch:
-                                      - op: replace
-                                        path: /stringProperty
-                                        value: new value
+                                ```yaml
+                                jsonPatch:
+                                  - op: replace
+                                    path: /stringProperty
+                                    value: new value
+                                ```
 
                                 Example for a JSON object:
 
-                                    userProvided:
-                                      stringProperty: new value
-                                      booleanProperty: true
-                                      nestedProperty:
-                                        key: value
+                                ```yaml
+                                userProvided:
+                                  stringProperty: new value
+                                  booleanProperty: true
+                                  nestedProperty:
+                                    key: value
+                                ```
                               type: object
                               x-kubernetes-preserve-unknown-fields: true
                           type: object

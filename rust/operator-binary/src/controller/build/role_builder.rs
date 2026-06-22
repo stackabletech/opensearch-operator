@@ -18,15 +18,7 @@ use stackable_operator::{
         Label, Labels,
         consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
     },
-};
-
-use crate::{
-    controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
-    },
-    crd::v1alpha1,
-    framework::{
+    v2::{
         NameIsValidLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
@@ -37,6 +29,14 @@ use crate::{
             operator::ClusterName,
         },
     },
+};
+
+use crate::{
+    controller::{
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
+        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
+    },
+    crd::v1alpha1,
 };
 
 const PDB_DEFAULT_MAX_UNAVAILABLE: u16 = 1;
@@ -379,6 +379,21 @@ mod tests {
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        v2::{
+            builder::pod::container::EnvVarSet,
+            role_utils::GenericCommonConfig,
+            types::{
+                common::Port,
+                kubernetes::{
+                    ConfigMapName, Hostname, ListenerClassName, ListenerName, NamespaceName,
+                    SecretClassName, ServiceName,
+                },
+                operator::{
+                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
+                    RoleGroupName,
+                },
+            },
+        },
     };
     use uuid::uuid;
 
@@ -394,21 +409,6 @@ mod tests {
             },
         },
         crd::v1alpha1,
-        framework::{
-            builder::pod::container::EnvVarSet,
-            role_utils::GenericCommonConfig,
-            types::{
-                common::Port,
-                kubernetes::{
-                    ConfigMapName, Hostname, ListenerClassName, ListenerName, NamespaceName,
-                    SecretClassName, ServiceName,
-                },
-                operator::{
-                    ClusterName, ControllerName, OperatorName, ProductName, ProductVersion,
-                    RoleGroupName,
-                },
-            },
-        },
     };
 
     fn context_names() -> ContextNames {
@@ -426,7 +426,7 @@ mod tests {
             .expect("should be a valid ProductImage");
 
         let role_group_config = OpenSearchRoleGroupConfig {
-            replicas: 1,
+            replicas: Some(1),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
                 discovery_service_exposed: true,
