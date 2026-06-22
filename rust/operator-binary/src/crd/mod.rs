@@ -77,6 +77,7 @@ pub mod versioned {
     /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[versioned(crd(
+        doc = "An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch.",
         group = "opensearch.stackable.tech",
         kind = "OpenSearchCluster",
         plural = "opensearchclusters",
