@@ -14,15 +14,21 @@ All notable changes to this project will be documented in this file.
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#129]).
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
-- Bump `stackable-operator` to 0.110.1 ([#137]).
+- Bump `stackable-operator` to 0.113.0 ([#137], [#147], [#149]).
+- Move the framework code to operator-rs. This introduces no user-visible changes, except that the
+  allowed length of role group names increases from 16 to 63 ([#147]).
 - Replace the generic subject DN in the configuration setting `plugins.security.nodes_dn` with the
   FQDNs of the OpenSearch nodes ([#144]).
+- test: Bump vector-aggregator to 0.55.0, replace /graphql call with gRPC call ([#146]).
 
 [#129]: https://github.com/stackabletech/opensearch-operator/pull/129
 [#130]: https://github.com/stackabletech/opensearch-operator/pull/130
 [#137]: https://github.com/stackabletech/opensearch-operator/pull/137
 [#141]: https://github.com/stackabletech/opensearch-operator/pull/141
 [#144]: https://github.com/stackabletech/opensearch-operator/pull/144
+[#146]: https://github.com/stackabletech/opensearch-operator/pull/146
+[#147]: https://github.com/stackabletech/opensearch-operator/pull/147
+[#149]: https://github.com/stackabletech/opensearch-operator/pull/149
 
 ## [26.3.0] - 2026-03-16
 

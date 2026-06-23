@@ -3,6 +3,7 @@ use std::{array, str::FromStr};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use stackable_operator::{
+    attributed_string_type,
     commons::{
         affinity::{StackableAffinity, StackableAffinityFragment, affinity_between_role_pods},
         cluster_operation::ClusterOperation,
@@ -16,6 +17,7 @@ use stackable_operator::{
         fragment::Fragment,
         merge::{Atomic, Merge},
     },
+    constant,
     deep_merger::ObjectOverrides,
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
@@ -25,13 +27,7 @@ use stackable_operator::{
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
     utils::crds::raw_object_schema,
-    versioned::versioned,
-};
-use strum::{Display, EnumIter};
-
-use crate::{
-    attributed_string_type, constant,
-    framework::{
+    v2::{
         NameIsValidLabelValue,
         config_overrides::JsonOrKeyValueConfigOverrides,
         role_utils::GenericCommonConfig,
@@ -43,7 +39,9 @@ use crate::{
             operator::{ClusterName, ProductName, RoleGroupName, RoleName},
         },
     },
+    versioned::versioned,
 };
+use strum::{Display, EnumIter};
 
 constant!(DEFAULT_ROLE_GROUP_LISTENER_CLASS: ListenerClassName = "cluster-internal");
 constant!(DEFAULT_DISCOVERY_SERVICE_LISTENER_CLASS: ListenerClassName = "cluster-internal");
@@ -79,6 +77,7 @@ pub mod versioned {
     /// generates in the [operator documentation](DOCS_BASE_URL_PLACEHOLDER/opensearch/).
     #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, PartialEq, Serialize)]
     #[versioned(crd(
+        doc = "An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch.",
         group = "opensearch.stackable.tech",
         kind = "OpenSearchCluster",
         plural = "opensearchclusters",
@@ -877,7 +876,14 @@ mod tests {
     use stackable_operator::versioned::test_utils::RoundtripTestData;
     use strum::IntoEnumIterator;
 
-    use crate::crd::{security_config_managing_role_group_default, v1alpha1};
+    use crate::crd::{
+        OpenSearchKeystoreKey, security_config_managing_role_group_default, v1alpha1,
+    };
+
+    #[test]
+    fn test_attributed_string_type_examples() {
+        OpenSearchKeystoreKey::test_example();
+    }
 
     #[test]
     fn test_node_role() {

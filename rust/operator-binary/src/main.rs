@@ -5,7 +5,6 @@ use std::{str::FromStr, sync::Arc};
 
 use clap::Parser as _;
 use crd::{OpenSearchCluster, OpenSearchClusterVersion, v1alpha1};
-use framework::types::operator::OperatorName;
 use futures::{FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu, futures::TryFutureExt};
 use stackable_operator::{
@@ -32,12 +31,12 @@ use stackable_operator::{
     shared::yaml::SerializeOptions,
     telemetry::Tracing,
     utils::signal::{self, SignalWatcher},
+    v2::types::operator::OperatorName,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
 mod controller;
 mod crd;
-mod framework;
 mod webhooks;
 
 mod built_info {
