@@ -96,7 +96,7 @@ impl<'a> RoleBuilder<'a> {
         RoleBinding {
             metadata,
             role_ref: RoleRef {
-                api_group: ClusterRole::GROUP.to_owned(),
+                api_group: Some(ClusterRole::GROUP.to_owned()),
                 kind: ClusterRole::KIND.to_owned(),
                 name: self.resource_names.cluster_role_name().to_string(),
             },
