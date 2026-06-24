@@ -55,7 +55,7 @@ transforms:
           # Try the offset format first and fall back to the literal "Z" so both layouts are parsed.
           parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3f%z")
           if err != null {
-            parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3fZ")
+            parsed_timestamp, err = parse_timestamp(timestamp_string, "%Y-%m-%dT%H:%M:%S,%3fZ", timezone: "Etc/UTC")
           }
           if err == null {
             .timestamp = parsed_timestamp
