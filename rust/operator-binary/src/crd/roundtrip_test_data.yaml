@@ -1,6 +1,6 @@
 ---
 image:
-  productVersion: 3.4.0
+  productVersion: 3.6.0
   pullPolicy: IfNotPresent
 clusterOperation:
   reconciliationPaused: false
@@ -117,8 +117,8 @@ nodes:
       replicas: 2
 ---
 image:
-  custom: oci.example.com/namespace/opensearch:3.4.0-custom
-  productVersion: 3.4.0
+  custom: oci.example.com/namespace/opensearch:3.6.0-custom
+  productVersion: 3.6.0
   pullPolicy: Always
   pullSecrets:
     - name: registry-credentials

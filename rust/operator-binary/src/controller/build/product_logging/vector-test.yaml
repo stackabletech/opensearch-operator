@@ -1,7 +1,7 @@
 # Run tests with `./test-vector.sh`
 #
 # A downside of these test cases is that they compare the whole event and that the message can
-# contain source code positions in vector.yaml, e.g. "function call error for \"parse_timestamp\" at (584:643)". Please adapt the tests if you change VRL code in vector.yaml.
+# contain source code positions in vector.yaml, e.g. "function call error for \"parse_timestamp\" at (990:1070)". Please adapt the tests if you change VRL code in vector.yaml.
 ---
 tests:
   - name: Test opensearch_server log entry without stacktrace
@@ -11,10 +11,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -31,7 +31,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -42,23 +42,23 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,363Z", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}",
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,363+0000", "level": "INFO", "component": "o.o.c.c.JoinHelper", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "failed to join {opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true} with JoinRequest{sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, minimumTerm=0, optionalJoin=Optional[Join{term=1, lastAcceptedTerm=0, lastAcceptedVersion=0, sourceNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}, targetNode={opensearch-nodes-cluster-manager-0}{sk-r0P_TTYuPqaamTFbjKg}{fIRSMbQYSe2nKQZ_sPn4kg}{10.244.0.20}{10.244.0.20:9300}{m}{shard_indexing_pressure_enabled=true}}]}",
             "stacktrace": ["org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]",
             "Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower",
-            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.6.0.jar:3.6.0]",
             "at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]",
-            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]",
-            "at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.4.0.jar:3.4.0]",
-            "at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.4.0.jar:3.4.0]",
-            "at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.4.0.jar:3.4.0]",
-            "at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.4.0.jar:3.4.0]",
-            "at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.4.0.jar:3.4.0]",
+            "at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.6.0.jar:3.6.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.6.0.jar:3.6.0]",
+            "at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.6.0.jar:3.6.0]",
+            "at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.6.0.jar:3.6.0]",
+            "at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.6.0.jar:3.6.0]",
+            "at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.6.0.jar:3.6.0]",
             "at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]",
             "at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]",
             "at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]"] }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473451193Z
+          timestamp: 2025-10-01T12:47:29.473451193+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -75,14 +75,14 @@ tests:
                   \n\
                   org.opensearch.transport.RemoteTransportException: [opensearch-nodes-cluster-manager-0][10.244.0.20:9300][internal:cluster/coordination/join]\n\
                   Caused by: org.opensearch.cluster.coordination.CoordinationStateRejectedException: became follower\n\
-                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.lambda$$close$$3(JoinHelper.java:648) ~[opensearch-3.6.0.jar:3.6.0]\n\
                   at java.base/java.util.HashMap$$Values.forEach(HashMap.java:1073) ~[?:?]\n\
-                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.4.0.jar:3.4.0]\n\
-                  at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.4.0.jar:3.4.0]\n\
-                  at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.4.0.jar:3.4.0]\n\
-                  at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.4.0.jar:3.4.0]\n\
-                  at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.4.0.jar:3.4.0]\n\
-                  at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.4.0.jar:3.4.0]\n\
+                  at org.opensearch.cluster.coordination.JoinHelper$$CandidateJoinAccumulator.close(JoinHelper.java:648) ~[opensearch-3.6.0.jar:3.6.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.becomeFollower(Coordinator.java:829) ~[opensearch-3.6.0.jar:3.6.0]\n\
+                  at org.opensearch.cluster.coordination.Coordinator.onFollowerCheckRequest(Coordinator.java:405) ~[opensearch-3.6.0.jar:3.6.0]\n\
+                  at org.opensearch.cluster.coordination.FollowersChecker$$2.doRun(FollowersChecker.java:250) ~[opensearch-3.6.0.jar:3.6.0]\n\
+                  at org.opensearch.common.util.concurrent.ThreadContext$$ContextPreservingAbstractRunnable.doRun(ThreadContext.java:975) ~[opensearch-3.6.0.jar:3.6.0]\n\
+                  at org.opensearch.common.util.concurrent.AbstractRunnable.run(AbstractRunnable.java:52) ~[opensearch-3.6.0.jar:3.6.0]\n\
                   at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]\n\
                   at java.base/java.util.concurrent.ThreadPoolExecutor$$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]\n\
                   at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]",
@@ -90,7 +90,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.363Z'
+                "timestamp": t'2025-10-01T12:47:28.363+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -101,10 +101,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -119,12 +119,12 @@ tests:
                 "file": "opensearch_server.json",
                 "level": "INFO",
                 "logger": "",
-                "message": "{\"type\": \"server\", \"timestamp\": \"2025-10-01T12:47:28,582Z\", \"level\": \"INFO\", \"component\": \"o.o.n.Node\", \"cluster.name\": \"opensearch\", \"node.name\": \"opensearch-nodes-cluster-manager-0\", \"message\": \"started\", \"cluster.uuid\": \"Jh1D6YAhTmyzkHI7vM1WWw\", \"node.id\": \"sk-r0P_TTYuPqaamTFbjKg\"\n",
+                "message": "{\"type\": \"server\", \"timestamp\": \"2025-10-01T12:47:28,582+0000\", \"level\": \"INFO\", \"component\": \"o.o.n.Node\", \"cluster.name\": \"opensearch\", \"node.name\": \"opensearch-nodes-cluster-manager-0\", \"message\": \"started\", \"cluster.uuid\": \"Jh1D6YAhTmyzkHI7vM1WWw\", \"node.id\": \"sk-r0P_TTYuPqaamTFbjKg\"\n",
                 "namespace": "default",
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": "2025-10-01T12:47:29.473487331Z"
+                "timestamp": "2025-10-01T12:47:29.473487331+0000"
               }
 
               assert_eq!(expected_log_event, .)
@@ -138,7 +138,7 @@ tests:
             false
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -158,7 +158,38 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": "2025-10-01T12:47:29.473487331Z"
+                "timestamp": "2025-10-01T12:47:29.473487331+0000"
+              }
+
+              assert_eq!(expected_log_event, .)
+  - name: Test opensearch_server log entry with a timestamp in the Zulu timezone
+    inputs:
+      - type: log
+        insert_at: processed_files_opensearch_server
+        log_fields:
+          file: /stackable/log/opensearch/opensearch_server.json
+          message: |
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+          pod: opensearch-nodes-cluster-manager-0
+          source_type: file
+          timestamp: 2025-10-01T12:47:29.473487331+0000
+    outputs:
+      - extract_from: extended_logs
+        conditions:
+          - type: vrl
+            source: |
+              expected_log_event = {
+                "cluster": "opensearch",
+                "container": "opensearch",
+                "file": "opensearch_server.json",
+                "level": "INFO",
+                "logger": "o.o.n.Node",
+                "message": "started",
+                "namespace": "default",
+                "pod": "opensearch-nodes-cluster-manager-0",
+                "role": "nodes",
+                "roleGroup": "cluster-manager",
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -172,7 +203,7 @@ tests:
             {"type": "server", "timestamp": "unparsable", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -182,7 +213,7 @@ tests:
                 "cluster": "opensearch",
                 "container": "opensearch",
                 "errors": [
-                  "Timestamp not parsable, using current time instead: function call error for \"parse_timestamp\" at (584:643): Invalid timestamp \"unparsable\": input contains invalid characters"
+                  "Timestamp not parsable, using current time instead: function call error for \"parse_timestamp\" at (990:1070): Invalid timestamp \"unparsable\": input contains invalid characters"
                 ],
                 "file": "opensearch_server.json",
                 "level": "INFO",
@@ -192,7 +223,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": "2025-10-01T12:47:29.473487331Z"
+                "timestamp": "2025-10-01T12:47:29.473487331+0000"
               }
 
               assert_eq!(expected_log_event, .)
@@ -206,7 +237,7 @@ tests:
             {"type": "server", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -226,7 +257,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": "2025-10-01T12:47:29.473487331Z"
+                "timestamp": "2025-10-01T12:47:29.473487331+0000"
               }
 
               assert_eq!(expected_log_event, .)
@@ -237,10 +268,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "INFO", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -260,7 +291,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -271,10 +302,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -294,7 +325,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -305,10 +336,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "DEPRECATION", "component": "o.o.d.t.TransportInfo", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "transport.publish_address was printed as [ip:port] instead of [hostname/ip:port]. This format is deprecated and will change to [hostname/ip:port] in a future version. Use -Dopensearch.transport.cname_in_publish_address=true to enforce non-deprecated formatting.", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "DEPRECATION", "component": "o.o.d.t.TransportInfo", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "transport.publish_address was printed as [ip:port] instead of [hostname/ip:port]. This format is deprecated and will change to [hostname/ip:port] in a future version. Use -Dopensearch.transport.cname_in_publish_address=true to enforce non-deprecated formatting.", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -325,7 +356,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -336,10 +367,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "CRITICAL", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "CRITICAL", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "message": "started", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -359,7 +390,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -370,10 +401,10 @@ tests:
         log_fields:
           file: /stackable/log/opensearch/opensearch_server.json
           message: |
-            {"type": "server", "timestamp": "2025-10-01T12:47:28,582Z", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
+            {"type": "server", "timestamp": "2025-10-01T12:47:28,582+0000", "level": "INFO", "component": "o.o.n.Node", "cluster.name": "opensearch", "node.name": "opensearch-nodes-cluster-manager-0", "cluster.uuid": "Jh1D6YAhTmyzkHI7vM1WWw", "node.id": "sk-r0P_TTYuPqaamTFbjKg"  }
           pod: opensearch-nodes-cluster-manager-0
           source_type: file
-          timestamp: 2025-10-01T12:47:29.473487331Z
+          timestamp: 2025-10-01T12:47:29.473487331+0000
     outputs:
       - extract_from: extended_logs
         conditions:
@@ -393,7 +424,7 @@ tests:
                 "pod": "opensearch-nodes-cluster-manager-0",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": t'2025-10-01T10:47:28.582Z'
+                "timestamp": t'2025-10-01T12:47:28.582+0000'
               }
 
               assert_eq!(expected_log_event, .)
@@ -414,7 +445,7 @@ tests:
           pod: opensearch-nodes-cluster-manager-0
           revision: dc7e792 2025-08-12 13:47:08.632326804
           source_type: internal_logs
-          timestamp: 2025-10-02T09:46:14.479381097Z
+          timestamp: 2025-10-02T09:46:14.479381097+0000
           version: 0.49.0
     outputs:
       - extract_from: extended_logs
@@ -434,7 +465,7 @@ tests:
                 "revision": "dc7e792 2025-08-12 13:47:08.632326804",
                 "role": "nodes",
                 "roleGroup": "cluster-manager",
-                "timestamp": "2025-10-02T09:46:14.479381097Z",
+                "timestamp": "2025-10-02T09:46:14.479381097+0000",
                 "version": "0.49.0"
               }
 
