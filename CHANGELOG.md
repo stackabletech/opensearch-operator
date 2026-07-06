@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#129]).
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
-- Bump `stackable-operator` to 0.113.0 ([#137], [#147], [#149]).
+- Bump `stackable-operator` to 0.113.1 ([#137], [#144], [#147], [#149]).
 - Move the framework code to operator-rs. This introduces no user-visible changes, except that the
   allowed length of role group names increases from 16 to 63 ([#147]).
 - Replace the generic subject DN in the configuration setting `plugins.security.nodes_dn` with the
