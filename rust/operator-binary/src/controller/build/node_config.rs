@@ -74,7 +74,7 @@ const CONFIG_OPTION_NODE_ROLES: &str = "node.roles";
 
 /// Defines the path for the logs
 /// OpenSearch grants the required access rights, see
-/// <https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L369>
+/// <https://github.com/opensearch-project/OpenSearch/blob/3.6.0/server/src/main/java/org/opensearch/bootstrap/Security.java#L371>
 /// The permissions "write" and "delete" are required for the log file rollover.
 /// Type: string
 const CONFIG_OPTION_PATH_LOGS: &str = "path.logs";
@@ -427,7 +427,7 @@ impl NodeConfig {
     /// Please read the following sections for an explanation of these restrictions.
     ///
     /// This configuration setting replaces the setting `cluster.initial_master_nodes`, see
-    /// <https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93>.
+    /// <https://github.com/opensearch-project/OpenSearch/blob/3.6.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L79-L93>.
     ///
     /// This setting is required on nodes with the cluster-manager node role on a multi-node
     /// cluster. Otherwise the bootstrapping of the cluster fails and all pods report:
@@ -437,7 +437,7 @@ impl NodeConfig {
     /// error is thrown:
     ///  > setting [cluster.initial_cluster_manager_nodes] is not allowed when [discovery.type] is set to [single-node]
     ///
-    /// see <https://github.com/opensearch-project/OpenSearch/blob/3.4.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136>
+    /// see <https://github.com/opensearch-project/OpenSearch/blob/3.6.0/server/src/main/java/org/opensearch/cluster/coordination/ClusterBootstrapService.java#L126-L136>
     ///
     /// This setting does not seem to have an effect on nodes without the cluster-manager node
     /// role. However, as it is recommended (see the Elasticsearch documentation below) to not set
@@ -590,7 +590,7 @@ mod tests {
     }
 
     fn node_config(test_config: TestConfig) -> NodeConfig {
-        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.4.0"}"#)
+        let image: ProductImage = serde_json::from_str(r#"{"productVersion": "3.6.0"}"#)
             .expect("should be a valid ProductImage");
 
         let role_group_name = RoleGroupName::from_str_unsafe("data");
@@ -659,10 +659,10 @@ mod tests {
 
         let cluster = ValidatedCluster::new(
             ResolvedProductImage {
-                product_version: "3.4.0".to_owned(),
-                app_version_label_value: LabelValue::from_str("3.4.0-stackable0.0.0-dev")
+                product_version: "3.6.0".to_owned(),
+                app_version_label_value: LabelValue::from_str("3.6.0-stackable0.0.0-dev")
                     .expect("should be a valid label value"),
-                image: "oci.stackable.tech/sdp/opensearch:3.4.0-stackable0.0.0-dev".to_string(),
+                image: "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev".to_string(),
                 image_pull_policy: "Always".to_owned(),
                 pull_secrets: None,
             },

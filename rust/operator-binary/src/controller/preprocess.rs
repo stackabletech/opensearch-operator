@@ -88,7 +88,7 @@ mod tests {
             },
             "spec": {
                 "image": {
-                    "productVersion": "3.4.0"
+                    "productVersion": "3.6.0"
                 },
                 "clusterConfig": {
                     "security": {
