@@ -139,10 +139,12 @@ echo "Using OpenSearch Dashboards"
 kubectl create secret generic opensearch-credentials \
     --from-literal kibanaserver=E4kENuEmkqH3jyHC
 
+# Hide notes because they are very confusing in combination with the port forward below.
 helm install opensearch-dashboards opensearch-dashboards \
     --repo https://opensearch-project.github.io/helm-charts \
     --version 3.6.0 \
     --values opensearch-dashboards-values.yaml \
+    --hide-notes \
     --wait
 # end::opensearch-dashboards[]
 
