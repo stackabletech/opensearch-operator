@@ -118,7 +118,7 @@ spec:
           value: "true"
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
-        - name: _POD_NAME
+        - name: POD_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1
@@ -128,9 +128,9 @@ spec:
         - name: discovery.seed_hosts
           # value: opensearch-seed-nodes.$NAMESPACE.svc.cluster.local
         - name: http.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
         - name: network.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
         - name: node.name
           valueFrom:
             fieldRef:
@@ -139,7 +139,7 @@ spec:
         - name: node.roles
           value: cluster_manager
         - name: transport.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-cluster-manager-headless.$NAMESPACE.svc.cluster.local
         imagePullPolicy: IfNotPresent
         name: opensearch
         ports:
@@ -604,7 +604,7 @@ spec:
           value: "true"
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
-        - name: _POD_NAME
+        - name: POD_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1
@@ -612,9 +612,9 @@ spec:
         - name: discovery.seed_hosts
           # value: opensearch-seed-nodes.$NAMESPACE.svc.cluster.local
         - name: http.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
         - name: network.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
         - name: node.name
           valueFrom:
             fieldRef:
@@ -623,7 +623,7 @@ spec:
         - name: node.roles
           value: data,ingest,remote_cluster_client
         - name: transport.publish_host
-          # value: $(_POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
+          # value: $(POD_NAME).opensearch-nodes-data-headless.$NAMESPACE.svc.cluster.local
         imagePullPolicy: IfNotPresent
         name: opensearch
         ports:

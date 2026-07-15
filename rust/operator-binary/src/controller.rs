@@ -340,10 +340,7 @@ impl ValidatedCluster {
             ValidatedSecurity::ManagedByApi {
                 tls_server_secret_class: Some(_),
                 ..
-            } | ValidatedSecurity::ManagedByOperator {
-                tls_server_secret_class: _,
-                ..
-            }
+            } | ValidatedSecurity::ManagedByOperator { .. }
         )
     }
 }
@@ -488,8 +485,6 @@ pub async fn reconcile(
     .apply(prepared_resources)
     .await
     .context(ApplyResourcesSnafu)?;
-
-    // not necessary in this controller: create discovery ConfigMap based on the applied resources (client required)
 
     // update status (client required)
     update_status(

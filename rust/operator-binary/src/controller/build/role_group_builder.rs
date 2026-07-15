@@ -2079,7 +2079,7 @@ mod tests {
             ],
             "env": [
                 {
-                    "name": "_POD_NAME",
+                    "name": "POD_NAME",
                     "valueFrom": {
                         "fieldRef": {
                             "fieldPath": "metadata.name"
@@ -2092,11 +2092,11 @@ mod tests {
                 },
                 {
                     "name": "http.publish_host",
-                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                    "value": "$(POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                 },
                 {
                     "name": "network.publish_host",
-                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                    "value": "$(POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                 },
                 {
                     "name": "node.name",
@@ -2112,7 +2112,7 @@ mod tests {
                 },
                 {
                     "name": "transport.publish_host",
-                    "value": "$(_POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
+                    "value": "$(POD_NAME).my-opensearch-cluster-nodes-default-headless.default.svc.cluster.local"
                 },
             ],
             "image": "oci.stackable.tech/sdp/opensearch:3.6.0-stackable0.0.0-dev",
