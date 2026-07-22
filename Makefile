@@ -28,21 +28,14 @@ docker-build:
 	docker build --force-rm --build-arg VERSION=${VERSION} -t "${OCI_REGISTRY_HOSTNAME}/${OCI_REGISTRY_PROJECT_IMAGES}/${OPERATOR_NAME}:${VERSION}-${ARCH}" -f docker/Dockerfile .
 
 ## Chart related targets
-compile-chart: version crds config
+compile-chart: version crds
 
 chart-clean:
-	rm -rf "deploy/helm/${OPERATOR_NAME}/configs"
 	rm -rf "deploy/helm/${OPERATOR_NAME}/crds"
 
 version:
 	cat "deploy/helm/${OPERATOR_NAME}/Chart.yaml" | yq ".version = \"${VERSION}\" | .appVersion = \"${VERSION}\"" > "deploy/helm/${OPERATOR_NAME}/Chart.yaml.new"
 	mv "deploy/helm/${OPERATOR_NAME}/Chart.yaml.new" "deploy/helm/${OPERATOR_NAME}/Chart.yaml"
-
-config:
-	if [ -d "deploy/config-spec/" ]; then\
-		mkdir -p "deploy/helm/${OPERATOR_NAME}/configs";\
-		cp -r deploy/config-spec/* "deploy/helm/${OPERATOR_NAME}/configs";\
-	fi
 
 # We generate a crds.yaml, so that the effect of code changes are visible.
 # The operator will take care of the CRD rollout itself.
@@ -72,7 +65,7 @@ check-kubernetes:
 
 run-dev: check-nix check-kubernetes
 	kubectl apply -f deploy/stackable-operators-ns.yaml
-	nix run --extra-experimental-features "nix-command flakes" -f. tilt -- up --port 5440 --namespace stackable-operators
+	nix run --extra-experimental-features "nix-command flakes" -f. tilt -- up --port 5430 --namespace stackable-operators
 
 stop-dev: check-nix check-kubernetes
 	nix run --extra-experimental-features "nix-command flakes" -f. tilt -- down
