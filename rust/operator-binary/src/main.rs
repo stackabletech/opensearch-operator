@@ -120,7 +120,6 @@ async fn main() -> Result<()> {
         }
         Command::Run(RunArguments {
             operator_environment,
-            product_config: _,
             watch_namespace,
             maintenance,
             common,
