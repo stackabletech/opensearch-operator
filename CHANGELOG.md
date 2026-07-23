@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Bump stackable-operator to 0.114.0 ([#166]).
+
+[#166]: https://github.com/stackabletech/opensearch-operator/pull/166
+
 ## [26.7.0] - 2026-07-21
 
 ## [26.7.0-rc1] - 2026-07-16
@@ -16,7 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- BUmp stackable-operator to 0.113.3 ([#158]).
+- Bump stackable-operator to 0.113.3 ([#158]).
 - Document Helm deployed RBAC permissions and remove unnecessary permissions ([#129]).
 - BREAKING: `configOverrides` now only accepts the known config file `opensearch.yml`.
   Previously, arbitrary file names were silently accepted and ignored ([#137]).
