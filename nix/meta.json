@@ -1,1 +1,1 @@
-{"operator": {"name": "opensearch-operator", "pretty_string": "OpenSearch", "product_string": "opensearch", "url": "stackabletech/opensearch-operator.git"}}
+{"operator": {"name": "opensearch-operator", "pretty_string": "OpenSearch", "product_string": "opensearch", "url": "stackabletech/opensearch-operator.git", "chart_description": "Kubernetes operator for OpenSearch. Deploy and run OpenSearch clusters with the Stackable Data Platform (SDP).", "keywords": ["opensearch", "search", "observability", "kubernetes", "operator"]}}
