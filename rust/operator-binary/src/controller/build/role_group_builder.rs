@@ -53,7 +53,11 @@ use stackable_operator::{
                 restarter_ignore_configmap_annotations, restarter_ignore_secret_annotations,
             },
         },
-        kvp::label::{recommended_labels, role_group_selector, role_selector},
+        kvp::label::{
+            recommended_labels_for_role_group_resources,
+            recommended_labels_for_unversioned_role_group_resources, role_group_selector,
+            role_selector,
+        },
         product_logging::framework::{
             STACKABLE_LOG_DIR, ValidatedContainerLogConfigChoice, vector_container,
         },
@@ -343,7 +347,7 @@ impl<'a> RoleGroupBuilder<'a> {
         let role_group_listener_volume_claim_template =
             listener_operator_volume_source_builder_build_pvc(
                 &ListenerReference::Listener(self.resource_names.listener_name()),
-                &self.recommended_labels(),
+                &self.recommended_labels_for_pvcs(),
                 &ROLE_GROUP_LISTENER_VOLUME_NAME,
             );
 
@@ -505,7 +509,7 @@ impl<'a> RoleGroupBuilder<'a> {
         context_names: &ContextNames,
     ) -> Labels {
         let mut labels = role_selector(
-            cluster,
+            &cluster.name,
             &context_names.product_name,
             &ValidatedCluster::role_name(),
         );
@@ -1393,10 +1397,22 @@ impl<'a> RoleGroupBuilder<'a> {
 
     /// Recommended labels for role group resources
     fn recommended_labels(&self) -> Labels {
-        recommended_labels(
-            self.cluster,
+        recommended_labels_for_role_group_resources(
+            &self.cluster.name,
             &self.context_names.product_name,
             &self.cluster.product_version,
+            &self.context_names.operator_name,
+            &self.context_names.controller_name,
+            &ValidatedCluster::role_name(),
+            &self.role_group_name,
+        )
+    }
+
+    /// Recommended labels for PersistentVolumeClaims
+    fn recommended_labels_for_pvcs(&self) -> Labels {
+        recommended_labels_for_unversioned_role_group_resources(
+            &self.cluster.name,
+            &self.context_names.product_name,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
             &ValidatedCluster::role_name(),
@@ -1409,7 +1425,7 @@ impl<'a> RoleGroupBuilder<'a> {
     /// [`Pod`]: stackable_operator::k8s_openapi::api::core::v1::Pod
     fn pod_selector(&self) -> Labels {
         role_group_selector(
-            self.cluster,
+            &self.cluster.name,
             &self.context_names.product_name,
             &ValidatedCluster::role_name(),
             &self.role_group_name,

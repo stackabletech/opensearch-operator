@@ -340,10 +340,7 @@ impl ValidatedCluster {
             ValidatedSecurity::ManagedByApi {
                 tls_server_secret_class: Some(_),
                 ..
-            } | ValidatedSecurity::ManagedByOperator {
-                tls_server_secret_class: _,
-                ..
-            }
+            } | ValidatedSecurity::ManagedByOperator { .. }
         )
     }
 }
