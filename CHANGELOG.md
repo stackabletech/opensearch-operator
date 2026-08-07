@@ -7,8 +7,16 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Bump stackable-operator to 0.114.0 ([#166]).
+- All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#XXX]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#XXX]).
 
 [#166]: https://github.com/stackabletech/opensearch-operator/pull/166
+[#XXX]: https://github.com/stackabletech/opensearch-operator/pull/XXX
 
 ## [26.7.0] - 2026-07-21
 

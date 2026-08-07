@@ -10,6 +10,7 @@ use stackable_operator::{
         meta::ObjectMetaBuilder,
         pod::{
             container::FieldPathEnvVar,
+            security::PodSecurityContextBuilder,
             volume::{SecretFormat, SecretOperatorVolumeSourceBuilder, VolumeBuilder},
         },
     },
@@ -26,9 +27,9 @@ use stackable_operator::{
             apps::v1::{StatefulSet, StatefulSetSpec},
             core::v1::{
                 Affinity, ConfigMap, ConfigMapVolumeSource, Container, ContainerPort,
-                EmptyDirVolumeSource, KeyToPath, PodSecurityContext, PodSpec, PodTemplateSpec,
-                Probe, SecretVolumeSource, Service, ServicePort, ServiceSpec, TCPSocketAction,
-                Volume, VolumeMount,
+                EmptyDirVolumeSource, KeyToPath, PodSpec, PodTemplateSpec, Probe,
+                SecretVolumeSource, Service, ServicePort, ServiceSpec, TCPSocketAction, Volume,
+                VolumeMount,
             },
         },
         apimachinery::pkg::{
@@ -466,10 +467,9 @@ impl<'a> RoleGroupBuilder<'a> {
             .clone()
             .map(|wrapped| wrapped.node_selector);
 
-        let security_context = PodSecurityContext {
-            fs_group: Some(1000),
-            ..PodSecurityContext::default()
-        };
+        let security_context = PodSecurityContextBuilder::with_stackable_defaults()
+            .fs_group(1000)
+            .build();
 
         // The PodBuilder is not used because it re-validates the values which are already
         // validated. For instance, it would be necessary to convert the
