@@ -3149,7 +3149,8 @@ mod tests {
                             "containers": expected_containers,
                             "initContainers": expected_init_containers,
                             "securityContext": {
-                                "fsGroup": 1000
+                                "fsGroup": 1000,
+                                "runAsNonRoot": true
                             },
                             "serviceAccountName": "my-opensearch-cluster-serviceaccount",
                             "terminationGracePeriodSeconds": 30,
