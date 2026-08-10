@@ -6,7 +6,6 @@ metadata:
 spec:
   group: opensearch.stackable.tech
   names:
-    categories: []
     kind: OpenSearchCluster
     plural: opensearchclusters
     shortNames:
@@ -14,8 +13,7 @@ spec:
     singular: opensearchcluster
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: An OpenSearch cluster stacklet. This resource is managed by the Stackable operator for OpenSearch.
