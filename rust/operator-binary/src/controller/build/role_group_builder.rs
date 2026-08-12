@@ -359,7 +359,7 @@ impl<'a> RoleGroupBuilder<'a> {
             .then(|| {
                 listener_operator_volume_source_builder_build_pvc(
                     &ListenerReference::Listener(self.discovery_service_listener_name.to_owned()),
-                    &self.recommended_labels(),
+                    &self.recommended_labels_for_pvcs(),
                     &DISCOVERY_SERVICE_LISTENER_VOLUME_NAME,
                 )
             });
@@ -3202,7 +3202,6 @@ mod tests {
                                     "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                                     "app.kubernetes.io/name": "opensearch",
                                     "app.kubernetes.io/role-group": "default",
-                                    "app.kubernetes.io/version": "3.6.0",
                                     "stackable.tech/vendor": "Stackable"
                                 },
                                 "name": "listener"
@@ -3232,7 +3231,6 @@ mod tests {
                                     "app.kubernetes.io/managed-by": "opensearch.stackable.tech_opensearchcluster",
                                     "app.kubernetes.io/name": "opensearch",
                                     "app.kubernetes.io/role-group": "default",
-                                    "app.kubernetes.io/version": "3.6.0",
                                     "stackable.tech/vendor": "Stackable",
                                 },
                                 "name": "discovery-service-listener",
