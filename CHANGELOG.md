@@ -6,8 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.115.0 ([#166], [#171]).
+- Bump stackable-operator to 0.116.0 ([#166], [#171]).
 - Remove the product version label from PersistentVolumeClaims ([#171]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#171]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
 
 ### Fixed
