@@ -3,7 +3,7 @@
 use stackable_operator::{
     commons::resources::{PvcConfigFragment, ResourcesFragment},
     k8s_openapi::apimachinery::pkg::api::resource::Quantity,
-    role_utils::CommonConfiguration,
+    v2::role_utils::CommonConfiguration,
 };
 use tracing::info;
 

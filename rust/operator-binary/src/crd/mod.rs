@@ -22,7 +22,7 @@ use stackable_operator::{
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
     product_logging::{self, spec::Logging},
-    role_utils::{GenericRoleConfig, Role, RoleGroup},
+    role_utils::GenericRoleConfig,
     schemars::{self, JsonSchema},
     shared::time::Duration,
     status::condition::{ClusterCondition, HasStatusCondition},
@@ -30,7 +30,7 @@ use stackable_operator::{
     v2::{
         NameIsValidLabelValue,
         config_overrides::JsonOrKeyValueConfigOverrides,
-        role_utils::GenericCommonConfig,
+        role_utils::{GenericCommonConfig, Role, RoleGroup},
         types::{
             kubernetes::{
                 ConfigMapKey, ConfigMapName, ContainerName, ListenerClassName, SecretClassName,

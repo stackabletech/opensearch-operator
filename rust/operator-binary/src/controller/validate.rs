@@ -8,15 +8,14 @@ use stackable_operator::{
     crd::listener,
     kube::ResourceExt,
     product_logging::spec::Logging,
-    role_utils::RoleGroup,
     shared::time::Duration,
     v2::{
-        builder::pod::container::{EnvVarName, EnvVarSet},
+        builder::pod::container::EnvVarSet,
         controller_utils::{get_cluster_name, get_namespace, get_uid},
         product_logging::framework::{
             VectorContainerLogConfig, validate_logging_configuration_for_container,
         },
-        role_utils::{RoleGroupConfig, with_validated_config},
+        role_utils::{RoleGroup, RoleGroupConfig, with_validated_config},
         types::{
             common::Port,
             kubernetes::{ConfigMapName, Hostname},
@@ -78,11 +77,6 @@ pub enum Error {
         "failed to get vectorAggregatorConfigMapName; It must be set if enableVectorAgent is true."
     ))]
     GetVectorAggregatorConfigMapName {},
-
-    #[snafu(display("failed to parse environment variable"))]
-    ParseEnvironmentVariable {
-        source: stackable_operator::v2::macros::attributed_string_type::Error,
-    },
 
     #[snafu(display("failed to parse the hostname of the Listener status"))]
     ParseListenerStatusHostname {
@@ -248,14 +242,7 @@ fn validate_role_group_config(
             .into(),
     };
 
-    let mut env_overrides = EnvVarSet::new();
-
-    for (env_var_name, env_var_value) in merged_role_group.config.env_overrides {
-        env_overrides = env_overrides.with_value(
-            &EnvVarName::from_str(&env_var_name).context(ParseEnvironmentVariableSnafu)?,
-            env_var_value,
-        );
-    }
+    let env_overrides: EnvVarSet = merged_role_group.config.env_overrides.into();
 
     Ok(RoleGroupConfig {
         replicas: merged_role_group.replicas,
@@ -464,15 +451,17 @@ mod tests {
             ContainerLogConfigChoiceFragment, ContainerLogConfigFragment,
             CustomContainerLogConfigFragment, LogLevel, LoggerConfig, LoggingFragment,
         },
-        role_utils::{CommonConfiguration, Role, RoleGroup},
         shared::time::Duration,
         v2::{
             builder::pod::container::{EnvVarName, EnvVarSet},
             config_overrides::{JsonConfigOverrides, JsonOrKeyValueConfigOverrides},
+            env_overrides::EnvOverrides,
             product_logging::framework::{
                 ValidatedContainerLogConfigChoice, VectorContainerLogConfig,
             },
-            role_utils::{GenericCommonConfig, RoleGroupConfig},
+            role_utils::{
+                CommonConfiguration, GenericCommonConfig, Role, RoleGroup, RoleGroupConfig,
+            },
             types::{
                 common::Port,
                 kubernetes::{
@@ -871,20 +860,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_err_parse_environment_variable() {
-        test_validate_err(
-            |cluster, _| {
-                cluster.spec.nodes.config.env_overrides = [(
-                    "INVALID_ENVIRONMENT_VARIABLE_WITH_=".to_owned(),
-                    "value".to_owned(),
-                )]
-                .into()
-            },
-            ErrorDiscriminants::ParseEnvironmentVariable,
-        );
-    }
-
-    #[test]
     fn test_validate_err_parse_listener_status_hostname() {
         test_validate_err(
             |_, dereferenced_objects| {
@@ -1082,11 +1057,10 @@ mod tests {
                                 )
                             )
                         },
-                        env_overrides: [
-                            ("ENV1".to_owned(), "value from role level".to_owned()),
-                            ("ENV2".to_owned(), "value from role level".to_owned()),
-                        ]
-                        .into(),
+                        env_overrides: EnvOverrides::from_iter([
+                            (EnvVarName::from_str_unsafe("ENV1"), "value from role level".to_owned()),
+                            (EnvVarName::from_str_unsafe("ENV2"), "value from role level".to_owned()),
+                        ]),
                         cli_overrides: [
                             ("--param1".to_owned(), "value from role level".to_owned()),
                             ("--param2".to_owned(), "value from role level".to_owned()),
@@ -1129,11 +1103,10 @@ mod tests {
                                         )
                                     )
                                 },
-                                env_overrides: [
-                                    ("ENV2".to_owned(), "value from role-group level".to_owned()),
-                                    ("ENV3".to_owned(), "value from role-group level".to_owned()),
-                                ]
-                                .into(),
+                                env_overrides: EnvOverrides::from_iter([
+                                    (EnvVarName::from_str_unsafe("ENV2"), "value from role-group level".to_owned()),
+                                    (EnvVarName::from_str_unsafe("ENV3"), "value from role-group level".to_owned()),
+                                ]),
                                 cli_overrides: [
                                     (
                                         "--param2".to_owned(),
