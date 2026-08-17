@@ -81,8 +81,9 @@ use super::{
 };
 use crate::{
     controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, OpenSearchRoleGroupConfig, TRANSPORT_PORT,
-        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole, ValidatedSecurity,
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, NODES_ROLE_NAME, OpenSearchRoleGroupConfig,
+        TRANSPORT_PORT, TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedNodeRole,
+        ValidatedSecurity,
         build::{
             product_logging::config::{
                 MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE, vector_config_file_extra_env_vars,
@@ -229,7 +230,7 @@ impl<'a> RoleGroupBuilder<'a> {
     ) -> RoleGroupBuilder<'a> {
         let resource_names = ResourceNames {
             cluster_name: cluster.name.clone(),
-            role_name: ValidatedCluster::role_name(),
+            role_name: NODES_ROLE_NAME.clone(),
             role_group_name: role_group_name.clone(),
         };
 
@@ -508,11 +509,8 @@ impl<'a> RoleGroupBuilder<'a> {
         cluster: &ValidatedCluster,
         context_names: &ContextNames,
     ) -> Labels {
-        let mut labels = role_selector(
-            &cluster.name,
-            &context_names.product_name,
-            &ValidatedCluster::role_name(),
-        );
+        let mut labels =
+            role_selector(&cluster.name, &context_names.product_name, &NODES_ROLE_NAME);
 
         labels.insert(Self::build_node_role_label(
             &ValidatedNodeRole::ClusterManager,
@@ -1403,19 +1401,20 @@ impl<'a> RoleGroupBuilder<'a> {
             &self.cluster.product_version,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
-            &ValidatedCluster::role_name(),
+            &NODES_ROLE_NAME,
             &self.role_group_name,
         )
     }
 
-    /// Recommended labels for PersistentVolumeClaims
+    /// Recommended labels for PersistentVolumeClaims, which cannot be modified once they are
+    /// deployed. The version label is omitted so the labels stay stable across version upgrades.
     fn recommended_labels_for_pvcs(&self) -> Labels {
         recommended_labels_for_unversioned_role_group_resources(
             &self.cluster.name,
             &self.context_names.product_name,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
-            &ValidatedCluster::role_name(),
+            &NODES_ROLE_NAME,
             &self.role_group_name,
         )
     }
@@ -1427,7 +1426,7 @@ impl<'a> RoleGroupBuilder<'a> {
         role_group_selector(
             &self.cluster.name,
             &self.context_names.product_name,
-            &ValidatedCluster::role_name(),
+            &NODES_ROLE_NAME,
             &self.role_group_name,
         )
     }

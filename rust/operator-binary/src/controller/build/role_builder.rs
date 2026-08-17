@@ -19,6 +19,7 @@ use stackable_operator::{
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
+        kvp::label::recommended_labels_for_role_resources,
         role_utils::ResourceNames,
         types::{
             kubernetes::{ConfigMapName, ListenerName, ServiceName},
@@ -29,8 +30,9 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, NODES_ROLE_NAME, TRANSPORT_PORT,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedSecurity,
+        build::role_group_builder::RoleGroupBuilder,
     },
     crd::v1alpha1,
 };
@@ -252,7 +254,7 @@ impl<'a> RoleBuilder<'a> {
                 pod_disruption_budget_builder_with_role(
                     &self.cluster,
                     &self.context_names.product_name,
-                    &ValidatedCluster::role_name(),
+                    &NODES_ROLE_NAME,
                     &self.context_names.operator_name,
                     &self.context_names.controller_name,
                 )
@@ -280,13 +282,13 @@ impl<'a> RoleBuilder<'a> {
 
     /// Common labels for role resources
     fn recommended_labels(&self) -> Labels {
-        stackable_operator::v2::kvp::label::recommended_labels_for_role_resources(
+        recommended_labels_for_role_resources(
             &self.cluster.name,
             &self.context_names.product_name,
             &self.cluster.product_version,
             &self.context_names.operator_name,
             &self.context_names.controller_name,
-            &ValidatedCluster::role_name(),
+            &NODES_ROLE_NAME,
         )
     }
 }

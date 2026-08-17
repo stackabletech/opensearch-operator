@@ -20,7 +20,7 @@ use stackable_operator::{
 use super::ValidatedCluster;
 use crate::{
     controller::{
-        OpenSearchRoleGroupConfig, ValidatedNodeRole,
+        NODES_ROLE_NAME, OpenSearchRoleGroupConfig, ValidatedNodeRole,
         build::role_group_builder::RoleGroupSecurityMode, replicas,
     },
     crd::v1alpha1,
@@ -264,7 +264,7 @@ impl NodeConfig {
             .map(|role_group_name| {
                 let resource_names = ResourceNames {
                     cluster_name: self.cluster.name.clone(),
-                    role_name: ValidatedCluster::role_name(),
+                    role_name: NODES_ROLE_NAME.clone(),
                     role_group_name: role_group_name.clone(),
                 };
 
@@ -494,7 +494,7 @@ impl NodeConfig {
             for (role_group_name, role_group_config) in cluster_manager_configs {
                 let role_group_resource_names = role_group_utils::ResourceNames {
                     cluster_name: self.cluster.name.clone(),
-                    role_name: ValidatedCluster::role_name(),
+                    role_name: NODES_ROLE_NAME.clone(),
                     role_group_name,
                 };
 

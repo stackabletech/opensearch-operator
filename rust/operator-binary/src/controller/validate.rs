@@ -31,8 +31,9 @@ use super::{
 };
 use crate::{
     controller::{
-        DereferencedObjects, HTTP_PORT_NAME, ValidatedDiscoveryEndpoint, ValidatedNodeRole,
-        ValidatedNodeRoles, ValidatedOpenSearchConfigOverrides, ValidatedSecurity,
+        DereferencedObjects, HTTP_PORT_NAME, NODES_ROLE_NAME, ValidatedDiscoveryEndpoint,
+        ValidatedNodeRole, ValidatedNodeRoles, ValidatedOpenSearchConfigOverrides,
+        ValidatedSecurity,
     },
     crd::{NodeRoles, OpenSearchRoleGroup, v1alpha1},
 };
@@ -201,7 +202,7 @@ fn validate_role_group_config(
         &v1alpha1::OpenSearchConfig::default_config(
             &context_names.product_name,
             cluster_name,
-            &ValidatedCluster::role_name(),
+            &NODES_ROLE_NAME,
         ),
     )
     .context(ValidateOpenSearchConfigSnafu)?;
