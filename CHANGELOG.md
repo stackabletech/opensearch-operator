@@ -6,7 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.114.0 ([#166]).
+- Bump stackable-operator to 0.116.0 ([#166], [#171]).
+- BREAKING: Remove the `app.kubernetes.io/version` label from the listener PVC templates of the
+  StatefulSets (previously set to the product version). StatefulSets created by older operator
+  versions cannot be updated in place: after the operator upgrade, delete each nodes StatefulSet
+  so that the operator immediately recreates it with the new labels ([#171]).
+- `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
+  operator-specific validation code ([#171]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
 
 ### Fixed
@@ -16,6 +22,7 @@ All notable changes to this project will be documented in this file.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#172]).
 
 [#166]: https://github.com/stackabletech/opensearch-operator/pull/166
+[#171]: https://github.com/stackabletech/opensearch-operator/pull/171
 [#172]: https://github.com/stackabletech/opensearch-operator/pull/172
 
 ## [26.7.0] - 2026-07-21

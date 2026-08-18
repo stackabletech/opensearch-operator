@@ -14,15 +14,12 @@ use stackable_operator::{
         },
     },
     kube::api::ObjectMeta,
-    kvp::{
-        Label, Labels,
-        consts::{STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE},
-    },
+    kvp::Labels,
     v2::{
-        NameIsValidLabelValue,
         builder::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
+        kvp::label::recommended_labels_for_role_resources,
         role_utils::ResourceNames,
         types::{
             kubernetes::{ConfigMapName, ListenerName, ServiceName},
@@ -33,8 +30,9 @@ use stackable_operator::{
 
 use crate::{
     controller::{
-        ContextNames, HTTP_PORT, HTTP_PORT_NAME, TRANSPORT_PORT, TRANSPORT_PORT_NAME,
-        ValidatedCluster, ValidatedSecurity, build::role_group_builder::RoleGroupBuilder,
+        ContextNames, HTTP_PORT, HTTP_PORT_NAME, NODES_ROLE_NAME, TRANSPORT_PORT,
+        TRANSPORT_PORT_NAME, ValidatedCluster, ValidatedSecurity,
+        build::role_group_builder::RoleGroupBuilder,
     },
     crd::v1alpha1,
 };
@@ -256,7 +254,7 @@ impl<'a> RoleBuilder<'a> {
                 pod_disruption_budget_builder_with_role(
                     &self.cluster,
                     &self.context_names.product_name,
-                    &ValidatedCluster::role_name(),
+                    &NODES_ROLE_NAME,
                     &self.context_names.operator_name,
                     &self.context_names.controller_name,
                 )
@@ -278,36 +276,20 @@ impl<'a> RoleBuilder<'a> {
                 None,
                 Some(true),
             ))
-            .with_labels(self.labels())
+            .with_labels(self.recommended_labels())
             .build()
     }
 
     /// Common labels for role resources
-    fn labels(&self) -> Labels {
-        // Well-known Kubernetes labels
-        let mut labels = Labels::role_selector(
-            &self.cluster,
-            &self.context_names.product_name.to_label_value(),
-            &ValidatedCluster::role_name().to_label_value(),
+    fn recommended_labels(&self) -> Labels {
+        recommended_labels_for_role_resources(
+            &self.cluster.name,
+            &self.context_names.product_name,
+            &self.cluster.product_version,
+            &self.context_names.operator_name,
+            &self.context_names.controller_name,
+            &NODES_ROLE_NAME,
         )
-        .unwrap();
-
-        let managed_by = Label::managed_by(
-            self.context_names.operator_name.as_ref(),
-            self.context_names.controller_name.as_ref(),
-        )
-        .unwrap();
-        let version = Label::version(self.cluster.product_version.as_ref()).unwrap();
-
-        labels.insert(managed_by);
-        labels.insert(version);
-
-        // Stackable-specific labels
-        labels
-            .parse_insert((STACKABLE_VENDOR_KEY, STACKABLE_VENDOR_VALUE))
-            .unwrap();
-
-        labels
     }
 }
 

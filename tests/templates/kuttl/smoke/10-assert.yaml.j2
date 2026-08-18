@@ -324,6 +324,7 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn: "true"
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
@@ -343,6 +344,7 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn: "true"
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
@@ -453,7 +455,6 @@ spec:
         app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: cluster-manager
-        app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
         stackable.tech/vendor: Stackable
       name: listener
     spec:
@@ -475,7 +476,6 @@ spec:
         app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: cluster-manager
-        app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
         stackable.tech/vendor: Stackable
       name: discovery-service-listener
     spec:
@@ -806,9 +806,11 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn: "true"
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
+                secrets.stackable.tech/provision-parts: public-private
                 secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
@@ -824,9 +826,11 @@ spec:
           volumeClaimTemplate:
             metadata:
               annotations:
+                secrets.stackable.tech/backend.autotls.cert.domain-components-in-subject-dn: "true"
                 secrets.stackable.tech/backend.autotls.cert.lifetime: 1d
                 secrets.stackable.tech/class: tls
                 secrets.stackable.tech/format: tls-pem
+                secrets.stackable.tech/provision-parts: public-private
                 secrets.stackable.tech/scope: pod,listener-volume=listener
             spec:
               accessModes:
@@ -933,7 +937,6 @@ spec:
         app.kubernetes.io/managed-by: opensearch.stackable.tech_opensearchcluster
         app.kubernetes.io/name: opensearch
         app.kubernetes.io/role-group: data
-        app.kubernetes.io/version: {{ test_scenario['values']['opensearch'].split(',')[0] }}
         stackable.tech/vendor: Stackable
       name: listener
     spec:

@@ -21,6 +21,7 @@ use stackable_operator::{
         affinity::StackableAffinity, networking::DomainName,
         product_image_selection::ResolvedProductImage,
     },
+    constant,
     crd::listener,
     k8s_openapi::api::{
         apps::v1::StatefulSet,
@@ -64,6 +65,9 @@ pub const HTTP_PORT: Port = Port(9200);
 pub const TRANSPORT_PORT_NAME: &str = "transport";
 pub const TRANSPORT_PORT: Port = Port(9300);
 pub const FIELD_MANAGER: &str = "opensearch-operator";
+
+// The name of the single OpenSearch role.
+constant!(pub NODES_ROLE_NAME: RoleName = "nodes");
 
 /// Names in the controller context which are passed to the submodules of the controller
 ///
@@ -306,11 +310,6 @@ impl ValidatedCluster {
         }
     }
 
-    /// Returns the one role name
-    pub fn role_name() -> RoleName {
-        RoleName::from_str("nodes").expect("should be a valid role name")
-    }
-
     /// Returns true if only a single OpenSearch node is defined in the cluster
     pub fn is_single_node(&self) -> bool {
         self.node_count() == 1
@@ -340,10 +339,7 @@ impl ValidatedCluster {
             ValidatedSecurity::ManagedByApi {
                 tls_server_secret_class: Some(_),
                 ..
-            } | ValidatedSecurity::ManagedByOperator {
-                tls_server_secret_class: _,
-                ..
-            }
+            } | ValidatedSecurity::ManagedByOperator { .. }
         )
     }
 }
@@ -529,7 +525,9 @@ mod tests {
     };
     use uuid::uuid;
 
-    use super::{Context, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging};
+    use super::{
+        Context, NODES_ROLE_NAME, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging,
+    };
     use crate::{
         controller::{
             OpenSearchNodeResources, ValidatedNodeRole, ValidatedNodeRoles,
@@ -548,9 +546,9 @@ mod tests {
     }
 
     #[test]
-    fn test_validated_cluster_role_name() {
-        // Test that the function does not panic
-        ValidatedCluster::role_name();
+    fn test_constants() {
+        // Test that dereferencing the constants does not panic.
+        let _ = *NODES_ROLE_NAME;
     }
 
     #[test]
