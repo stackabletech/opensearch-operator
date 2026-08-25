@@ -195,11 +195,11 @@ async fn main() -> Result<()> {
                 watcher::Config::default(),
             )
             .owns(
-                watch_namespace.get_api::<DeserializeGuard<RoleBinding>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<PodDisruptionBudget>>(&client),
                 watcher::Config::default(),
             )
             .owns(
-                watch_namespace.get_api::<DeserializeGuard<PodDisruptionBudget>>(&client),
+                watch_namespace.get_api::<DeserializeGuard<RoleBinding>>(&client),
                 watcher::Config::default(),
             )
             .owns(
