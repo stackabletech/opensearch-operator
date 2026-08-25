@@ -6,7 +6,10 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 metadata:
   name: recreate-owned-resources
-timeout: 600
+# The budget is generous on purpose: the sweep recreates both StatefulSets back to
+# back (after the restarter has already rolled the pods once for the recreated
+# ConfigMaps), so five JVMs boot simultaneously - slower than the staggered install.
+timeout: 900
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -67,7 +70,7 @@ metadata:
 apiVersion: listeners.stackable.tech/v1alpha1
 kind: Listener
 metadata:
-  name: opensearch-nodes
+  name: opensearch
   ownerReferences:
     - apiVersion: opensearch.stackable.tech/v1alpha1
       controller: true
