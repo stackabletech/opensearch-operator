@@ -442,6 +442,10 @@ pub async fn reconcile(
 ) -> Result<Action> {
     tracing::info!("Starting reconcile");
 
+    if object.meta().deletion_timestamp.is_some() {
+        return Ok(Action::await_change());
+    }
+
     let cluster = object
         .0
         .as_ref()
@@ -502,17 +506,21 @@ pub async fn reconcile(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeMap, str::FromStr};
+    use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
     use stackable_operator::{
+        cli::OperatorEnvironmentOptions,
+        client::Client,
         commons::{
             affinity::StackableAffinity, networking::DomainName,
             product_image_selection::ResolvedProductImage,
         },
         k8s_openapi::api::core::v1::PodTemplateSpec,
+        kube::{Client as KubeClient, Config, runtime::controller::Action},
         kvp::LabelValue,
         product_logging::spec::AutomaticContainerLogConfig,
         shared::time::Duration,
+        utils::cluster_info::KubernetesClusterInfo,
         v2::{
             builder::pod::container::EnvVarSet,
             product_logging::framework::ValidatedContainerLogConfigChoice,
@@ -527,6 +535,7 @@ mod tests {
 
     use super::{
         Context, NODES_ROLE_NAME, OpenSearchRoleGroupConfig, ValidatedCluster, ValidatedLogging,
+        reconcile,
     };
     use crate::{
         controller::{
@@ -684,5 +693,58 @@ mod tests {
             pod_overrides: PodTemplateSpec::default(),
             product_specific_common_config: GenericCommonConfig::default(),
         }
+    }
+
+    /// The client points at a closed port, so any API call would fail the reconciliation: an `Ok`
+    /// proves that a cluster being deleted returns before the reconciler touches the Kubernetes
+    /// API, and because the spec is invalid, before the `DeserializeGuard` is unwrapped.
+    #[test]
+    fn reconcile_exits_early_for_deleted_cluster() {
+        let cluster = serde_yaml::from_str(
+            r#"
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+  namespace: default
+  deletionTimestamp: "2026-08-14T12:00:00Z"
+spec: {}
+"#,
+        )
+        .expect("YAML parses; the invalid spec is captured inside the DeserializeGuard");
+
+        let action = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread tokio runtime")
+            .block_on(async {
+                let client = Client::new(
+                    KubeClient::try_from(Config::new(
+                        "http://127.0.0.1:1".parse().expect("valid static URI"),
+                    ))
+                    .expect("client from static config"),
+                    None,
+                    "default".to_owned(),
+                    KubernetesClusterInfo {
+                        cluster_domain: DomainName::from_str("cluster.local")
+                            .expect("valid cluster domain"),
+                    },
+                );
+                let context = Arc::new(Context::new(
+                    client,
+                    OperatorEnvironmentOptions {
+                        operator_namespace: "stackable-operators".to_owned(),
+                        operator_service_name: "opensearch-operator".to_owned(),
+                        image_repository: "oci.stackable.tech/sdp".to_owned(),
+                    },
+                    OperatorName::from_str("opensearch.stackable.tech")
+                        .expect("valid operator name"),
+                ));
+
+                reconcile(Arc::new(cluster), context).await
+            })
+            .expect("a deleted cluster reconciles without any API call");
+
+        assert_eq!(action, Action::await_change());
     }
 }

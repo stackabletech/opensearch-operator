@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - `envOverrides` names are now validated by the shared `EnvVarName` type rather than by
   operator-specific validation code ([#171]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
+- The operator now early-exits the reconcile action when the cluster is marked for deletion ([#179]).
 
 ### Fixed
 
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
 [#166]: https://github.com/stackabletech/opensearch-operator/pull/166
 [#171]: https://github.com/stackabletech/opensearch-operator/pull/171
 [#172]: https://github.com/stackabletech/opensearch-operator/pull/172
+[#179]: https://github.com/stackabletech/opensearch-operator/pull/179
 
 ## [26.7.0] - 2026-07-21
 
