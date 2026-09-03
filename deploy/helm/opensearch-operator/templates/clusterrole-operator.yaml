@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "operator.fullname" . }}-clusterrole
+  name: {{ include "opensearch-operator.fullname" . }}-clusterrole
   labels:
-  {{- include "operator.labels" . | nindent 4 }}
+  {{- include "opensearch-operator.labels" . | nindent 4 }}
 rules:
   # For automatic cluster domain detection.
   - apiGroups:
@@ -49,7 +49,7 @@ rules:
     verbs:
       - bind
     resourceNames:
-      - {{ include "operator.name" . }}-clusterrole
+      - {{ include "opensearch-operator.name" . }}-clusterrole
   # StatefulSet created per role group. Applied via SSA, tracked for orphan cleanup, and
   # owned by the controller.
   - apiGroups:
@@ -115,17 +115,17 @@ rules:
       - patch
   # Primary CRD: watched by the controller and read during reconciliation.
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "opensearch-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters
+      - {{ include "opensearch-operator.name" . }}clusters
     verbs:
       - get
       - list
       - watch
   # Status subresource: updated at the end of every reconciliation.
   - apiGroups:
-      - {{ include "operator.name" . }}.stackable.tech
+      - {{ include "opensearch-operator.name" . }}.stackable.tech
     resources:
-      - {{ include "operator.name" . }}clusters/status
+      - {{ include "opensearch-operator.name" . }}clusters/status
     verbs:
       - patch
