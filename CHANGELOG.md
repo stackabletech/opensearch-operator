@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support floating tag in product image selection ([#186]).
+
 ### Changed
 
-- Bump stackable-operator to 0.116.0 ([#166], [#171]).
+- Bump stackable-operator to 0.118.0 ([#166], [#171], [#186]).
 - BREAKING: Remove the `app.kubernetes.io/version` label from the listener PVC templates of the
   StatefulSets (previously set to the product version). StatefulSets created by older operator
   versions cannot be updated in place: after the operator upgrade, delete each nodes StatefulSet
@@ -26,6 +30,7 @@ All notable changes to this project will be documented in this file.
 [#171]: https://github.com/stackabletech/opensearch-operator/pull/171
 [#172]: https://github.com/stackabletech/opensearch-operator/pull/172
 [#179]: https://github.com/stackabletech/opensearch-operator/pull/179
+[#186]: https://github.com/stackabletech/opensearch-operator/pull/186
 
 ## [26.7.0] - 2026-07-21
 
