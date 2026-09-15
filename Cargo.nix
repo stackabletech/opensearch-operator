@@ -989,9 +989,9 @@ rec {
       };
       "cc" = rec {
         crateName = "cc";
-        version = "1.4.1";
+        version = "1.4.6";
         edition = "2021";
-        sha256 = "0dniydgf5lv8dh4mr6n1gvas9albqmp0kyh557wkcij6jacw8rlh";
+        sha256 = "1x7za83rw7kd1vmpcc3bsfzp4zzazpr6n7w2i8zxqq63sr10zsx3";
         dependencies = [
           {
             name = "find-msvc-tools";
@@ -1036,9 +1036,9 @@ rec {
       };
       "chacha20" = rec {
         crateName = "chacha20";
-        version = "0.10.1";
+        version = "0.10.2";
         edition = "2024";
-        sha256 = "108aajbvs3rwl4d0pdvq3p8ydy4pwh0rxy2z265ynwkflrmla96m";
+        sha256 = "01hvvbgdmqkcgs2s4f12s9wa5h2gbq05rqvypv61azlwd55mxhv5";
         authors = [
           "RustCrypto Developers"
         ];
@@ -2804,9 +2804,9 @@ rec {
       };
       "find-msvc-tools" = rec {
         crateName = "find-msvc-tools";
-        version = "0.1.10";
+        version = "0.1.12";
         edition = "2021";
-        sha256 = "1pp1612g5k6im9732g16j6a87czhb35xcyzlrpq2mkgdwrrkbdr6";
+        sha256 = "0bcxgbc8g33fkpzx71ws9307ad2jyxsm35my1bc6zikj79y1q3ry";
         libName = "find_msvc_tools";
 
       };
@@ -5440,8 +5440,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "k8s_version";
         authors = [
@@ -6254,9 +6254,9 @@ rec {
       };
       "log" = rec {
         crateName = "log";
-        version = "0.4.33";
+        version = "0.4.34";
         edition = "2021";
-        sha256 = "1bd9dmk22pxgnf0h0slba6rz99zb0a0b2mdhpk8p92bp26ycbvhc";
+        sha256 = "1ihkzn0m33ab79fcl4mkb04n5iwqzbxzyw7l7hazqkffaqzbvy7r";
         authors = [
           "The Rust Project Developers"
         ];
@@ -6270,11 +6270,12 @@ rec {
           "kv_unstable_sval" = [ "kv_sval" "kv_unstable" ];
           "serde" = [ "serde_core" ];
           "serde_core" = [ "dep:serde_core" ];
+          "std" = [ "alloc" ];
           "sval" = [ "dep:sval" ];
           "sval_ref" = [ "dep:sval_ref" ];
           "value-bag" = [ "dep:value-bag" ];
         };
-        resolvedDefaultFeatures = [ "std" ];
+        resolvedDefaultFeatures = [ "alloc" "std" ];
       };
       "matchers" = rec {
         crateName = "matchers";
@@ -8870,9 +8871,9 @@ rec {
       };
       "rustls" = rec {
         crateName = "rustls";
-        version = "0.23.43";
+        version = "0.23.45";
         edition = "2021";
-        sha256 = "01nsagj78r88pifaz55ln1rw31py5n00h7bnw58h3g1aw1n3i0q2";
+        sha256 = "0d6n90q52x5cjyxb6bwcnf9hwg6yb31cwr63rk8n5yfjqwqxfh8d";
         dependencies = [
           {
             name = "log";
@@ -9125,9 +9126,9 @@ rec {
       };
       "rustls-webpki" = rec {
         crateName = "rustls-webpki";
-        version = "0.103.13";
+        version = "0.103.15";
         edition = "2021";
-        sha256 = "0vkm7z9pnxz5qz66p2kmyy2pwx0g4jnsbqk5xzfhs4czcjl2ki31";
+        sha256 = "1hhanq3lz384v4nccacnjfwsyy99n3yc6m6iw8kljz8yicfwzhzk";
         libName = "webpki";
         dependencies = [
           {
@@ -9151,7 +9152,7 @@ rec {
           "alloc" = [ "ring?/alloc" "pki-types/alloc" ];
           "aws-lc-rs" = [ "dep:aws-lc-rs" "aws-lc-rs/aws-lc-sys" "aws-lc-rs/prebuilt-nasm" ];
           "aws-lc-rs-fips" = [ "dep:aws-lc-rs" "aws-lc-rs/fips" ];
-          "aws-lc-rs-unstable" = [ "aws-lc-rs" "aws-lc-rs/unstable" ];
+          "aws-lc-rs-unstable" = [ "aws-lc-rs" ];
           "default" = [ "std" ];
           "ring" = [ "dep:ring" ];
           "std" = [ "alloc" "pki-types/std" ];
@@ -9507,11 +9508,27 @@ rec {
         authors = [
           "David Tolnay <dtolnay@gmail.com>"
         ];
+        dependencies = [
+          {
+            name = "serde";
+            packageId = "serde";
+            optional = true;
+            usesDefaultFeatures = false;
+            target = { target, features }: false;
+          }
+          {
+            name = "serde_core";
+            packageId = "serde_core";
+            rename = "serde";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+        ];
         features = {
           "default" = [ "std" ];
           "serde" = [ "dep:serde" ];
         };
-        resolvedDefaultFeatures = [ "default" "std" ];
+        resolvedDefaultFeatures = [ "default" "serde" "std" ];
       };
       "serde" = rec {
         crateName = "serde";
@@ -10375,8 +10392,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_certs";
         authors = [
@@ -10501,6 +10518,10 @@ rec {
             packageId = "regex";
           }
           {
+            name = "semver";
+            packageId = "semver";
+          }
+          {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
@@ -10570,13 +10591,13 @@ rec {
       };
       "stackable-operator" = rec {
         crateName = "stackable-operator";
-        version = "0.116.0";
+        version = "0.118.0";
         edition = "2024";
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_operator";
         authors = [
@@ -10667,6 +10688,7 @@ rec {
           {
             name = "semver";
             packageId = "semver";
+            features = [ "serde" ];
           }
           {
             name = "serde";
@@ -10756,8 +10778,10 @@ rec {
           "client-feature-gates" = [ "dep:winnow" ];
           "crds" = [ "dep:stackable-versioned" ];
           "default" = [ "crds" ];
-          "full" = [ "client-feature-gates" "crds" "certs" "test-support" "time" "webhook" "kube-ws" "kube-cel" ];
+          "full" = [ "client-feature-gates" "crds" "certs" "test-support" "time" "webhook" "kube-ws" "kube-cel" "kube-http-proxy" "kube-socks5" ];
           "kube-cel" = [ "kube/cel" ];
+          "kube-http-proxy" = [ "kube/http-proxy" ];
+          "kube-socks5" = [ "kube/socks5" ];
           "kube-ws" = [ "kube/ws" ];
           "time" = [ "stackable-shared/time" ];
           "webhook" = [ "dep:stackable-webhook" ];
@@ -10771,8 +10795,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         procMacro = true;
         libName = "stackable_operator_derive";
@@ -10806,8 +10830,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_shared";
         authors = [
@@ -10887,8 +10911,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_telemetry";
         authors = [
@@ -10997,8 +11021,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_versioned";
         authors = [
@@ -11047,8 +11071,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         procMacro = true;
         libName = "stackable_versioned_macros";
@@ -11115,8 +11139,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/stackabletech/operator-rs.git";
-          rev = "7b9f9ac9a76fa425ab27f2821377ef86571ca121";
-          sha256 = "1p3744fxgvs12sqwvi8hhainwrgvhdfwmbyqf0sp0aq3awq3q1v9";
+          rev = "bc6c84025c2dcc834b94bfb57ec72810ae5f5eb1";
+          sha256 = "0cgziqra8097hp05ynib1qpw4c95n972f4w2rk9l3llyp8r1vmci";
         };
         libName = "stackable_webhook";
         authors = [

@@ -4,9 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
+  ([#186]).
+
 ### Changed
 
-- Bump stackable-operator to 0.116.0 ([#166], [#171]).
+- Bump stackable-operator to 0.118.0 ([#166], [#171], [#186]).
+- BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
+  Abbreviated values such as `26.7` are no longer accepted ([#186]).
+- BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
+  always defaulting to `Always` ([#186]).
 - BREAKING: Remove the `app.kubernetes.io/version` label from the listener PVC templates of the
   StatefulSets (previously set to the product version). StatefulSets created by older operator
   versions cannot be updated in place: after the operator upgrade, delete each nodes StatefulSet
@@ -26,6 +35,7 @@ All notable changes to this project will be documented in this file.
 [#171]: https://github.com/stackabletech/opensearch-operator/pull/171
 [#172]: https://github.com/stackabletech/opensearch-operator/pull/172
 [#179]: https://github.com/stackabletech/opensearch-operator/pull/179
+[#186]: https://github.com/stackabletech/opensearch-operator/pull/186
 
 ## [26.7.0] - 2026-07-21
 
