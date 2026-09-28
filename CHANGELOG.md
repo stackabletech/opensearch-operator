@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#186]).
 - Add support for OpenSearch 3.8.0, deprecate 3.6.0 and remove support for 3.4.0 ([#189]).
+- Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#190]).
 
 ### Changed
 
@@ -25,6 +26,7 @@ All notable changes to this project will be documented in this file.
   operator-specific validation code ([#171]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
 - The operator now early-exits the reconcile action when the cluster is marked for deletion ([#179]).
+- Bump stackable-operator to 0.119.0 ([#190]).
 
 ### Fixed
 
@@ -38,6 +40,7 @@ All notable changes to this project will be documented in this file.
 [#179]: https://github.com/stackabletech/opensearch-operator/pull/179
 [#186]: https://github.com/stackabletech/opensearch-operator/pull/186
 [#189]: https://github.com/stackabletech/opensearch-operator/pull/189
+[#190]: https://github.com/stackabletech/opensearch-operator/pull/190
 
 ## [26.7.0] - 2026-07-21
 
