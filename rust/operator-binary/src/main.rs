@@ -32,6 +32,7 @@ use stackable_operator::{
     telemetry::Tracing,
     utils::signal::{self, SignalWatcher},
     v2::types::operator::OperatorName,
+    webhook::health::HealthCheckRegistry,
 };
 use strum::{EnumDiscriminants, IntoStaticStr};
 
@@ -165,9 +166,16 @@ async fn main() -> Result<()> {
             .await
             .context(CreateClientSnafu)?;
 
+            let mut readiness_checks = HealthCheckRegistry::new();
+            let opensearch_cluster_crd_check = readiness_checks.register(format!(
+                "CRD {crd} established",
+                crd = v1alpha1::OpenSearchCluster::crd_name()
+            ));
+
             let webhook_server = webhooks::conversion::create_webhook_server(
                 &operator_environment,
                 maintenance.disable_crd_maintenance,
+                readiness_checks,
                 client.as_kube_client(),
             )
             .await
@@ -248,9 +256,10 @@ async fn main() -> Result<()> {
 
             let delayed_controller = async {
                 let crd_name = v1alpha1::OpenSearchCluster::crd_name();
-                signal::crd_established(&client, crd_name, None)
+                signal::crd_established(&client, crd_name)
                     .await
                     .context(EstablishCrdSnafu { crd_name })?;
+                opensearch_cluster_crd_check.mark_passed();
                 controller.await
             };
 
