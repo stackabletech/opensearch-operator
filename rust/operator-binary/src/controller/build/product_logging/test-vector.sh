@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 SUBSTITUTED_VECTOR_YAML="vector-subst.yaml"
-trap "rm \"$SUBSTITUTED_VECTOR_YAML\"" EXIT
+trap 'rm "$SUBSTITUTED_VECTOR_YAML"' EXIT
 
 DATA_DIR=/stackable/log/_vector-state \
 LOG_DIR=/stackable/log \
