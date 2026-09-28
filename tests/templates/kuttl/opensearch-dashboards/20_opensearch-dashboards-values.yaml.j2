@@ -11,6 +11,11 @@ serviceAccount:
 # OPENSEARCH_HOSTS cannot be supplied if opensearchHosts is set (so unset explicitly).
 # See https://github.com/opensearch-project/helm-charts/blob/main/charts/opensearch-dashboards/templates/deployment.yaml#L122
 opensearchHosts: ""
+resources:
+  requests:
+    cpu: 500m
+  limits:
+    cpu: "1"
 extraEnvs:
   - name: OPENSEARCH_HOSTS
     valueFrom:

@@ -16,7 +16,7 @@ spec:
             - -c
           args:
             - |
-              pip install opensearch-py==3.1.0
+              pip install opensearch-py==3.2.0
               python scripts/create-snapshot.py
           env:
             # required for pip install
@@ -90,7 +90,11 @@ data:
           "bucket": "opensearch-data",
           # The S3CrtClient that was introduced in OpenSearch 3.3.0, does not
           # work with a TLS-secured MinIO. Use the old Netty client instead.
-          "s3_async_client_type": "netty"
+          "s3_async_client_type": "netty",
+          # The default "server_side_encryption_type" changed from
+          # "bucket_default" to "AES256" in OpenSearch 3.8.0. MinIO requires
+          # "bucket_default".
+          "server_side_encryption_type": "bucket_default"
         }
       }
     )
