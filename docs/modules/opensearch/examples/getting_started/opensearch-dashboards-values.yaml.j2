@@ -1,7 +1,7 @@
 ---
 image:
   repository: oci.stackable.tech/sdp/opensearch-dashboards
-  tag: 3.6.0-stackable{{ versions.opensearch }}
+  tag: 3.8.0-stackable{{ versions.opensearch }}
 serviceAccount:
   create: false
   name: simple-opensearch-serviceaccount
@@ -23,6 +23,11 @@ config:
         secure: true
 # See https://github.com/opensearch-project/helm-charts/blob/main/charts/opensearch-dashboards/templates/deployment.yaml#L122
 opensearchHosts: ""
+resources:
+  requests:
+    cpu: 500m
+  limits:
+    cpu: "1"
 extraEnvs:
 - name: OPENSEARCH_HOSTS
   valueFrom:

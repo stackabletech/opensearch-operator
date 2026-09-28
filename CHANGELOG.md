@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Support floating tags for product images via the new `spec.image.stackableVersionPolicy` field
   ([#186]).
+- Add support for OpenSearch 3.8.0, deprecate 3.6.0 and remove support for 3.4.0 ([#189]).
 
 ### Changed
 
@@ -36,6 +37,7 @@ All notable changes to this project will be documented in this file.
 [#172]: https://github.com/stackabletech/opensearch-operator/pull/172
 [#179]: https://github.com/stackabletech/opensearch-operator/pull/179
 [#186]: https://github.com/stackabletech/opensearch-operator/pull/186
+[#189]: https://github.com/stackabletech/opensearch-operator/pull/189
 
 ## [26.7.0] - 2026-07-21
 

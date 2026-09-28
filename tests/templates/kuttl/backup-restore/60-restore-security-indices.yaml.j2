@@ -8,7 +8,7 @@ spec:
     spec:
       initContainers:
         - name: download-security-indices-backup
-          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
           command:
             - /root/scripts/download-security-indices-backup.sh
           env:
@@ -39,7 +39,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-            # The image minio/mc runs as root.
+            # The image pgsty/mc runs as root.
             runAsNonRoot: false
           resources:
             requests:
