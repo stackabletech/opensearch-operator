@@ -4,8 +4,8 @@
 :opensearch: https://opensearch.org/
 :crs: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 :github: https://github.com/stackabletech/opensearch-operator/
-:crd: {crd-docs-base-url}/opensearch-operator/{crd-docs-version}/
-:crd-opensearchcluster: {crd-docs}/opensearch.stackable.tech/opensearchcluster/v1alpha1/
+:crd: {crd-ref}{crd-ref-release}&operator=opensearch-operator
+:crd-opensearchcluster: {crd-ref}/opensearch.stackable.tech/v1alpha1/opensearchcluster{crd-ref-release}
 :feature-tracker: https://features.stackable.tech/unified
 
 [.link-bar]
