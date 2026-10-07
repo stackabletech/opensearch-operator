@@ -1,0 +1,38 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-azure-storage-container
+spec:
+  template:
+    spec:
+      containers:
+        - name: az
+          image: mcr.microsoft.com/azure-cli:2.91.0
+          command:
+            - az
+            - storage
+            - container
+            - create
+            - --name
+            - opensearch-remote
+          envFrom:
+            - secretRef:
+                name: azurite-credentials
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              value: "DefaultEndpointsProtocol=https;AccountName=$(AZURITE_ACCOUNT);AccountKey=$(AZURITE_ACCOUNT_KEY);BlobEndpoint=https://azurite.$(NAMESPACE).svc.cluster.local:10000/$(AZURITE_ACCOUNT);"
+            - name: REQUESTS_CA_BUNDLE
+              value: /tls/ca.crt
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+      volumes:
+        - name: tls
+          configMap:
+            name: truststore-pem
+      restartPolicy: OnFailure

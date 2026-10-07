@@ -1,0 +1,131 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-opensearch
+spec:
+  template:
+    spec:
+      containers:
+        - name: test-opensearch
+          image: oci.stackable.tech/sdp/testing-tools:0.3.0-stackable0.0.0-dev
+          command:
+            - /bin/bash
+            - -euxo
+            - pipefail
+            - -c
+          args:
+            - |
+              pip install opensearch-py==3.2.0
+              python scripts/test.py
+          env:
+            # required for pip install
+            - name: HOME
+              value: /stackable
+          envFrom:
+            - configMapRef:
+                name: opensearch
+          volumeMounts:
+            - name: script
+              mountPath: /stackable/scripts
+            - name: tls
+              mountPath: /stackable/tls
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 128Mi
+              cpu: 400m
+      volumes:
+        - name: script
+          configMap:
+            name: test-opensearch
+        - name: tls
+          configMap:
+            name: truststore-pem
+      serviceAccountName: test-service-account
+      securityContext:
+        fsGroup: 1000
+      restartPolicy: OnFailure
+  backoffLimit: 10
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-opensearch
+data:
+  test.py: |
+    import os
+    from opensearchpy import OpenSearch
+
+    INDEX_NAME = 'test-index'
+
+
+    class OpenSearchTestClient:
+      """Provides the OpenSearch operations required by this test."""
+
+      def __init__(self, index_name):
+        self.index_name = index_name
+        self.client = OpenSearch(
+          hosts=[{
+            'host': os.environ['OPENSEARCH_HOSTNAME'],
+            'port': os.environ['OPENSEARCH_PORT'],
+          }],
+          http_auth=('admin', 'AJVFsGJBbpT6mChn'),
+          http_compress=True,
+          use_ssl=os.environ['OPENSEARCH_PROTOCOL'] == 'https',
+          verify_certs=True,
+          ca_certs='/stackable/tls/ca.crt'
+        )
+
+      def create_index(self):
+        response = self.client.indices.create(index=self.index_name)
+        print(f'Index created; {response=}')
+
+      def delete_index(self):
+        response = self.client.indices.delete(index=self.index_name, ignore_unavailable=True)
+        print(f'Index deleted; {response=}')
+
+      def add_document(self):
+        response = self.client.index(
+          index=self.index_name,
+          body={
+            'name': 'Stackable'
+          },
+          id=1,
+          # Segments are only uploaded to the remote store on a refresh and the remote store refresh
+          # listener uploads them synchronously, so the upload is finished when this call returns.
+          refresh=True
+        )
+        print(f'Document added; {response=}')
+
+      def bytes_uploaded_to_remote_store(self):
+        stats = self.client.indices.stats(index=self.index_name, metric='segments')
+        segments = stats['indices'][self.index_name]['total']['segments']
+        return segments['remote_store']['upload']['total_upload_size']['succeeded_bytes']
+
+
+    client = OpenSearchTestClient(INDEX_NAME)
+
+    # The Job is retried on failure, so delete a left-over index from a previous attempt.
+    client.delete_index()
+
+    client.create_index()
+
+    uploaded_bytes_before = client.bytes_uploaded_to_remote_store()
+    client.add_document()
+    uploaded_bytes_after = client.bytes_uploaded_to_remote_store()
+
+    print(f'Bytes uploaded to the remote store; {uploaded_bytes_before=}, {uploaded_bytes_after=}')
+
+    assert uploaded_bytes_after > uploaded_bytes_before, \
+      'The segments of the added document were not uploaded to the remote store'
+
+    client.delete_index()

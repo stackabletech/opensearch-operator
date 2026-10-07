@@ -1,0 +1,7 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-azure-storage-container
+status:
+  succeeded: 1

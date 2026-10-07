@@ -1,0 +1,226 @@
+---
+apiVersion: opensearch.stackable.tech/v1alpha1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch
+spec:
+  image:
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+    custom: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% endif %}
+    productVersion: "{{ test_scenario['values']['opensearch'].split(',')[0] }}"
+    pullPolicy: IfNotPresent
+  clusterConfig:
+    keystore:
+      - key: azure.client.default.account
+        secretKeyRef:
+          name: azurite-credentials
+          key: AZURITE_ACCOUNT
+      - key: azure.client.default.key
+        secretKeyRef:
+          name: azurite-credentials
+          key: AZURITE_ACCOUNT_KEY
+    security:
+      settings:
+        config:
+          managedBy: operator
+          content:
+            value:
+              _meta:
+                type: config
+                config_version: 2
+              config:
+                dynamic:
+                  authc:
+                    basic_internal_auth_domain:
+                      description: Authenticate via HTTP Basic against internal users database
+                      http_enabled: true
+                      transport_enabled: true
+                      order: 1
+                      http_authenticator:
+                        type: basic
+                        challenge: true
+                      authentication_backend:
+                        type: intern
+                  authz: {}
+                  http:
+                    anonymous_auth_enabled: true
+        internalUsers:
+          managedBy: API
+          content:
+            valueFrom:
+              secretKeyRef:
+                name: security-config-file-internal-users
+                key: internal_users.yml
+        roles:
+          managedBy: API
+          content:
+            valueFrom:
+              configMapKeyRef:
+                name: security-config
+                key: roles.yml
+        rolesMapping:
+          managedBy: API
+          content:
+            valueFrom:
+              configMapKeyRef:
+                name: security-config
+                key: roles_mapping.yml
+{% if lookup('env', 'VECTOR_AGGREGATOR') %}
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+{% endif %}
+  nodes:
+    config:
+      logging:
+        enableVectorAgent: {{ lookup('env', 'VECTOR_AGGREGATOR') | length > 0 }}
+    roleConfig:
+      discoveryServiceListenerClass: external-unstable
+    roleGroups:
+      cluster-manager:
+        config:
+          discoveryServiceExposed: true
+          nodeRoles:
+            - cluster_manager
+          resources:
+            storage:
+              data:
+                capacity: 100Mi
+        replicas: 3
+      data:
+        config:
+          discoveryServiceExposed: false
+          nodeRoles:
+            - ingest
+            - data
+            - remote_cluster_client
+          resources:
+            storage:
+              data:
+                capacity: 200Mi
+        replicas: 2
+    podOverrides:
+      spec:
+        initContainers:
+          - name: init-system-keystore
+            image: oci.stackable.tech/sandbox/sigi/opensearch:3.8.0-stackable0.0.0-dev
+            command:
+              - update-ca-trust
+            args:
+              - extract
+              - --output
+              - /stackable/ca-trust
+            volumeMounts:
+              - name: system-trust-store
+                mountPath: /stackable/ca-trust
+                readOnly: false
+              - name: azurite-ca
+                mountPath: /etc/pki/ca-trust/source/anchors/azurite-ca.crt
+                subPath: ca.crt
+                readOnly: true
+        containers:
+          - name: opensearch
+            env:
+              - name: NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+            volumeMounts:
+              - name: system-trust-store
+                mountPath: /etc/pki/java/cacerts
+                subPath: java/cacerts
+                readOnly: true
+        volumes:
+          - name: azurite-ca
+            configMap:
+              name: truststore-pem
+              # defaultMode: 0o660
+          - name: system-trust-store
+            emptyDir:
+              sizeLimit: 10Mi
+    configOverrides:
+      opensearch.yml:
+        jsonMergePatch:
+          azure:
+            client:
+              default:
+                endpoint_suffix: "ignored;DefaultEndpointsProtocol=https;BlobEndpoint=https://azurite.${NAMESPACE}.svc.cluster.local:10000/devstoreaccount1"
+          node:
+            attr:
+              remote_store:
+                segment:
+                  repository: azurite
+                translog:
+                  repository: azurite
+                state:
+                  repository: azurite
+                repository:
+                  azurite:
+                    type: azure
+                    settings:
+                      client: default
+                      container: opensearch-remote
+                      base_path: remote-store
+            store:
+              # Disable memory mapping in this test; If memory mapping were activated, the kernel
+              # setting vm.max_map_count would have to be increased to 262144 on the node.
+              allow_mmap: false
+          cluster:
+            indices:
+              replication:
+                strategy: SEGMENT
+            remote_store:
+              state:
+                enabled: true
+            # Disable the disk allocation decider in this test; Otherwise the test depends on the
+            # disk usage of the node and if the relative watermark set in
+            # `cluster.routing.allocation.disk.watermark.high` is reached then the security index
+            # could not be created even if enough disk space would be available.
+            routing.allocation.disk.threshold_enabled: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: security-config-file-internal-users
+stringData:
+  internal_users.yml: |
+    ---
+    _meta:
+      type: internalusers
+      config_version: 2
+
+    admin:
+      hash: $2y$10$xRtHZFJ9QhG9GcYhRpAGpufCZYsk//nxsuel5URh0GWEBgmiI4Q/e
+      reserved: true
+      backend_roles:
+        - admin
+      description: OpenSearch admin user
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-config
+data:
+  roles.yml: |
+    ---
+    _meta:
+      type: roles
+      config_version: 2
+
+    monitoring:
+      reserved: true
+      cluster_permissions:
+        - cluster:monitor/main
+  roles_mapping.yml: |
+    ---
+    _meta:
+      type: rolesmapping
+      config_version: 2
+
+    all_access:
+      reserved: false
+      backend_roles:
+        - admin
+
+    monitoring:
+      backend_roles:
+        - opendistro_security_anonymous_backendrole
