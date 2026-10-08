@@ -67,6 +67,12 @@ tests:
     dimensions:
       - opensearch
       - opensearch_home
+  # The test case "repository-azure-plugin" does not work with the original image because it
+  # requires the repository-azure plugin.
+  - name: repository-azure-plugin
+    dimensions:
+      - opensearch
+      - release
 suites:
   - name: nightly
     patch:
