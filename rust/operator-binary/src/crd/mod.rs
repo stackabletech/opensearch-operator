@@ -574,7 +574,7 @@ impl v1alpha1::OpenSearchConfig {
                     data: PvcConfigFragment {
                         // Default taken from the Helm chart, see
                         // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L220
-                        // This value should be overriden by the user. Data nodes need probably
+                        // This value should be overridden by the user. Data nodes need probably
                         // more, the other nodes less.
                         capacity: Some(Quantity("8Gi".to_owned())),
                         storage_class: None,

@@ -419,7 +419,7 @@ pub fn error_policy(
     _context: Arc<Context>,
 ) -> Action {
     match error {
-        // root object is invalid, will be requed when modified
+        // root object is invalid, will be requeued when modified
         Error::DeserializeClusterDefinition { .. } => Action::await_change(),
         _ => Action::requeue(*Duration::from_secs(5)),
     }
