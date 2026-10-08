@@ -140,8 +140,6 @@ data:
     client.add_document()
     uploaded_bytes_after = client.bytes_uploaded_to_remote_store()
 
-    print(f'Bytes uploaded to the remote store; {uploaded_bytes_before=}, {uploaded_bytes_after=}')
-
     assert uploaded_bytes_after > uploaded_bytes_before, \
       'The segments of the added document were not uploaded to the remote store'
 
