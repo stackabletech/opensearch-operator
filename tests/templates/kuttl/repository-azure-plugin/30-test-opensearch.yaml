@@ -25,6 +25,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: opensearch
+            - secretRef:
+                name: opensearch-credentials
           volumeMounts:
             - name: script
               mountPath: /stackable/scripts
@@ -78,7 +80,10 @@ data:
             'host': os.environ['OPENSEARCH_HOSTNAME'],
             'port': os.environ['OPENSEARCH_PORT'],
           }],
-          http_auth=('admin', 'AJVFsGJBbpT6mChn'),
+          http_auth=(
+            os.environ["OPENSEARCH_USER"],
+            os.environ["OPENSEARCH_PASSWORD"]
+          ),
           http_compress=True,
           use_ssl=os.environ['OPENSEARCH_PROTOCOL'] == 'https',
           verify_certs=True,

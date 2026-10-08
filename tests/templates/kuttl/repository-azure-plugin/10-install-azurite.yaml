@@ -95,5 +95,5 @@ metadata:
   name: azurite-credentials
 stringData:
   # The default storage account of Azurite, see https://github.com/Azure/Azurite#default-storage-account.
-  AZURITE_ACCOUNT: devstoreaccount1
+  AZURITE_ACCOUNT_NAME: devstoreaccount1
   AZURITE_ACCOUNT_KEY: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==

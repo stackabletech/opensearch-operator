@@ -15,7 +15,7 @@ spec:
       - key: azure.client.default.account
         secretKeyRef:
           name: azurite-credentials
-          key: AZURITE_ACCOUNT
+          key: AZURITE_ACCOUNT_NAME
       - key: azure.client.default.key
         secretKeyRef:
           name: azurite-credentials
@@ -23,7 +23,7 @@ spec:
     security:
       settings:
         config:
-          managedBy: operator
+          managedBy: API
           content:
             value:
               _meta:
@@ -102,7 +102,11 @@ spec:
       spec:
         initContainers:
           - name: init-system-keystore
-            image: oci.stackable.tech/sandbox/sigi/opensearch:3.8.0-stackable0.0.0-dev
+{% if test_scenario['values']['opensearch'].find(",") > 0 %}
+            image: "{{ test_scenario['values']['opensearch'].split(',')[1] }}"
+{% else %}
+            image: oci.stackable.tech/sdp/opensearch:{{ test_scenario['values']['opensearch'].split(',')[0] }}-stackable{{ test_scenario['values']['release'] }}
+{% endif %}
             command:
               - update-ca-trust
             args:
@@ -124,6 +128,11 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.namespace
+              - name: AZURITE_ACCOUNT_NAME
+                valueFrom:
+                  secretKeyRef:
+                    key: AZURITE_ACCOUNT_NAME
+                    name: azurite-credentials
             volumeMounts:
               - name: system-trust-store
                 mountPath: /etc/pki/java/cacerts
@@ -133,7 +142,6 @@ spec:
           - name: azurite-ca
             configMap:
               name: truststore-pem
-              # defaultMode: 0o660
           - name: system-trust-store
             emptyDir:
               sizeLimit: 10Mi
@@ -142,8 +150,17 @@ spec:
         jsonMergePatch:
           azure:
             client:
-              default:
-                endpoint_suffix: "ignored;DefaultEndpointsProtocol=https;BlobEndpoint=https://azurite.${NAMESPACE}.svc.cluster.local:10000/devstoreaccount1"
+              azurite:
+                # The plugin appends this value to the connection string of the Azure SDK as
+                # `;EndpointSuffix=<value>`, see `AzureStorageSettings.buildConnectString`. As
+                # there is no setting for the endpoint URL of Azurite, `BlobEndpoint` is injected
+                # here. `ignored` is just a placeholder which terminates `EndpointSuffix=`. It is
+                # never used because an explicit `BlobEndpoint` takes precedence over an endpoint
+                # derived from the account name and the endpoint suffix.
+                endpoint_suffix: "\
+                  ignored;\
+                  BlobEndpoint=https://azurite.${NAMESPACE}.svc.cluster.local:10000/${AZURITE_ACCOUNT_NAME}\
+                  "
           node:
             attr:
               remote_store:
@@ -157,7 +174,7 @@ spec:
                   azurite:
                     type: azure
                     settings:
-                      client: default
+                      client: azurite
                       container: opensearch-remote
                       base_path: remote-store
             store:
@@ -167,15 +184,25 @@ spec:
           cluster:
             indices:
               replication:
+                # Remote-backed storage requires segment replication.
                 strategy: SEGMENT
             remote_store:
               state:
+                # Publish the cluster metadata to the remote repository.
                 enabled: true
             # Disable the disk allocation decider in this test; Otherwise the test depends on the
             # disk usage of the node and if the relative watermark set in
             # `cluster.routing.allocation.disk.watermark.high` is reached then the security index
             # could not be created even if enough disk space would be available.
             routing.allocation.disk.threshold_enabled: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-credentials
+stringData:
+  OPENSEARCH_USER: admin
+  OPENSEARCH_PASSWORD: AJVFsGJBbpT6mChn
 ---
 apiVersion: v1
 kind: Secret
@@ -205,11 +232,6 @@ data:
     _meta:
       type: roles
       config_version: 2
-
-    monitoring:
-      reserved: true
-      cluster_permissions:
-        - cluster:monitor/main
   roles_mapping.yml: |
     ---
     _meta:
@@ -220,7 +242,3 @@ data:
       reserved: false
       backend_roles:
         - admin
-
-    monitoring:
-      backend_roles:
-        - opendistro_security_anonymous_backendrole

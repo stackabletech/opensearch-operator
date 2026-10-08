@@ -73,7 +73,7 @@ tests:
   - name: repository-azure-plugin
     dimensions:
       - opensearch
-      # - release
+      - release
 suites:
   - name: nightly
     patch:
