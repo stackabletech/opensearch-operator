@@ -12,11 +12,11 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     keystore:
-      - key: azure.client.default.account
+      - key: azure.client.azurite.account
         secretKeyRef:
           name: azurite-credentials
           key: AZURITE_ACCOUNT_NAME
-      - key: azure.client.default.key
+      - key: azure.client.azurite.key
         secretKeyRef:
           name: azurite-credentials
           key: AZURITE_ACCOUNT_KEY
@@ -82,6 +82,8 @@ spec:
           nodeRoles:
             - cluster_manager
           resources:
+            cpu:
+              min: 500m
             storage:
               data:
                 capacity: 100Mi
@@ -94,6 +96,8 @@ spec:
             - data
             - remote_cluster_client
           resources:
+            cpu:
+              min: 500m
             storage:
               data:
                 capacity: 200Mi

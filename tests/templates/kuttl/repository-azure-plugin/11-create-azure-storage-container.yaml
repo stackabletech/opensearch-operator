@@ -33,11 +33,34 @@ spec:
                 "
             - name: REQUESTS_CA_BUNDLE
               value: /tls/ca.crt
+            # The home directory of the user is not writable, so let the Azure
+            # CLI store its configuration in the writable /tmp directory.
+            - name: AZURE_CONFIG_DIR
+              value: /tmp/.azure
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            privileged: false
           volumeMounts:
             - name: tls
               mountPath: /tls
+            # The Azure CLI requires a writable temporary directory, also for
+            # its configuration (see AZURE_CONFIG_DIR).
+            - name: tmp
+              mountPath: /tmp
+      securityContext:
+        runAsNonRoot: true
+        runAsGroup: 1000
+        runAsUser: 1000
+        fsGroup: 1000
+      serviceAccountName: test-service-account
       volumes:
         - name: tls
           configMap:
             name: truststore-pem
+        - name: tmp
+          emptyDir: {}
       restartPolicy: OnFailure

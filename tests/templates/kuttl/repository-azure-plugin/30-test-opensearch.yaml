@@ -19,9 +19,10 @@ spec:
               pip install opensearch-py==3.2.0
               python scripts/test.py
           env:
-            # required for pip install
+            # required for pip install; the root filesystem is read-only, so
+            # point the home directory at the writable /tmp directory.
             - name: HOME
-              value: /stackable
+              value: /tmp
           envFrom:
             - configMapRef:
                 name: opensearch
@@ -32,11 +33,17 @@ spec:
               mountPath: /stackable/scripts
             - name: tls
               mountPath: /stackable/tls
+            # pip installs the packages into the home directory (see HOME) and
+            # Python requires a writable temporary directory.
+            - name: tmp
+              mountPath: /tmp
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
             runAsNonRoot: true
           resources:
             requests:
@@ -52,8 +59,13 @@ spec:
         - name: tls
           configMap:
             name: truststore-pem
+        - name: tmp
+          emptyDir: {}
       serviceAccountName: test-service-account
       securityContext:
+        runAsNonRoot: true
+        runAsGroup: 1000
+        runAsUser: 1000
         fsGroup: 1000
       restartPolicy: OnFailure
   backoffLimit: 10

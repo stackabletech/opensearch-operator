@@ -5,7 +5,6 @@ dimensions:
       - 3.1.0
       - 3.6.0
       - 3.8.0
-      - 3.8.0,oci.stackable.tech/sandbox/sigi/opensearch-with-repository-azure:3.8.0-stackable0.0.0-dev
       # To use a custom image, add a comma and the full name after the product version, e.g.:
       # - 3.8.0,oci.stackable.tech/sandbox/opensearch:3.8.0-stackable0.0.0-dev
       # - 3.8.0,localhost:5000/sdp/opensearch:3.8.0-stackable0.0.0-dev
