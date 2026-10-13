@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bump stackable-operator to 0.118.0 ([#166], [#171], [#186]).
+- Bump stackable-operator to 0.119.0 ([#166], [#171], [#186], [#190]).
 - BREAKING: `spec.image.stackableVersion` must now be a full, valid semver version, e.g. `26.7.1`.
   Abbreviated values such as `26.7` are no longer accepted ([#186]).
 - BREAKING: `spec.image.pullPolicy` now defaults to `IfNotPresent` for non-floating tags instead of
@@ -26,8 +26,7 @@ All notable changes to this project will be documented in this file.
   operator-specific validation code ([#171]).
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
 - The operator now early-exits the reconcile action when the cluster is marked for deletion ([#179]).
-- Bump stackable-operator to 0.119.0 ([#190]).
-- test: Bump vector-aggregator to 0.58.0 ([#195]).
+- Support Vector 0.58.0 ([#195], [#197]).
 
 ### Fixed
 
@@ -43,6 +42,7 @@ All notable changes to this project will be documented in this file.
 [#189]: https://github.com/stackabletech/opensearch-operator/pull/189
 [#190]: https://github.com/stackabletech/opensearch-operator/pull/190
 [#195]: https://github.com/stackabletech/opensearch-operator/pull/195
+[#197]: https://github.com/stackabletech/opensearch-operator/pull/197
 
 ## [26.7.0] - 2026-07-21
 
