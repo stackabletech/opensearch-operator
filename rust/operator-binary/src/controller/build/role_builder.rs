@@ -223,7 +223,7 @@ impl<'a> RoleBuilder<'a> {
                 {
                     data.insert(
                         file_type.filename.to_owned(),
-                        serde_yaml::to_string(value).expect(
+                        yaml_serde::to_string(value).expect(
                             "serde_json::Value should always be serializable as a string of YAML",
                         ),
                     );
