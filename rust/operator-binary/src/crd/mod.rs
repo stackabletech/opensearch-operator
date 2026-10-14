@@ -922,8 +922,8 @@ mod tests {
 
     impl RoundtripTestData for v1alpha1::OpenSearchClusterSpec {
         fn roundtrip_test_data() -> Vec<Self> {
-            serde_yaml::Deserializer::from_str(include_str!("roundtrip_test_data.yaml"))
-                .map(serde_yaml::with::singleton_map_recursive::deserialize)
+            yaml_serde::Deserializer::from_str(include_str!("roundtrip_test_data.yaml"))
+                .map(yaml_serde::with::singleton_map_recursive::deserialize)
                 .collect::<Result<_, _>>()
                 .expect("roundtrip_test_data.yaml should contain OpenSearchClusterSpec documents")
         }
