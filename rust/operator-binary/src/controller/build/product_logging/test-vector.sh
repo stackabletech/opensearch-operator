@@ -1,17 +1,20 @@
 #!/usr/bin/env sh
 
-SUBSTITUTED_VECTOR_YAML="vector-subst.yaml"
-trap 'rm "$SUBSTITUTED_VECTOR_YAML"' EXIT
+set -eu
 
-DATA_DIR=/stackable/log/_vector-state \
-LOG_DIR=/stackable/log \
-OPENSEARCH_SERVER_LOG_FILE=opensearch_server.json \
-NAMESPACE=default \
-CLUSTER_NAME=opensearch \
-ROLE_NAME=nodes \
-ROLE_GROUP_NAME=cluster-manager \
-VECTOR_AGGREGATOR_ADDRESS=vector-aggregator \
-VECTOR_FILE_LOG_LEVEL=info \
-envsubst < vector.yaml > "$SUBSTITUTED_VECTOR_YAML"
+export DATA_DIR=/stackable/log/_vector-state
+export LOG_DIR=/stackable/log
+export OPENSEARCH_SERVER_LOG_FILE=opensearch_server.json
+export NAMESPACE=default
+export CLUSTER_NAME=opensearch
+export ROLE_NAME=nodes
+export ROLE_GROUP_NAME=cluster-manager
+export VECTOR_AGGREGATOR_ADDRESS=http://vector-aggregator:6000
+export VECTOR_FILE_LOG_LEVEL=info
 
-vector test "$SUBSTITUTED_VECTOR_YAML" vector-test.yaml
+# Required because vector.yaml contains ${...} placeholders
+export VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION=true
+
+vector validate --no-environment vector.yaml
+
+vector test vector.yaml vector-test.yaml

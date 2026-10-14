@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - All product containers now run with `securityContext.runAsNonRoot` set to `true` to improve security ([#172]).
 - All pods now set `securityContext.seccompProfile.type` to `RuntimeDefault` ([#198]).
 - The operator now early-exits the reconcile action when the cluster is marked for deletion ([#179]).
-- test: Bump vector-aggregator to 0.58.0 ([#195]).
+- Support Vector 0.58.0 ([#195], [#197]).
 - Replace the unmaintained `serde_yaml` crate with `yaml_serde` ([#198]).
 
 ### Fixed
@@ -44,6 +44,7 @@ All notable changes to this project will be documented in this file.
 [#189]: https://github.com/stackabletech/opensearch-operator/pull/189
 [#190]: https://github.com/stackabletech/opensearch-operator/pull/190
 [#195]: https://github.com/stackabletech/opensearch-operator/pull/195
+[#197]: https://github.com/stackabletech/opensearch-operator/pull/197
 [#198]: https://github.com/stackabletech/opensearch-operator/pull/198
 
 ## [26.7.0] - 2026-07-21
