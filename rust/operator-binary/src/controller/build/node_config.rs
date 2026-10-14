@@ -190,7 +190,7 @@ impl NodeConfig {
 
     /// Creates the main OpenSearch configuration file in YAML format
     pub fn opensearch_config_file_content(&self) -> String {
-        serde_yaml::to_string(&self.opensearch_config())
+        yaml_serde::to_string(&self.opensearch_config())
             .expect("serde_json::Value should always be serializable as a string of YAML")
     }
 

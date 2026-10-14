@@ -2169,7 +2169,7 @@ mod tests {
                 concat!(
                     "mkdir --parents /stackable/log/_vector-state\n",
                     "# Vector will ignore SIGTERM (as PID != 1) and must be shut down by writing a shutdown trigger file\n",
-                    "vector & vector_pid=$!\n",
+                    "/stackable/bin/vector-with-env-var-interpolation & vector_pid=$!\n",
                     "if [ ! -f \"/stackable/log/_vector/shutdown\" ]; then\n",
                     "mkdir -p /stackable/log/_vector\n",
                     "inotifywait -qq --event create /stackable/log/_vector;\n",
@@ -3165,7 +3165,10 @@ mod tests {
                             "initContainers": expected_init_containers,
                             "securityContext": {
                                 "fsGroup": 1000,
-                                "runAsNonRoot": true
+                                "runAsNonRoot": true,
+                                "seccompProfile": {
+                                    "type": "RuntimeDefault"
+                                }
                             },
                             "serviceAccountName": "my-opensearch-cluster-serviceaccount",
                             "terminationGracePeriodSeconds": 30,
