@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - The operator now early-exits the reconcile action when the cluster is marked for deletion ([#179]).
 - Support Vector 0.58.0 ([#195], [#197], [#199]).
 - Replace the unmaintained `serde_yaml` crate with `yaml_serde` ([#198]).
+- The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#201]).
 
 ### Fixed
 
@@ -47,6 +48,7 @@ All notable changes to this project will be documented in this file.
 [#197]: https://github.com/stackabletech/opensearch-operator/pull/197
 [#198]: https://github.com/stackabletech/opensearch-operator/pull/198
 [#199]: https://github.com/stackabletech/opensearch-operator/pull/199
+[#201]: https://github.com/stackabletech/opensearch-operator/pull/201
 
 ## [26.7.0] - 2026-07-21
 
