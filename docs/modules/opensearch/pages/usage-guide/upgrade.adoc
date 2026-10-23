@@ -1,6 +1,16 @@
 = SDP upgrade notes
 :description: Instructions for upgrading the SDP versions.
 
+== Upgrade from SDP 26.7 to 26.11
+
+=== Node certificates
+
+The operator no longer accepts node certificates whose distinguished names lack domain components.
+Such certificates were issued up to SDP 26.3.
+
+If you are upgrading from SDP 26.3, then you must upgrade to SDP 26.7 first and restart all OpenSearch Pods, so that they get certificates with domain components.
+Otherwise, the nodes which are already restarted with SDP 26.11 reject the transport connections of the nodes which are not restarted yet, and the cluster can lose its quorum during the rolling restart.
+
 == Upgrade from SDP 26.3 to 26.7
 
 === Dedicated ConfigMap for security settings

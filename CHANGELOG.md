@@ -31,6 +31,13 @@ All notable changes to this project will be documented in this file.
 - Replace the unmaintained `serde_yaml` crate with `yaml_serde` ([#198]).
 - The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#201]).
 
+### Removed
+
+- Remove support for node certificates whose distinguished names lack domain components, i.e. the
+  allowed node DN `CN=generated certificate for pod`. This entry was only required to make the
+  transition from SDP 26.3 to 26.7 possible. Since SDP 26.7, the generated certificates contain the
+  domain components, so the fallback is no longer needed in SDP 26.11 ([#202]).
+
 ### Fixed
 
 - Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
@@ -49,6 +56,7 @@ All notable changes to this project will be documented in this file.
 [#198]: https://github.com/stackabletech/opensearch-operator/pull/198
 [#199]: https://github.com/stackabletech/opensearch-operator/pull/199
 [#201]: https://github.com/stackabletech/opensearch-operator/pull/201
+[#202]: https://github.com/stackabletech/opensearch-operator/pull/202
 
 ## [26.7.0] - 2026-07-21
 

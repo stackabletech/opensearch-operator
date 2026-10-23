@@ -31,7 +31,9 @@ pub enum Error {
 
     #[snafu(display("failed to fetch the discovery service listener"))]
     FetchDiscoveryServiceListener {
-        source: stackable_operator::client::Error,
+        // boxed because otherwise Clippy warns about a large enum variant
+        #[snafu(source(from(stackable_operator::client::Error, Box::new)))]
+        source: Box<stackable_operator::client::Error>,
     },
 }
 
