@@ -1,6 +1,6 @@
 //! Configuration of an OpenSearch node
 
-use std::{iter, str::FromStr};
+use std::str::FromStr;
 
 use serde_json::json;
 use stackable_operator::{
