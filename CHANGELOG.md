@@ -31,18 +31,18 @@ All notable changes to this project will be documented in this file.
 - Replace the unmaintained `serde_yaml` crate with `yaml_serde` ([#198]).
 - The operator Deployment runs with a restricted security context and a read-only root filesystem, so it can be deployed into namespaces that enforce the `restricted` Pod Security Standard ([#201]).
 
-### Fixed
-
-- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
-  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
-  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#172]).
-
 ### Removed
 
 - Remove support for node certificates whose distinguished names lack domain components, i.e. the
   allowed node DN `CN=generated certificate for pod`. This entry was only required to make the
   transition from SDP 26.3 to 26.7 possible. Since SDP 26.7, the generated certificates contain the
   domain components, so the fallback is no longer needed in SDP 26.11 ([#202]).
+
+### Fixed
+
+- Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
+  which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
+  See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#172]).
 
 [#166]: https://github.com/stackabletech/opensearch-operator/pull/166
 [#171]: https://github.com/stackabletech/opensearch-operator/pull/171
