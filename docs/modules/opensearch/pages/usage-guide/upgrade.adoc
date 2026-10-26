@@ -27,17 +27,8 @@ ApiError: StatefulSet.apps "opensearch-nodes-default" is invalid:
 spec: Forbidden: updates to statefulset spec for fields other than 'replicas', ...
 ----
 
-The OpenSearch cluster keeps running at first, so this error is easy to overlook.
+The OpenSearch cluster keeps running and stays healthy, so this error is easy to overlook.
 The operator cannot apply any further change to the StatefulSets though, for instance to the number of replicas or to the product version, until the error is resolved.
-The Pods also keep the outdated Pod template.
-If such a Pod is restarted, then it can fail to start, because the operator already changed the resources which the outdated Pod template refers to.
-For instance, a Pod which is restarted after an upgrade from SDP 26.3 stays in the state `ContainerCreating`, because the security settings moved into a dedicated ConfigMap:
-
-[source]
-----
-MountVolume.SetUp failed for volume "security-config-file-config":
-configmap references non-existent config key: config.yml
-----
 
 To resolve this error, you need to delete the StatefulSets right after the operator upgrade.
 You can do this using the following command:
