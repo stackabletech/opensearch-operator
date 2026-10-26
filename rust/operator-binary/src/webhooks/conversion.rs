@@ -22,7 +22,11 @@ pub enum Error {
     MergeCrd { source: MergeError },
 
     #[snafu(display("failed to create conversion webhook server"))]
-    CreateWebhook { source: WebhookServerError },
+    CreateWebhook {
+        // boxed because otherwise Clippy warns about a large enum variant
+        #[snafu(source(from(WebhookServerError, Box::new)))]
+        source: Box<WebhookServerError>,
+    },
 }
 
 /// Creates and returns a [`WebhookServer`].

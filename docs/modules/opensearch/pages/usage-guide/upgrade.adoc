@@ -1,7 +1,67 @@
 = SDP upgrade notes
 :description: Instructions for upgrading the SDP versions.
 
+== Upgrade from SDP 26.7 to 26.11
+
+A direct upgrade from SDP 26.3 to 26.11 is not supported.
+Upgrade to SDP 26.7 first and restart all OpenSearch Pods, see the notes for the upgrade from SDP 26.3 to 26.7 below.
+
+=== Node certificates
+
+The operator no longer accepts node certificates whose distinguished names lack domain components.
+Such certificates were issued up to SDP 26.3.
+
+If you are upgrading from SDP 26.3, then you must upgrade to SDP 26.7 first and restart all OpenSearch Pods, so that they get certificates with domain components.
+Otherwise, the nodes which are already restarted with SDP 26.11 reject the transport connections of the nodes which are not restarted yet, and the cluster can lose its quorum during the rolling restart.
+
+=== StatefulSet updates
+
+The `app.kubernetes.io/version` label was removed from the listener PVC templates of the StatefulSets.
+Kubernetes restricts changes to `spec.volumeClaimTemplates` and other StatefulSet fields, so the operator cannot apply this change in place and the following error occurs:
+
+[source]
+----
+ERROR stackable_operator::logging::controller: Failed to reconcile object ...
+unable to patch resource "opensearch-nodes-default",
+ApiError: StatefulSet.apps "opensearch-nodes-default" is invalid:
+spec: Forbidden: updates to statefulset spec for fields other than 'replicas', ...
+----
+
+The OpenSearch cluster keeps running and stays healthy, so this error is easy to overlook.
+The operator cannot apply any further change to the StatefulSets though, for instance to the number of replicas or to the product version, until the error is resolved.
+
+To resolve this error, you need to delete the StatefulSets right after the operator upgrade.
+You can do this using the following command:
+
+[source,shell]
+----
+kubectl delete statefulsets.apps --cascade=orphan opensearch-nodes-default
+----
+
+The operator will automatically recreate the StatefulSet.
+`--cascade=orphan` retains the Pods, so that they are not all deleted at once.
+The recreated StatefulSet adopts them and restarts them one after another to apply the new product image.
+
+Up to SDP 26.7, the label was set to the product version, so this error occurred on every product version upgrade.
+Since the label is removed in SDP 26.11, the error does not occur in subsequent upgrades.
+
 == Upgrade from SDP 26.3 to 26.7
+
+=== Node certificates
+
+Since SDP 26.7, the certificates issued by the Secret Operator contain domain components in their distinguished names, and the operator adds the corresponding entry to the list of allowed node distinguished names.
+This list is read once at node startup, so the nodes which are still running with SDP 26.3 reject the transport connections of the nodes which are already restarted with SDP 26.7:
+
+[source]
+----
+Node presenting certificate with SSL Principal {DC=local,DC=cluster,DC=svc,
+DC=default,DC=opensearch-nodes-default-headless,DC=opensearch-nodes-default-0,
+CN=generated certificate for pod} could not securely connect to the cluster.
+Please ensure the principal is correct and present in the nodes_dn list.
+----
+
+The cluster can lose its quorum during the rolling restart and be unavailable for a short time.
+Plan for a short downtime; the cluster recovers on its own once all Pods are restarted.
 
 === Dedicated ConfigMap for security settings
 

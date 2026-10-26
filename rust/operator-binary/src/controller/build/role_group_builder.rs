@@ -821,22 +821,23 @@ impl<'a> RoleGroupBuilder<'a> {
         let opensearch_path_conf = self.node_config.opensearch_path_conf();
 
         for file_type in settings {
-            let mount_path;
-            let sub_path;
-
-            if use_sub_path {
-                mount_path = format!(
-                    "{opensearch_path_conf}/opensearch-security/{filename}",
-                    filename = file_type.filename.to_owned()
-                );
-                sub_path = Some(file_type.filename.to_owned());
+            let (mount_path, sub_path) = if use_sub_path {
+                (
+                    format!(
+                        "{opensearch_path_conf}/opensearch-security/{filename}",
+                        filename = file_type.filename.to_owned()
+                    ),
+                    Some(file_type.filename.to_owned()),
+                )
             } else {
-                mount_path = format!(
-                    "{opensearch_path_conf}/opensearch-security/{file_type}",
-                    file_type = file_type.id
-                );
-                sub_path = None;
-            }
+                (
+                    format!(
+                        "{opensearch_path_conf}/opensearch-security/{file_type}",
+                        file_type = file_type.id
+                    ),
+                    None,
+                )
+            };
 
             volume_mounts.push(VolumeMount {
                 mount_path,
