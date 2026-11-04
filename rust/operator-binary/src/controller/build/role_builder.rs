@@ -20,6 +20,7 @@ use stackable_operator::{
             meta::ownerreference_from_resource, pdb::pod_disruption_budget_builder_with_role,
         },
         kvp::label::recommended_labels_for_role_resources,
+        rbac::RbacResourceNames,
         role_utils::ResourceNames,
         types::{
             kubernetes::{ConfigMapName, ListenerName, ServiceName},
