@@ -32,6 +32,13 @@ customConfig:
       condition: >-
         .pod == "opensearch-nodes-automatic-log-config-0" &&
         .container == "opensearch"
+    filteredAutomaticLogConfigContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "opensearch-nodes-automatic-log-config-0" &&
+        .container == "containerdebug"
     filteredAutomaticLogConfigVector:
       type: filter
       inputs:
@@ -46,6 +53,13 @@ customConfig:
       condition: >-
         .pod == "opensearch-nodes-custom-log-config-0" &&
         .container == "opensearch"
+    filteredCustomLogConfigContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "opensearch-nodes-custom-log-config-0" &&
+        .container == "containerdebug"
     filteredCustomLogConfigVector:
       type: filter
       inputs:
@@ -73,6 +87,10 @@ customConfig:
       type: console
       encoding:
         codec: json
+      buffer:
+        # Avoid back pressure from a stalling stdout. The test should not
+        # fail because of a sink which only aids debugging.
+        when_full: drop_newest
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     aggregator:
       inputs:
