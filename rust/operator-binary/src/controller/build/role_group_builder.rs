@@ -1018,12 +1018,9 @@ impl<'a> RoleGroupBuilder<'a> {
             Volume {
                 name: LOG_VOLUME_NAME.to_string(),
                 empty_dir: Some(EmptyDirVolumeSource {
-                    // Only the OpenSearch log files are budgeted here. The `containerdebug`
-                    // files in this volume are rotated by time, which bounds their number but
-                    // not their size, so they are an unbudgeted writer. They stay negligible at
-                    // the default INFO level and a 30 minute loop, but raising `FILE_LOG_LEVEL`
-                    // via `envOverrides` can exceed the limit, which makes the kubelet evict the
-                    // Pod.
+                    // Only the OpenSearch log files are budgeted. The `containerdebug` files in this
+                    // volume are rotated by time, not by size, so they have no budget; raising
+                    // `FILE_LOG_LEVEL` via `envOverrides` can therefore evict the Pod.
                     size_limit: Some(calculate_log_volume_size_limit(&[
                         MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE,
                     ])),
