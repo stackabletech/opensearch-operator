@@ -2,7 +2,9 @@
 
 use std::marker::PhantomData;
 
+use const_format::concatcp;
 use role_builder::RoleBuilder;
+use stackable_operator::v2::product_logging::framework::STACKABLE_LOG_DIR;
 
 use super::{ContextNames, KubernetesResources, Prepared, ValidatedCluster};
 
@@ -10,6 +12,11 @@ pub mod node_config;
 pub mod product_logging;
 pub mod role_builder;
 pub mod role_group_builder;
+
+/// Directory which the `containerdebug` process writes its log files to. It must be exactly one
+/// level below the log directory, because the Vector agent derives the container name from that
+/// path segment.
+pub const CONTAINERDEBUG_LOG_DIR: &str = concatcp!(STACKABLE_LOG_DIR, "/containerdebug");
 
 /// Builds Kubernetes resource specifications from the given validated cluster
 ///

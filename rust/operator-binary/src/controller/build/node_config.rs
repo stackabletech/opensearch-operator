@@ -17,7 +17,7 @@ use stackable_operator::{
     },
 };
 
-use super::ValidatedCluster;
+use super::{CONTAINERDEBUG_LOG_DIR, ValidatedCluster};
 use crate::{
     controller::{
         NODES_ROLE_NAME, OpenSearchRoleGroupConfig, ValidatedNodeRole,
@@ -392,7 +392,7 @@ impl NodeConfig {
             // `container: containerdebug`.
             .with_value(
                 &ENV_VAR_NAME_FILE_LOG_DIRECTORY,
-                format!("{STACKABLE_LOG_DIR}/containerdebug"),
+                CONTAINERDEBUG_LOG_DIR,
             )
             // Rotation is opt-in, so without these the file would grow unbounded.
             .with_value(&ENV_VAR_NAME_FILE_LOG_ROTATION_PERIOD, "hourly")

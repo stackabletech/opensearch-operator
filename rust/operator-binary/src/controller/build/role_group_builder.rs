@@ -74,6 +74,7 @@ use stackable_operator::{
 };
 
 use super::{
+    CONTAINERDEBUG_LOG_DIR,
     node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
     product_logging::config::{
         CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
@@ -768,7 +769,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 {remove_vector_shutdown_file_command}\n\
                 prepare_signal_handlers\n\
                 if command -v containerdebug >/dev/null 2>&1; then\n\
-                mkdir --parents {STACKABLE_LOG_DIR}/containerdebug\n\
+                mkdir --parents {CONTAINERDEBUG_LOG_DIR}\n\
                 containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
                 else\n\
                 echo >&2 \"containerdebug not installed; Proceed without it.\"\n\
