@@ -1,4 +1,5 @@
 = Troubleshooting
+:description: Troubleshooting OpenSearch on Kubernetes, covering the SSLHandshakeException warnings about AEAD cipher fragments that appear with TLS connections.
 
 == Errors and warnings in the OpenSearch logs
 
