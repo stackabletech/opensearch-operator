@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use const_format::concatcp;
 use serde_json::json;
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar,
@@ -17,7 +18,7 @@ use stackable_operator::{
     },
 };
 
-use super::{CONTAINERDEBUG_LOG_DIR, ValidatedCluster};
+use super::ValidatedCluster;
 use crate::{
     controller::{
         NODES_ROLE_NAME, OpenSearchRoleGroupConfig, ValidatedNodeRole,
@@ -392,7 +393,7 @@ impl NodeConfig {
             // `container: containerdebug`.
             .with_value(
                 &ENV_VAR_NAME_FILE_LOG_DIRECTORY,
-                CONTAINERDEBUG_LOG_DIR,
+                concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
             )
             // Rotation is opt-in, so without these the file would grow unbounded.
             .with_value(&ENV_VAR_NAME_FILE_LOG_ROTATION_PERIOD, "hourly")

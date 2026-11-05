@@ -100,7 +100,7 @@ spec:
           rm -f /stackable/log/_vector/shutdown
           prepare_signal_handlers
           if command -v containerdebug >/dev/null 2>&1; then
-          mkdir --parents /stackable/log/containerdebug
+          mkdir --parents "$FILE_LOG_DIRECTORY"
           containerdebug --output=/stackable/log/containerdebug-state.json --loop &
           else
           echo >&2 "containerdebug not installed; Proceed without it."
@@ -117,6 +117,12 @@ spec:
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
+        - name: FILE_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
+        - name: FILE_LOG_MAX_FILES
+          value: "2"
+        - name: FILE_LOG_ROTATION_PERIOD
+          value: hourly
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
         - name: _POD_NAME
@@ -587,7 +593,7 @@ spec:
           rm -f /stackable/log/_vector/shutdown
           prepare_signal_handlers
           if command -v containerdebug >/dev/null 2>&1; then
-          mkdir --parents /stackable/log/containerdebug
+          mkdir --parents "$FILE_LOG_DIRECTORY"
           containerdebug --output=/stackable/log/containerdebug-state.json --loop &
           else
           echo >&2 "containerdebug not installed; Proceed without it."
@@ -604,6 +610,12 @@ spec:
         env:
         - name: DISABLE_INSTALL_DEMO_CONFIG
           value: "true"
+        - name: FILE_LOG_DIRECTORY
+          value: /stackable/log/containerdebug
+        - name: FILE_LOG_MAX_FILES
+          value: "2"
+        - name: FILE_LOG_ROTATION_PERIOD
+          value: hourly
         - name: OPENSEARCH_HOME
           value: {{ test_scenario['values']['opensearch_home'] }}
         - name: _POD_NAME
