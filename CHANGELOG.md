@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   ([#186]).
 - Add support for OpenSearch 3.8.0, deprecate 3.6.0 and remove support for 3.4.0 ([#189]).
 - Add `/ready` endpoint to the operator Deployment, which reports the CRD installation status ([#190]).
+- The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
+  the Vector aggregator. The operator enables the file logs of containerdebug for this, with an
+  hourly rotation that keeps at most two files ([#205]).
 
 ### Changed
 
@@ -43,6 +46,9 @@ All notable changes to this project will be documented in this file.
 - Fix a longstanding problem of including empty `categories`, `shortNames` and `additionalPrinterColumns` in the CRDs,
   which could cause problems with GitOps tools (e.g. ArgoCD) reporting a diff in the custom resources.
   See [our internal issue](https://github.com/stackabletech/hdfs-operator/issues/626) and [the fix](https://github.com/kube-rs/kube/pull/2042) for details ([#172]).
+- The `containerdebug` process is started again. It was guarded with `command --search`, which is
+  fish syntax and fails in bash, so the guard was always false and containerdebug never ran
+  ([#205]).
 
 [#166]: https://github.com/stackabletech/opensearch-operator/pull/166
 [#171]: https://github.com/stackabletech/opensearch-operator/pull/171
@@ -57,6 +63,7 @@ All notable changes to this project will be documented in this file.
 [#199]: https://github.com/stackabletech/opensearch-operator/pull/199
 [#201]: https://github.com/stackabletech/opensearch-operator/pull/201
 [#202]: https://github.com/stackabletech/opensearch-operator/pull/202
+[#205]: https://github.com/stackabletech/opensearch-operator/pull/205
 
 ## [26.7.0] - 2026-07-21
 

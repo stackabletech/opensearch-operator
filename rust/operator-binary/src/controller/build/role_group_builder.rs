@@ -767,7 +767,8 @@ impl<'a> RoleGroupBuilder<'a> {
                 "{COMMON_BASH_TRAP_FUNCTIONS}\n\
                 {remove_vector_shutdown_file_command}\n\
                 prepare_signal_handlers\n\
-                if command --search containerdebug >/dev/null 2>&1; then\n\
+                if command -v containerdebug >/dev/null 2>&1; then\n\
+                mkdir --parents \"$FILE_LOG_DIRECTORY\"\n\
                 containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
                 else\n\
                 echo >&2 \"containerdebug not installed; Proceed without it.\"\n\
@@ -1016,6 +1017,9 @@ impl<'a> RoleGroupBuilder<'a> {
             Volume {
                 name: LOG_VOLUME_NAME.to_string(),
                 empty_dir: Some(EmptyDirVolumeSource {
+                    // Only the OpenSearch log files are budgeted. The `containerdebug` files in this
+                    // volume are rotated by time, not by size, so they have no budget; raising
+                    // `FILE_LOG_LEVEL` via `envOverrides` can therefore evict the Pod.
                     size_limit: Some(calculate_log_volume_size_limit(&[
                         MAX_OPENSEARCH_SERVER_LOG_FILES_SIZE,
                     ])),
@@ -2076,7 +2080,8 @@ mod tests {
                     "\n",
                     "rm -f /stackable/log/_vector/shutdown\n",
                     "prepare_signal_handlers\n",
-                    "if command --search containerdebug >/dev/null 2>&1; then\n",
+                    "if command -v containerdebug >/dev/null 2>&1; then\n",
+                    "mkdir --parents \"$FILE_LOG_DIRECTORY\"\n",
                     "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
                     "else\n",
                     "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",
@@ -2094,6 +2099,18 @@ mod tests {
                 "-c"
             ],
             "env": [
+                {
+                    "name": "FILE_LOG_DIRECTORY",
+                    "value": "/stackable/log/containerdebug"
+                },
+                {
+                    "name": "FILE_LOG_MAX_FILES",
+                    "value": "2"
+                },
+                {
+                    "name": "FILE_LOG_ROTATION_PERIOD",
+                    "value": "hourly"
+                },
                 {
                     "name": "_POD_NAME",
                     "valueFrom": {
