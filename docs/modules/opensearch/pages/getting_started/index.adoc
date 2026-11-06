@@ -1,4 +1,5 @@
 = Getting started
+:description: Getting started with OpenSearch on Kubernetes, covering the Stackable operator and its dependencies, a first cluster and ingesting and searching data.
 
 This guide helps you get started with OpenSearch using the Stackable Operator.
 It covers the installation of the operator and its dependencies, setting up your first OpenSearch instance, connecting to it, and ingesting and searching for data.

@@ -1,4 +1,5 @@
 = Pod Placement
+:description: Pod placement for OpenSearch on Kubernetes, covering the default affinity that spreads the nodes of a cluster across Kubernetes nodes.
 
 You can configure the Pod placement of the OpenSearch pods as described in xref:concepts:operations/pod_placement.adoc[].
 
