@@ -6,6 +6,7 @@
 :exampleOpensearchPort: 31315
 
 = Discovery
+:description: Reference for the discovery ConfigMap the Stackable operator for OpenSearch publishes, with the connection parameters for reaching the cluster.
 :page-aliases: discovery.adoc
 
 The Stackable Operator for OpenSearch publishes a xref:concepts:service_discovery.adoc[service discovery ConfigMap] which exposes a client configuration bundle that allows access to the OpenSearch cluster.
