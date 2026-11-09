@@ -25,7 +25,7 @@ On role groups with only the `cluster_manager` node role, you probably want to d
 
 == Resource Requests
 
-include::home:concepts:stackable_resource_requests.adoc[]
+include::concepts:partial$stackable_resource_requests.adoc[]
 
 A minimal HA setup consisting of 3 nodes has the following https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/[resource requirements{external-link-icon}^]:
 
