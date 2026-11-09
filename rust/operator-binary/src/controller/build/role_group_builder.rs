@@ -74,7 +74,7 @@ use stackable_operator::{
 };
 
 use super::{
-    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, NodeConfig},
+    node_config::{CONFIGURATION_FILE_OPENSEARCH_YML, ENV_VAR_NAME_FILE_LOG_DIRECTORY, NodeConfig},
     product_logging::config::{
         CONFIGURATION_FILE_LOG4J2_PROPERTIES, create_log4j2_config, vector_config_file_content,
     },
@@ -768,7 +768,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 {remove_vector_shutdown_file_command}\n\
                 prepare_signal_handlers\n\
                 if command -v containerdebug >/dev/null 2>&1; then\n\
-                mkdir --parents \"$FILE_LOG_DIRECTORY\"\n\
+                mkdir --parents \"${file_log_directory}\" || true\n\
                 containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
                 else\n\
                 echo >&2 \"containerdebug not installed; Proceed without it.\"\n\
@@ -777,6 +777,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 wait_for_termination $!\n\
                 {create_vector_shutdown_file_command}",
                 extra_args = self.role_group_config.cli_overrides_to_vec().join(" "),
+                file_log_directory = ENV_VAR_NAME_FILE_LOG_DIRECTORY.as_ref(),
                 remove_vector_shutdown_file_command =
                     remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
                 create_vector_shutdown_file_command =
@@ -2081,7 +2082,7 @@ mod tests {
                     "rm -f /stackable/log/_vector/shutdown\n",
                     "prepare_signal_handlers\n",
                     "if command -v containerdebug >/dev/null 2>&1; then\n",
-                    "mkdir --parents \"$FILE_LOG_DIRECTORY\"\n",
+                    "mkdir --parents \"$FILE_LOG_DIRECTORY\" || true\n",
                     "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
                     "else\n",
                     "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",

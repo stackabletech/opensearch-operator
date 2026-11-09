@@ -100,7 +100,7 @@ spec:
           rm -f /stackable/log/_vector/shutdown
           prepare_signal_handlers
           if command -v containerdebug >/dev/null 2>&1; then
-          mkdir --parents "$FILE_LOG_DIRECTORY"
+          mkdir --parents "$FILE_LOG_DIRECTORY" || true
           containerdebug --output=/stackable/log/containerdebug-state.json --loop &
           else
           echo >&2 "containerdebug not installed; Proceed without it."
@@ -593,7 +593,7 @@ spec:
           rm -f /stackable/log/_vector/shutdown
           prepare_signal_handlers
           if command -v containerdebug >/dev/null 2>&1; then
-          mkdir --parents "$FILE_LOG_DIRECTORY"
+          mkdir --parents "$FILE_LOG_DIRECTORY" || true
           containerdebug --output=/stackable/log/containerdebug-state.json --loop &
           else
           echo >&2 "containerdebug not installed; Proceed without it."
