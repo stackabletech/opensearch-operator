@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use const_format::concatcp;
 use serde_json::json;
 use stackable_operator::{
     builder::pod::container::FieldPathEnvVar,
@@ -144,6 +145,9 @@ const CONFIG_OPTION_TRANSPORT_PUBLISH_HOST: &str = "transport.publish_host";
 const DEFAULT_OPENSEARCH_HOME: &str = "/stackable/opensearch";
 
 constant!(ENV_VAR_NAME_DISCOVERY_SEED_HOSTS: EnvVarName = CONFIG_OPTION_DISCOVERY_SEED_HOSTS);
+constant!(pub(super) ENV_VAR_NAME_FILE_LOG_DIRECTORY: EnvVarName = "FILE_LOG_DIRECTORY");
+constant!(ENV_VAR_NAME_FILE_LOG_MAX_FILES: EnvVarName = "FILE_LOG_MAX_FILES");
+constant!(ENV_VAR_NAME_FILE_LOG_ROTATION_PERIOD: EnvVarName = "FILE_LOG_ROTATION_PERIOD");
 constant!(ENV_VAR_NAME_HTTP_PUBLISH_HOST: EnvVarName = CONFIG_OPTION_HTTP_PUBLISH_HOST);
 constant!(ENV_VAR_NAME_INITIAL_CLUSTER_MANAGER_NODES: EnvVarName = CONFIG_OPTION_INITIAL_CLUSTER_MANAGER_NODES);
 constant!(ENV_VAR_NAME_NETWORK_PUBLISH_HOST: EnvVarName = CONFIG_OPTION_NETWORK_PUBLISH_HOST);
@@ -381,7 +385,19 @@ impl NodeConfig {
                         .collect::<Vec<_>>(),
                 )
                 .expect("Node roles cannot contain commas, therefore creating a comma-separated list is safe."),
-            );
+            )
+            // Let the `containerdebug` process write its tracing information to a file. These
+            // are the generic `stackable-telemetry` variables and apply to the whole OpenSearch
+            // container, so any other telemetry-based process in it would log into the same
+            // directory and the Vector agent would label its events with
+            // `container: containerdebug`.
+            .with_value(
+                &ENV_VAR_NAME_FILE_LOG_DIRECTORY,
+                concatcp!(STACKABLE_LOG_DIR, "/containerdebug"),
+            )
+            // Rotation is opt-in, so without these the file would grow unbounded.
+            .with_value(&ENV_VAR_NAME_FILE_LOG_ROTATION_PERIOD, "hourly")
+            .with_value(&ENV_VAR_NAME_FILE_LOG_MAX_FILES, "2");
 
         if let Some(initial_cluster_manager_nodes) = self.initial_cluster_manager_nodes() {
             env_vars = env_vars.with_value(
@@ -725,6 +741,9 @@ mod tests {
     fn test_constants() {
         // Test that dereferencing the constants does not panic.
         let _ = *ENV_VAR_NAME_DISCOVERY_SEED_HOSTS;
+        let _ = *ENV_VAR_NAME_FILE_LOG_DIRECTORY;
+        let _ = *ENV_VAR_NAME_FILE_LOG_MAX_FILES;
+        let _ = *ENV_VAR_NAME_FILE_LOG_ROTATION_PERIOD;
         let _ = *ENV_VAR_NAME_HTTP_PUBLISH_HOST;
         let _ = *ENV_VAR_NAME_INITIAL_CLUSTER_MANAGER_NODES;
         let _ = *ENV_VAR_NAME_NETWORK_PUBLISH_HOST;
@@ -763,6 +782,15 @@ mod tests {
 
         assert_eq!(
             EnvVarSet::new()
+                .with_value(
+                    &EnvVarName::from_str_unsafe("FILE_LOG_DIRECTORY"),
+                    "/stackable/log/containerdebug",
+                )
+                .with_value(&EnvVarName::from_str_unsafe("FILE_LOG_MAX_FILES"), "2")
+                .with_value(
+                    &EnvVarName::from_str_unsafe("FILE_LOG_ROTATION_PERIOD"),
+                    "hourly",
+                )
                 .with_value(&EnvVarName::from_str_unsafe("TEST"), "value")
                 .with_field_path(
                     &EnvVarName::from_str_unsafe("_POD_NAME"),

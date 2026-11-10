@@ -19,6 +19,7 @@ test-support = []
 stackable-operator.workspace = true
 
 clap.workspace = true
+const_format.workspace = true
 futures.workspace = true
 regex.workspace = true
 semver.workspace = true

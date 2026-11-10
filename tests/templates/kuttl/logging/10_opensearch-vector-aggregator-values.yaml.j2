@@ -32,6 +32,13 @@ customConfig:
       condition: >-
         .pod == "opensearch-nodes-automatic-log-config-0" &&
         .container == "opensearch"
+    filteredAutomaticLogConfigContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "opensearch-nodes-automatic-log-config-0" &&
+        .container == "containerdebug"
     filteredAutomaticLogConfigVector:
       type: filter
       inputs:
@@ -46,6 +53,13 @@ customConfig:
       condition: >-
         .pod == "opensearch-nodes-custom-log-config-0" &&
         .container == "opensearch"
+    filteredCustomLogConfigContainerdebug:
+      type: filter
+      inputs:
+        - validEvents
+      condition: >-
+        .pod == "opensearch-nodes-custom-log-config-0" &&
+        .container == "containerdebug"
     filteredCustomLogConfigVector:
       type: filter
       inputs:
@@ -67,12 +81,22 @@ customConfig:
       inputs:
         - filtered*
       type: blackhole
+    # Shows all events received from the agents. This sink is intentional and
+    # not a debugging leftover: if a "filtered*" transform gathers no event,
+    # then the assertion only reports a count, whereas this log shows which
+    # pod and container names actually arrived. A failure in CI cannot be
+    # reproduced by enabling this afterwards, so it is kept enabled at the
+    # price of the log volume.
     stdout:
       inputs:
         - vector
       type: console
       encoding:
         codec: json
+      buffer:
+        # Avoid back pressure from a stalling stdout. The test should not
+        # fail because of a sink which only aids debugging.
+        when_full: drop_newest
 {% if lookup('env', 'VECTOR_AGGREGATOR') %}
     aggregator:
       inputs:
