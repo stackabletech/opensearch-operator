@@ -511,7 +511,7 @@ mod tests {
                         "oci.example.org/opensearch:3.8.0-stackable{pkg_version}",
                         pkg_version = built_info::PKG_VERSION
                     ),
-                    image_pull_policy: "Always".to_owned(),
+                    image_pull_policy: "IfNotPresent".to_owned(),
                     pull_secrets: None,
                 },
                 ProductVersion::from_str_unsafe("3.8.0"),
