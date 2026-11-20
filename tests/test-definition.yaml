@@ -21,7 +21,7 @@ dimensions:
   # The release must sometimes be known in podOverrides or Helm values
   - name: release
     values:
-      - 26.11.0-rc1
+      - 26.11.0
 tests:
   - name: smoke
     dimensions:
