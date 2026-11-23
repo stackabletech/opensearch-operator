@@ -606,6 +606,7 @@ mod tests {
             replicas: Some(test_config.replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled { interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL },
                 discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {

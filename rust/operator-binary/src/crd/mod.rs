@@ -18,6 +18,7 @@ use stackable_operator::{
         merge::{Atomic, Merge},
     },
     constant,
+    crd::containerdebug::{default_containerdebug_config, v1alpha1::ContainerdebugConfig},
     deep_merger::ObjectOverrides,
     k8s_openapi::{api::core::v1::PodAntiAffinity, apimachinery::pkg::api::resource::Quantity},
     kube::CustomResource,
@@ -391,6 +392,9 @@ pub mod versioned {
         #[fragment_attrs(serde(default))]
         pub affinity: StackableAffinity,
 
+        #[fragment_attrs(serde(default))]
+        pub containerdebug: ContainerdebugConfig,
+
         /// Determines whether this role group is exposed in the discovery service.
         pub discovery_service_exposed: bool,
 
@@ -538,6 +542,7 @@ impl v1alpha1::OpenSearchConfig {
                 node_affinity: None,
                 node_selector: None,
             },
+            containerdebug: default_containerdebug_config(),
             discovery_service_exposed: Some(true),
             // Default taken from the Helm chart, see
             // https://github.com/opensearch-project/helm-charts/blob/opensearch-3.0.0/charts/opensearch/values.yaml#L364

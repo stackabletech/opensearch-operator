@@ -769,7 +769,7 @@ impl<'a> RoleGroupBuilder<'a> {
                 prepare_signal_handlers\n\
                 if command -v containerdebug >/dev/null 2>&1; then\n\
                 mkdir --parents \"${file_log_directory}\" || true\n\
-                containerdebug --output={STACKABLE_LOG_DIR}/containerdebug-state.json --loop &\n\
+                {containerdebug_command}\n\
                 else\n\
                 echo >&2 \"containerdebug not installed; Proceed without it.\"\n\
                 fi\n\
@@ -778,6 +778,12 @@ impl<'a> RoleGroupBuilder<'a> {
                 {create_vector_shutdown_file_command}",
                 extra_args = self.role_group_config.cli_overrides_to_vec().join(" "),
                 file_log_directory = ENV_VAR_NAME_FILE_LOG_DIRECTORY.as_ref(),
+                containerdebug_command = self
+                    .role_group_config
+                    .config
+                    .containerdebug
+                    .background_command(STACKABLE_LOG_DIR)
+                    .unwrap_or_default(),
                 remove_vector_shutdown_file_command =
                     remove_vector_shutdown_file_command(STACKABLE_LOG_DIR),
                 create_vector_shutdown_file_command =
@@ -1561,6 +1567,7 @@ mod tests {
             replicas: Some(1),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled { interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL },
                 discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("cluster-internal"),
                 logging: ValidatedLogging {
@@ -1760,6 +1767,60 @@ mod tests {
                 }
             }),
             config_map
+        );
+    }
+
+    /// The opensearch container starts `containerdebug` from the role group's validated config.
+    /// The command itself is owned (and tested) by operator-rs, so only the wiring is checked here.
+    #[rstest]
+    #[case::enabled(
+        stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled {
+            interval: Duration::from_minutes_unchecked(10)
+        }
+    )]
+    #[case::disabled(
+        stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Disabled
+    )]
+    fn test_build_stateful_set_starts_containerdebug_from_config(
+        #[case] containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig,
+    ) {
+        let expected = containerdebug.background_command(
+            stackable_operator::v2::product_logging::framework::STACKABLE_LOG_DIR,
+        );
+        let mut cluster = validated_cluster(TestSecurityMode::Disabled);
+        cluster
+            .role_group_configs
+            .values_mut()
+            .next()
+            .expect("should contain a role group")
+            .config
+            .containerdebug = containerdebug;
+        let context_names = context_names();
+        let role_group_builder = role_group_builder(&cluster, &context_names);
+
+        let args = role_group_builder
+            .build_stateful_set()
+            .spec
+            .and_then(|spec| spec.template.spec)
+            .expect("should have a pod spec")
+            .containers
+            .into_iter()
+            .find(|container| {
+                container.name
+                    == v1alpha1::Container::OpenSearch
+                        .to_container_name()
+                        .to_string()
+            })
+            .and_then(|container| container.args)
+            .expect("the opensearch container should have args")
+            .join("\n");
+
+        assert_eq!(
+            expected.as_deref(),
+            args.lines()
+                .map(str::trim)
+                .find(|line| line.starts_with("containerdebug ")),
+            "args: {args}"
         );
     }
 
@@ -2083,7 +2144,7 @@ mod tests {
                     "prepare_signal_handlers\n",
                     "if command -v containerdebug >/dev/null 2>&1; then\n",
                     "mkdir --parents \"$FILE_LOG_DIRECTORY\" || true\n",
-                    "containerdebug --output=/stackable/log/containerdebug-state.json --loop &\n",
+                    "containerdebug --output=/stackable/log/containerdebug-state.json --loop=30m &\n",
                     "else\n",
                     "echo >&2 \"containerdebug not installed; Proceed without it.\"\n",
                     "fi\n",

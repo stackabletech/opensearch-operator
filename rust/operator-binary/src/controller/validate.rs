@@ -119,6 +119,12 @@ pub enum Error {
     ValidateOpenSearchConfig {
         source: stackable_operator::config::fragment::ValidationError,
     },
+
+    #[snafu(display("invalid containerdebug configuration for role group {role_group}"))]
+    InvalidContainerdebugConfig {
+        source: stackable_operator::crd::containerdebug::Error,
+        role_group: RoleGroupName,
+    },
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -162,8 +168,13 @@ pub fn validate(
         let role_group_name =
             RoleGroupName::from_str(raw_role_group_name).context(ParseRoleGroupNameSnafu)?;
 
-        let validated_role_group_config =
-            validate_role_group_config(context_names, &cluster_name, cluster, role_group_config)?;
+        let validated_role_group_config = validate_role_group_config(
+            context_names,
+            &cluster_name,
+            cluster,
+            &role_group_name,
+            role_group_config,
+        )?;
 
         role_group_configs.insert(role_group_name, validated_role_group_config);
     }
@@ -194,6 +205,7 @@ fn validate_role_group_config(
     context_names: &ContextNames,
     cluster_name: &ClusterName,
     cluster: &v1alpha1::OpenSearchCluster,
+    role_group_name: &RoleGroupName,
     role_group_config: &OpenSearchRoleGroup,
 ) -> Result<OpenSearchRoleGroupConfig> {
     let merged_role_group: RoleGroup<v1alpha1::OpenSearchConfig, _, _> = with_validated_config(
@@ -206,6 +218,15 @@ fn validate_role_group_config(
         ),
     )
     .context(ValidateOpenSearchConfigSnafu)?;
+
+    let containerdebug = merged_role_group
+        .config
+        .config
+        .containerdebug
+        .validate()
+        .with_context(|_| InvalidContainerdebugConfigSnafu {
+            role_group: role_group_name.clone(),
+        })?;
 
     let logging = validate_logging_configuration(
         &merged_role_group.config.config.logging,
@@ -226,6 +247,7 @@ fn validate_role_group_config(
 
     let validated_config = ValidatedOpenSearchConfig {
         affinity: merged_role_group.config.config.affinity,
+        containerdebug,
         discovery_service_exposed: merged_role_group.config.config.discovery_service_exposed,
         listener_class: merged_role_group.config.config.listener_class,
         logging,
@@ -562,6 +584,7 @@ mod tests {
                                 }),
                                 ..StackableAffinity::default()
                             },
+                            containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled { interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL },
                             discovery_service_exposed: true,
                             listener_class: ListenerClassName::from_str_unsafe(
                                 "listener-class-from-role-group-level"
@@ -846,6 +869,84 @@ mod tests {
                 ]));
             },
             ErrorDiscriminants::ConflictingNodeRoles,
+        );
+    }
+
+    /// A role `config` that does not mention `containerdebug` still gets the default, so the
+    /// `containerdebug` field of the CRD must be optional. The role config is deserialized,
+    /// because only then does a missing `serde(default)` show.
+    #[test]
+    fn test_validate_ok_containerdebug_defaults_when_not_configured() {
+        let mut cluster = cluster();
+        cluster.spec.nodes.config.config =
+            serde_json::from_value(json!({ "gracefulShutdownTimeout": "1h" }))
+                .expect("should be a valid role config");
+
+        let validated_cluster = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster,
+            &dereferenced_objects(),
+        )
+        .expect("should be valid");
+        let (_, role_group_config) = validated_cluster
+            .role_group_configs
+            .first_key_value()
+            .expect("should contain a role group");
+
+        assert_eq!(
+            stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled {
+                interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL
+            },
+            role_group_config.config.containerdebug
+        );
+    }
+
+    #[test]
+    fn test_validate_err_invalid_containerdebug_config() {
+        test_validate_err(
+            |cluster, _| {
+                cluster.spec.nodes.config.config.containerdebug.interval =
+                    Some(Duration::from_secs(0))
+            },
+            ErrorDiscriminants::InvalidContainerdebugConfig,
+        );
+    }
+
+    /// An invalid `containerdebug` config names the role group it came from.
+    #[test]
+    fn test_validate_err_invalid_containerdebug_config_names_the_role_group() {
+        let mut cluster = cluster();
+        cluster.spec.nodes.config.config.containerdebug.interval = Some(Duration::from_secs(0));
+        let role_group_name = cluster
+            .spec
+            .nodes
+            .role_groups
+            .keys()
+            .next()
+            .expect("should contain a role group")
+            .to_owned();
+
+        let error = validate(
+            &context_names(),
+            &operator_environment(),
+            &cluster,
+            &dereferenced_objects(),
+        )
+        .expect_err("should be invalid");
+        let chain: Vec<String> =
+            std::iter::successors(Some(&error as &dyn std::error::Error), |error| {
+                error.source()
+            })
+            .map(ToString::to_string)
+            .collect();
+
+        assert_eq!(
+            vec![
+                format!("invalid containerdebug configuration for role group {role_group_name}"),
+                "the containerdebug interval must not be zero".to_owned(),
+            ],
+            chain
         );
     }
 
