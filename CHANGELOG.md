@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
   the Vector aggregator. The operator enables the file logs of containerdebug for this, with an
   hourly rotation that keeps at most two files ([#205]).
+- Add the `config.containerdebug` field to roles and role groups ([#TBD]).
 
 ### Changed
 
