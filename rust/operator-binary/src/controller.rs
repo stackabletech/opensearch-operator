@@ -22,7 +22,7 @@ use stackable_operator::{
         product_image_selection::ResolvedProductImage,
     },
     constant,
-    crd::listener,
+    crd::{containerdebug::ValidatedContainerdebugConfig, listener},
     k8s_openapi::api::{
         apps::v1::StatefulSet,
         core::v1::{ConfigMap, Service, ServiceAccount},
@@ -180,6 +180,7 @@ pub struct DereferencedObjects {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedOpenSearchConfig {
     pub affinity: StackableAffinity,
+    pub containerdebug: ValidatedContainerdebugConfig,
     pub discovery_service_exposed: bool,
     pub listener_class: ListenerClassName,
     pub logging: ValidatedLogging,
@@ -673,6 +674,7 @@ mod tests {
             replicas: Some(replicas),
             config: ValidatedOpenSearchConfig {
                 affinity: StackableAffinity::default(),
+                containerdebug: stackable_operator::crd::containerdebug::ValidatedContainerdebugConfig::Enabled { interval: stackable_operator::crd::containerdebug::DEFAULT_INTERVAL },
                 discovery_service_exposed: true,
                 listener_class: ListenerClassName::from_str_unsafe("external-stable"),
                 logging: ValidatedLogging {
