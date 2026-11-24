@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add the `config.containerdebug` field to roles and role groups ([#211]).
+
+[#211]: https://github.com/stackabletech/opensearch-operator/pull/211
+
 ## [26.11.0] - 2026-11-20
 
 ## [26.11.0-rc1] - 2026-11-19
@@ -17,7 +23,6 @@ All notable changes to this project will be documented in this file.
 - The logs of the `containerdebug` process are now collected by the Vector agent and forwarded to
   the Vector aggregator. The operator enables the file logs of containerdebug for this, with an
   hourly rotation that keeps at most two files ([#205]).
-- Add the `config.containerdebug` field to roles and role groups ([#TBD]).
 
 ### Changed
 
